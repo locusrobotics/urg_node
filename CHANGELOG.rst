@@ -8,7 +8,12 @@ Changelog for package urg_node
   add a script to set the IP address of an URG laser
 * Updated diagnostics to support configurable parameters.
 * add a script to set the IP address of an URG laser
-* Contributors: Chad Rockey, Michael Ferguson
+* Merge pull request `#1 <https://github.com/locusrobotics/urg_node/issues/1>`_ from locusrobotics/indigo-exceptions
+  Handle error cases.
+* locus: Close connection if urg_open or initialize fails.
+* locus: Handle errorno returned by urg_max_data_size
+* locus: Print unknown connection errors.
+* Contributors: Chad Rockey, Michael Ferguson, Eric Tappan
 
 0.1.8 (2014-06-16)
 ------------------
