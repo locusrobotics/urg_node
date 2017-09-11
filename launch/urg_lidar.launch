@@ -16,6 +16,7 @@
     <param name="publish_multiecho" value="false"/>
     <param name="angle_min" value="-1.5707963"/>
     <param name="angle_max" value="1.5707963"/>
+    <param name="range_offset" value="0.0"/>
   </node>
 
 </launch>
