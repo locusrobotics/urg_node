@@ -155,6 +155,8 @@ public:
 
   bool setAngleLimitsAndCluster(double& angle_min, double& angle_max, int cluster);
 
+  bool setRangeOffset(const float range_offset);
+
   void setSkip(int skip);
 
   ros::Duration computeLatency(size_t num_measurements);
@@ -225,6 +227,7 @@ private:
   int last_step_;
   int cluster_;
   int skip_;
+  float range_offset_;
 
   ros::Duration system_latency_;
   ros::Duration user_latency_;

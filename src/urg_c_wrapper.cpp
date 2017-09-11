@@ -132,6 +132,7 @@ void URGCWrapper::initialize(bool& using_intensity, bool& using_multiecho, bool 
   last_step_ = 0;
   cluster_ = 1;
   skip_ = 0;
+  range_offset_ = 0.0f;
 
   synchronize_time_ = synchronize_time;
   hardware_clock_ = 0.0;
@@ -252,7 +253,7 @@ bool URGCWrapper::grabScan(const sensor_msgs::LaserScanPtr& msg)
   {
     if (data_[(i) + 0] != 0)
     {
-      msg->ranges[i] = static_cast<float>(data_[i]) / 1000.0;
+      msg->ranges[i] = range_offset_ + static_cast<float>(data_[i]) / 1000.0f;
       if (use_intensity_)
       {
         msg->intensities[i] = intensity_[i];
@@ -318,7 +319,7 @@ bool URGCWrapper::grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg)
     {
       if (data_[(URG_MAX_ECHO * i) + j] != 0)
       {
-        range_echo.echoes.push_back(static_cast<float>(data_[(URG_MAX_ECHO * i) + j]) / 1000.0f);
+        range_echo.echoes.push_back(range_offset_ + static_cast<float>(data_[(URG_MAX_ECHO * i) + j]) / 1000.0f);
         if (use_intensity_)
         {
           intensity_echo.echoes.push_back(intensity_[(URG_MAX_ECHO * i) + j]);
@@ -862,6 +863,12 @@ bool URGCWrapper::setAngleLimitsAndCluster(double& angle_min, double& angle_max,
   {
     return false;
   }
+  return true;
+}
+
+bool URGCWrapper::setRangeOffset(const float range_offset)
+{
+  range_offset_ = range_offset;
   return true;
 }
 
