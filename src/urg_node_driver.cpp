@@ -228,6 +228,7 @@ bool UrgNode::reconfigure_callback(urg_node::URGConfig& config, int level)
   std::string frame_id = tf::resolve(config.tf_prefix, config.frame_id);
   urg_->setFrameId(frame_id);
   urg_->setUserLatency(config.time_offset);
+  urg_->setRangeOffset(config.range_offset);
 
   return true;
 }
