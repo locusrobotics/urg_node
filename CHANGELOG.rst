@@ -75,11 +75,13 @@ Changelog for package urg_node
   A URG-04LX in SCIP 1.1 mode used to lead to an exception being thrown in
   URGCwrapper::initialize. Now, before throwing the exception an attempt to
   switch the sensor to SCIP 2.0 is made.
+* Removing limits on range offset
+* RST-484 Adding range offset parameter
 * Fixed comments in launch file and added roslaunch.
 * Add flag to prevent updating of detailed status.
   If using a model that does not support AR00 command, hide it
   behind a rosparam.
-* Add safety stop heading and distance values (`#28 <https://github.com/ros-drivers/urg_node/issues/28>`_)
+* Add safety stop heading and distance values (`#28 <https://github.com/locusrobotics/urg_node/issues/28>`_)
   Added to the laser status field the last report of a safety
   stop of distance and angle reported. If this fails or is unavailable
   it will just report 0.
@@ -100,7 +102,7 @@ Changelog for package urg_node
   Updating urg node to be a self contained class. This allows
   for it to be imported in other nodes.
 * Roslint
-* Contributors: Benjamin Scholz, Mike O'Driscoll, Tony Baltovski
+* Contributors: Mike O'Driscoll, Tom Moore, Tony Baltovski
 
 0.1.10 (2017-03-21)
 -------------------
