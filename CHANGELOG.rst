@@ -2,6 +2,37 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.1.11 (2017-10-06)
+-------------------
+* Removing limits on range offset
+* RST-484 Adding range offset parameter
+* Fixed comments in launch file and added roslaunch.
+* Add flag to prevent updating of detailed status.
+  If using a model that does not support AR00 command, hide it
+  behind a rosparam.
+* Add safety stop heading and distance values (`#28 <https://github.com/locusrobotics/urg_node/issues/28>`_)
+  Added to the laser status field the last report of a safety
+  stop of distance and angle reported. If this fails or is unavailable
+  it will just report 0.
+* Updating depend and roslint.
+  Fixing some roslint error after moving a header name.
+  Additionally fixing the gencfg to be on the lib and not the node.
+* Adding missing std_srvs depend.
+  Adding missing std_srvs depend to package.xml and CMakelists.txt
+* Move urg_node to be a library.
+  Moving urg_node to urg_node_driver as a library.
+  This allows for other nodes to include this as an object instead
+  of spawning another separate process.
+* Add getAR00 status command.
+  Added ability to pull the status of the lidar AR00 status command.
+  This then publishes a latched topic with the current status of the
+  lidar's error code and lockout status.
+* Update urg_node to be a self contained class
+  Updating urg node to be a self contained class. This allows
+  for it to be imported in other nodes.
+* Roslint
+* Contributors: Mike O'Driscoll, Tom Moore, Tony Baltovski
+
 0.1.10 (2017-03-21)
 -------------------
 * Updated maintainer.
