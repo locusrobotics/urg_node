@@ -2,7 +2,7 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-0.1.17 (2022-03-03)
+0.1.18 (2022-03-03)
 -------------------
 * Update UST10 (`#96 <https://github.com/ros-drivers/urg_node/issues/96>`_)
   * Fix typo for package name
@@ -13,7 +13,7 @@ Changelog for package urg_node
 * Add URDF and STL of Hokuyo UST-10LX
 * Contributors: Joey Yang
 
-0.1.16 (2022-01-27)
+0.1.17 (2022-01-27)
 -------------------
 * roslint fixes.
 * Diagnostic Analyzers (`#93 <https://github.com/ros-drivers/urg_node/issues/93>`_)
@@ -24,25 +24,25 @@ Changelog for package urg_node
   * Removed edits to the CHANGELOG
 * Contributors: Tony Baltovski, luis-camero
 
-0.1.15 (2020-10-27)
+0.1.16 (2020-10-27)
 -------------------
 * Function setSkip() set as void
   This function as no return type causing undefined behavior. This function
   has been declared as void.
 * Contributors: bostoncleek
 
-0.1.14 (2020-06-04)
+0.1.15 (2020-06-04)
 -------------------
 * Bumped CMake version.
 * Removed trailing whitespace.
 * Contributors: Tony Baltovski
 
-0.1.13 (2020-03-27)
+0.1.14 (2020-03-27)
 -------------------
 * Revert "fix(updateStatus): Update status on diagnostics update"
 * Contributors: Tony Baltovski
 
-0.1.12 (2020-03-14)
+0.1.13 (2020-03-14)
 -------------------
 * Updated roslint to only check files in this repo.
 * Updated TravisCI config.
@@ -65,7 +65,7 @@ Changelog for package urg_node
 * Fixed linter errors.
 * Contributors: C. Andy Martin, Rein Appeldoorn, Tony Baltovski
 
-0.1.11 (2017-10-17)
+0.1.12 (2017-10-17)
 -------------------
 * Add support for URG-04LX in SCIP 1.1 mode
   The urg_node does not support SCIP 1.1. The Hokuyo URG-04LX supports both
@@ -75,11 +75,17 @@ Changelog for package urg_node
   A URG-04LX in SCIP 1.1 mode used to lead to an exception being thrown in
   URGCwrapper::initialize. Now, before throwing the exception an attempt to
   switch the sensor to SCIP 2.0 is made.
+* Contributors: Benjamin Scholz, Mike O'Driscoll, Tony Baltovski
+
+0.1.11 (2017-10-06)
+-------------------
+* Removing limits on range offset
+* RST-484 Adding range offset parameter
 * Fixed comments in launch file and added roslaunch.
 * Add flag to prevent updating of detailed status.
   If using a model that does not support AR00 command, hide it
   behind a rosparam.
-* Add safety stop heading and distance values (`#28 <https://github.com/ros-drivers/urg_node/issues/28>`_)
+* Add safety stop heading and distance values (`#28 <https://github.com/locusrobotics/urg_node/issues/28>`_)
   Added to the laser status field the last report of a safety
   stop of distance and angle reported. If this fails or is unavailable
   it will just report 0.
@@ -100,7 +106,7 @@ Changelog for package urg_node
   Updating urg node to be a self contained class. This allows
   for it to be imported in other nodes.
 * Roslint
-* Contributors: Benjamin Scholz, Mike O'Driscoll, Tony Baltovski
+* Contributors: Mike O'Driscoll, Tom Moore, Tony Baltovski
 
 0.1.10 (2017-03-21)
 -------------------
