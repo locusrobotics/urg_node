@@ -1,8 +1,9 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Forthcoming
------------
+
+0.2.0 (2019-01-16)
+------------------
 * Tailor: Updating Jenkinsfile
 * Tailor: Updating Jenkinsfile
 * Tailor: Updating Jenkinsfile
