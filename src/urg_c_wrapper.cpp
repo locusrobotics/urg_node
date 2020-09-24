@@ -863,7 +863,6 @@ bool URGCWrapper::setRangeOffset(const float range_offset)
 void URGCWrapper::setSkip(int skip)
 {
   skip_ = skip;
-  return true;
 }
 
 bool URGCWrapper::isIntensitySupported()
