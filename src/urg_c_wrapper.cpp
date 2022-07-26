@@ -374,59 +374,48 @@ bool URGCWrapper::getAR00Status(URGStatus& status)
     return false;
   }
 
-  // Debug output reponse up to scan data.
-  ROS_DEBUG_STREAM("Response: " << response.substr(0, 41));
-  // Decode the result if crc checks out.
-  // Grab the status
-  ss.clear();
-  ROS_DEBUG_STREAM("Status " << response.substr(8, 2));
-  ss << response.substr(8, 2);  // Status is 8th position 2 chars.
-  ss >> std::hex >> status.status;
+  this->deserializeSensingData(response, status, protocol::sensing_data::c_sensing_data_start_idx);
 
-  if (status.status != 0)
+}
+
+bool URGCWrapper::deserializeSensingData(
+  const std::string& f_buffer,
+  URGStatus& sensing_data,
+  const size_t& start_position) const
+{
+  size_t idx { start_position };
+  if (sizeof(URGStatus) > (f_buffer.size() + start_position))
+  {
+    std::cout << "Deserialization not feasible, please check input buffer!" << std::endl;
+    return false;
+  }
+  protocol::sensing_data::SensingDataReplyHelper deserialize(&f_buffer, idx);
+  // Get Status
+  deserialize.status.get(sensing_data.status);
+  if (sensing_data.status != 0)
   {
     ROS_WARN("Received bad status");
     return false;
   }
 
-  // Grab the operating mode
-  ss.clear();
-  ROS_DEBUG_STREAM("Operating mode " << response.substr(10, 1););
-  ss << response.substr(10, 1);
-  ss >> std::hex >> status.operating_mode;
-
-  // Grab the area number
-  ss.clear();
-  ss << response.substr(11, 2);
-  ROS_DEBUG_STREAM("Area Number " << response.substr(11, 2));
-  ss >> std::hex >> status.area_number;
-  // Per documentation add 1 to offset area number
-  status.area_number++;
+  deserialize.operating_mode.get(sensing_data.operating_mode);
+  deserialize.area_number.get(sensing_data.area_number);
 
   // Grab the Error Status
-  ss.clear();
-  ss << response.substr(13, 1);
-  ROS_DEBUG_STREAM("Error status " << response.substr(13, 1));
-  ss >> std::hex >> status.error_status;
-
-
-  // Grab the error code
-  ss.clear();
-  ss << response.substr(14, 2);
-  ROS_DEBUG_STREAM("Error code " << std::hex << response.substr(14, 2));
-  ss >> std::hex >> status.error_code;
-  // Offset by 0x40 is non-zero as per documentation
-  if (status.error_code != 0)
+  deserialize.error_state.get(sensing_data.error_state);
+  // Grab the error code and offset by 0x40 is non-zero as per documentation
+  deserialize.error_code.get(sensing_data.error_code);
+  if (sensing_data.error_code != 0)
   {
-     status.error_code += 0x40;
+    sensing_data.error_code += 0x40;
   }
-
-  // Get the lockout status
-  ss.clear();
-  ss << response.substr(16, 1);
-  ROS_DEBUG_STREAM("Lockout " << response.substr(16, 1));
-  ss >> std::hex >> status.lockout_status;
-
+  // Grab the lockout_state
+  deserialize.lockout_state.get(sensing_data.lockout_state);
+  deserialize.ossd1_state.get(sensing_data.ossd1_state);
+  deserialize.ossd2_state.get(sensing_data.ossd2_state);
+  deserialize.warning1_state.get(sensing_data.warning1_state);
+  deserialize.warning2_state.get(sensing_data.warning2_state);
+  deserialize.optical_window_contaminated.get(sensing_data.optical_window_contaminated);
   return true;
 }
 

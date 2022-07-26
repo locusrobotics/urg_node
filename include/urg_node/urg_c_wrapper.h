@@ -44,30 +44,12 @@
 
 #include <urg_c/urg_sensor.h>
 #include <urg_c/urg_utils.h>
+#include <urg_node/uam_protocol_types.h>
+
+
 
 namespace urg_node
 {
-
-class URGStatus
-{
-public:
-  URGStatus()
-  {
-    status = 0;
-    operating_mode = 0;
-    area_number = 0;
-    error_status = false;
-    error_code = 0;
-    lockout_status = false;
-  }
-
-  uint16_t status;
-  uint16_t operating_mode;
-  uint16_t area_number;
-  bool error_status;
-  uint16_t error_code;
-  bool lockout_status;
-};
 
 class UrgDetectionReport
 {
@@ -88,7 +70,8 @@ public:
 
 class URGCWrapper
 {
-public:
+public:  
+  using URGStatus = protocol::sensing_data::SensingDataReply;
   URGCWrapper(const std::string& ip_address, const int ip_port,
       bool& using_intensity, bool& using_multiecho, bool synchronize_time);
 
@@ -211,6 +194,15 @@ private:
    * @returns The textual response of the Lidar, empty if, but may return lidar's own error string.
    */
   std::string sendCommand(std::string cmd);
+
+  /**
+   * @brief Deserialize URGStatus from received data (which has ASCII encoding)
+   * @param f_buffer Received buffer
+   * @param sensing_data Sensing data
+   * @param start_position Start index in the buffer, case an offset is wanted
+   * @return true if success, false otherwise
+   */
+  bool deserializeSensingData(const std::string& f_buffer, URGStatus& sensing_data, const size_t& start_position = 0) const;
 
   std::string frame_id_;  ///< Output frame_id for each laserscan.
 
