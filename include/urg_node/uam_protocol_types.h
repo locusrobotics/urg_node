@@ -137,7 +137,7 @@ struct SensingDataReply
    * 0 - normal
    * 1 - setting
    */
-  uint8_t operating_mode { 0 };
+  bool operating_mode { 0 };
   /**
    * @brief Current Safety Area - This is the value that appears in the laser display
    */
