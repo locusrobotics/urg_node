@@ -374,8 +374,7 @@ bool URGCWrapper::getAR00Status(URGStatus& status)
     return false;
   }
 
-  this->deserializeSensingData(response, status, protocol::sensing_data::c_sensing_data_start_idx);
-
+  return this->deserializeSensingData(response, status, protocol::sensing_data::c_sensing_data_start_idx);
 }
 
 bool URGCWrapper::deserializeSensingData(
@@ -864,6 +863,7 @@ bool URGCWrapper::setRangeOffset(const float range_offset)
 void URGCWrapper::setSkip(int skip)
 {
   skip_ = skip;
+  return true;
 }
 
 bool URGCWrapper::isIntensitySupported()
