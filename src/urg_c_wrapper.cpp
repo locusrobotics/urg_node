@@ -402,7 +402,7 @@ bool URGCWrapper::deserializeSensingData(
 
   // Grab the Error Status
   deserialize.error_state.get(sensing_data.error_state);
-  // Grab the error code and offset by 0x40 is non-zero as per documentation
+  // Grab the error code and offset by 0x40 if non-zero as per documentation
   deserialize.error_code.get(sensing_data.error_code);
   if (sensing_data.error_code != 0)
   {

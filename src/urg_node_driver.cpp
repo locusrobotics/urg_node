@@ -132,9 +132,9 @@ bool UrgNode::updateStatus()
       {
         urg_node::Status msg;
         msg.operating_mode = status.operating_mode;
-        msg.error_state = status.error_state;
+        msg.error_status = status.error_state;
         msg.error_code = status.error_code;
-        msg.lockout_state = status.lockout_state;
+        msg.lockout_status = status.lockout_state;
         msg.area_number = status.area_number;
         msg.ossd1_state = status.ossd1_state;
         msg.ossd2_state = status.ossd2_state;
@@ -142,6 +142,8 @@ bool UrgNode::updateStatus()
         msg.warning2_state = status.warning2_state;
         msg.optical_window_contaminated = status.optical_window_contaminated;
 
+        //TODO: Detection log should not be requested together with status.
+        // For now keep the old code commented out.
         // UrgDetectionReport report;
         // if (urg_->getDL00Status(report))
         // {

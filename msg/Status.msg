@@ -4,12 +4,12 @@ uint16 SETTING=1
 uint16 operating_mode
 uint16 area_number
 # If the laser is reporting an error or not.
-bool error_state
+bool error_status
 # The error code the laser is reporting.
 uint16 error_code
 # Does the laser report that it is locked out.
-bool lockout_state
-# For the OSSD states and warning states this is possible state
+bool lockout_status
+# For the OSSD and warning states.
 # 0: Off (No detection)
 # 1: On (Detection)
 bool ossd1_state

@@ -244,22 +244,6 @@ struct SensingDataReply
   bool optical_window_contaminated { false };
 };
 #pragma pack()
-/**
- * @brief Command type
- */
-enum SubHeader : uint8_t
-{
-  E_00 = 0,
-  E_01,
-  E_02,
-  E_03,
-  E_04,
-  E_05,
-  E_06,
-  E_07,
-  E_08,
-  E_MAX
-};
 
 /**
  * @brief Helper function to deserialize/decode fields in the buffer
