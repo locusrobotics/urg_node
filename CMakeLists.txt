@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 2.8.3)
 project(urg_node)
 
 find_package(catkin REQUIRED COMPONENTS
@@ -66,13 +66,9 @@ install(DIRECTORY include/${PROJECT_NAME}/
 )
 
 ## Install script to set IP addresses
-catkin_install_python(PROGRAMS
+install(PROGRAMS
    scripts/set_urg_ip.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-install(DIRECTORY urdf meshes launch
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
 if(CATKIN_ENABLE_TESTING)
@@ -80,14 +76,7 @@ if(CATKIN_ENABLE_TESTING)
   # Ignore long -> int32_t warning, urg_c driver uses
   # long, etc. Wrapper must also use these
   set(ROSLINT_CPP_OPTS "--filter=-runtime/references,-runtime/int")
-  roslint_cpp(
-    include/urg_node/urg_c_wrapper.h
-    include/urg_node/urg_node_driver.h
-    src/getID.cpp
-    src/urg_c_wrapper.cpp
-    src/urg_node_driver.cpp
-    src/urg_node.cpp
-  )
+  roslint_cpp()
   roslint_add_test()
 
   find_package(roslaunch REQUIRED)

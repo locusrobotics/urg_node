@@ -43,7 +43,6 @@
 #include <diagnostic_updater/publisher.h>
 #include <urg_node/URGConfig.h>
 #include <std_srvs/Trigger.h>
-#include <bondcpp/bond.h>
 
 #include "urg_node/urg_c_wrapper.h"
 
@@ -74,7 +73,6 @@ private:
   bool reconfigure_callback(urg_node::URGConfig& config, int level);
   void update_reconfigure_limits();
   void calibrate_time_offset();
-  void addDiagnostics();
   void updateDiagnostics();
   void populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrapper &stat);
   void scanThread();
@@ -87,7 +85,6 @@ private:
   boost::thread diagnostics_thread_;
   boost::thread scan_thread_;
 
-  boost::shared_ptr<bond::Bond> bond_ = nullptr;
   boost::shared_ptr<urg_node::URGCWrapper> urg_;
   boost::shared_ptr<dynamic_reconfigure::Server<urg_node::URGConfig> > srv_;  ///< Dynamic reconfigure server
   boost::shared_ptr<diagnostic_updater::Updater> diagnostic_updater_;
@@ -119,7 +116,6 @@ private:
   std::string serial_port_;
   int serial_baud_;
   bool calibrate_time_;
-  bool synchronize_time_;
   bool publish_intensity_;
   bool publish_multiecho_;
   int error_limit_;
