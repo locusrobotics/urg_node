@@ -41,6 +41,81 @@ Changelog for package urg_node
 * Tailor: Creating Jenkinsfile
 * Contributors: locus-services
 
+0.1.18 (2022-03-03)
+-------------------
+* Update UST10 (`#96 <https://github.com/ros-drivers/urg_node/issues/96>`_)
+  * Fix typo for package name
+  * Replace UST10 URDF with one used in CPR robots ; remove lx suffix from UST10 files
+  * Fix typo in package name
+  * Add installation of urdf, meshes, and launch directories to CMakeLists.txt
+* Add collision to URDF
+* Add URDF and STL of Hokuyo UST-10LX
+* Contributors: Joey Yang
+
+0.1.17 (2022-01-27)
+-------------------
+* roslint fixes.
+* Diagnostic Analyzers (`#93 <https://github.com/ros-drivers/urg_node/issues/93>`_)
+  * Added diagnostic analyzers to organize robot_monitor
+  * Update Change Log
+  * Moved addDiagnostics call to the diagnostics thread
+  * Changed parameter prefix from "/" to ""
+  * Removed edits to the CHANGELOG
+* Contributors: Tony Baltovski, luis-camero
+
+0.1.16 (2020-10-27)
+-------------------
+* Function setSkip() set as void
+  This function as no return type causing undefined behavior. This function
+  has been declared as void.
+* Contributors: bostoncleek
+
+0.1.15 (2020-06-04)
+-------------------
+* Bumped CMake version.
+* Removed trailing whitespace.
+* Contributors: Tony Baltovski
+
+0.1.14 (2020-03-27)
+-------------------
+* Revert "fix(updateStatus): Update status on diagnostics update"
+* Contributors: Tony Baltovski
+
+0.1.13 (2020-03-14)
+-------------------
+* Updated roslint to only check files in this repo.
+* Updated TravisCI config.
+* fix(updateStatus): Update status on diagnostics update
+  Otherwise the diagnostics information does not really reflect the device
+  status.
+* synchronize_time: reset when clock is warped
+  If either the hardware clock or system clock warp, reset the EMA to
+  prevent incorrect clock values from being used. Detect the warp by
+  putting a limit on the absolute error between the synchronized clock
+  and the system clock. When a warp is detected, reset the EMA to force
+  the clocks to resynchronize. Use the system clock until the EMA has
+  stabalized again.
+* synchronize system clock to hardware time
+  Remove jitter from the system clock by synchronizing it to the change
+  in hardware time stamps. This does not synchrnoize it in an absolute
+  sense (i.e., doesn't remove system latench). However, coupled with
+  calibrating system latency, this results in a stable, accurate clock.
+* Add Travis config.
+* Fixed linter errors.
+* Contributors: C. Andy Martin, Rein Appeldoorn, Tony Baltovski
+
+0.1.12 (2017-10-17)
+-------------------
+* Add support for URG-04LX in SCIP 1.1 mode
+  The urg_node does not support SCIP 1.1. The Hokuyo URG-04LX supports both
+  SCIP 1.1 and SCIP 2.0, but needs to be switched to SCIP 2.0 at every startup
+  in its default configuration. For this purpose the function
+  URGCWrapper::setToSCIP2() was added.
+  A URG-04LX in SCIP 1.1 mode used to lead to an exception being thrown in
+  URGCwrapper::initialize. Now, before throwing the exception an attempt to
+  switch the sensor to SCIP 2.0 is made.
+* Contributors: Benjamin Scholz, Mike O'Driscoll, Tony Baltovski
+
 0.1.11 (2017-10-06)
 -------------------
 * Removing limits on range offset
