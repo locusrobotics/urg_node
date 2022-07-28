@@ -106,7 +106,6 @@ main(int argc, char** argv)
 
   bool publish_intensity = false;
   bool publish_multiecho = false;
-  bool synchronize_time = false;
   int serial_baud = 115200;
   int ip_port = 10940;
   std::string ip_address = "";
@@ -140,13 +139,11 @@ main(int argc, char** argv)
     {
       if (ip_address != "")
       {
-        urg_.reset(new urg_node::URGCWrapper(ip_address, ip_port,
-            publish_intensity, publish_multiecho, synchronize_time));
+        urg_.reset(new urg_node::URGCWrapper(ip_address, ip_port, publish_intensity, publish_multiecho));
       }
       else
       {
-        urg_.reset(new urg_node::URGCWrapper(serial_baud, serial_port,
-            publish_intensity, publish_multiecho, synchronize_time));
+        urg_.reset(new urg_node::URGCWrapper(serial_baud, serial_port, publish_intensity, publish_multiecho));
       }
       std::string device_id = urg_->getDeviceID();
       if (verbose)
