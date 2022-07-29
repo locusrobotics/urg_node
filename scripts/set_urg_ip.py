@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2014 Unbounded Robotics Inc. 
+# Copyright (c) 2014 Unbounded Robotics Inc.
 # All right reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -11,8 +11,8 @@
 #   * Redistributions in binary form must reproduce the above copyright
 #     notice, this list of conditions and the following disclaimer in the
 #     documentation and/or other materials provided with the distribution.
-#   * Neither the name of Unbounded Robotics Inc. nor the names of its 
-#     contributors may be used to endorse or promote products derived 
+#   * Neither the name of Unbounded Robotics Inc. nor the names of its
+#     contributors may be used to endorse or promote products derived
 #     from this software without specific prior written permission.
 #
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
@@ -35,7 +35,7 @@ import socket
 
 def parse_and_validate_ipv4(argument, name):
     """
-    Each address must have 4 
+    Each address must have 4
     """
     if len(argument.split(".")) != 4:
         print("Invalid %s, must be of the form xxx.yyy.zzz.www" % name)
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     sock.connect((args.ip, 10940))
 
     print("Updating settings")
-    sock.send(msg)
+    sock.send(msg.encode('utf-8'))
     try:
         sock.settimeout(5)
         returned = sock.recv(40)
