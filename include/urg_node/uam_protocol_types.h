@@ -1,9 +1,36 @@
-/*
- * uam_protocol_types.h
+/*********************************************************************
+ * Software License Agreement (BSD License)
  *
- *  Created on: 25/07/2022
- *      Author: cribeiromendes
- */
+ *  Copyright (c) 2022, Locus Robotics
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
 #ifndef INCLUDE_URG_NODE_UAM_PROTOCOL_TYPES_H_
 #define INCLUDE_URG_NODE_UAM_PROTOCOL_TYPES_H_
@@ -11,7 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include <urg_node/accessor.h>
+#include <urg_node/visitor.h>
 
 namespace protocol
 {
@@ -250,7 +277,7 @@ struct SensingDataReply
  */
 class SensingDataReplyHelper
 {
-#define ACCESSOR_MEMBER_IMPL(field) ACCESSOR_MEMBER(SensingDataReply,field)
+#define VISITOR_MEMBER_IMPL(field) VISITOR_MEMBER(SensingDataReply, field)
 public:
   SensingDataReplyHelper(const std::string* buffer, const size_t initial_offset) :
     status(buffer, initial_offset),
@@ -276,31 +303,30 @@ public:
   {
   }
 
-  ACCESSOR_MEMBER_IMPL(status);
-  ACCESSOR_MEMBER_IMPL(operating_mode);
-  ACCESSOR_MEMBER_IMPL(area_number);
-  ACCESSOR_MEMBER_IMPL(error_state);
-  ACCESSOR_MEMBER_IMPL(error_code);
-  ACCESSOR_MEMBER_IMPL(lockout_state);
-  ACCESSOR_MEMBER_IMPL(ossd1_state);
-  ACCESSOR_MEMBER_IMPL(ossd2_state);
-  ACCESSOR_MEMBER_IMPL(warning1_state);
-  ACCESSOR_MEMBER_IMPL(warning2_state);
-  ACCESSOR_MEMBER_IMPL(ossd3_state);
-  ACCESSOR_MEMBER_IMPL(ossd4_state);
-  ACCESSOR_MEMBER_IMPL(muting_state1);
-  ACCESSOR_MEMBER_IMPL(muting_state2);
-  ACCESSOR_MEMBER_IMPL(reset_request1);
-  ACCESSOR_MEMBER_IMPL(reset_request2);
-  ACCESSOR_MEMBER_IMPL(encoder_speed);
-  ACCESSOR_MEMBER_IMPL(timestamp);
-  ACCESSOR_MEMBER_IMPL(laser_state_off);
-  ACCESSOR_MEMBER_IMPL(optical_window_contaminated);
+  VISITOR_MEMBER_IMPL(status);
+  VISITOR_MEMBER_IMPL(operating_mode);
+  VISITOR_MEMBER_IMPL(area_number);
+  VISITOR_MEMBER_IMPL(error_state);
+  VISITOR_MEMBER_IMPL(error_code);
+  VISITOR_MEMBER_IMPL(lockout_state);
+  VISITOR_MEMBER_IMPL(ossd1_state);
+  VISITOR_MEMBER_IMPL(ossd2_state);
+  VISITOR_MEMBER_IMPL(warning1_state);
+  VISITOR_MEMBER_IMPL(warning2_state);
+  VISITOR_MEMBER_IMPL(ossd3_state);
+  VISITOR_MEMBER_IMPL(ossd4_state);
+  VISITOR_MEMBER_IMPL(muting_state1);
+  VISITOR_MEMBER_IMPL(muting_state2);
+  VISITOR_MEMBER_IMPL(reset_request1);
+  VISITOR_MEMBER_IMPL(reset_request2);
+  VISITOR_MEMBER_IMPL(encoder_speed);
+  VISITOR_MEMBER_IMPL(timestamp);
+  VISITOR_MEMBER_IMPL(laser_state_off);
+  VISITOR_MEMBER_IMPL(optical_window_contaminated);
 };
 
-// For now, keep the same decoding mechanism. Therefore, verify against old index
-// are correct
-// stx and etx are not taken into account as they are removed from the buffer
+// For now, keep the same decoding procedure.
+// The following asserts are just to verify that the expected indexes remain correct
 constexpr size_t c_sensing_data_start_idx { offsetof(CommandRequest, sub_header) - sizeof(CommandRequest::stx) +
                                             sizeof(CommandRequest::sub_header) };
 constexpr size_t c_sensing_data_packet_size { sizeof(SensingDataReply) };
