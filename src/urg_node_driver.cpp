@@ -127,29 +127,34 @@ bool UrgNode::updateStatus()
 
     if (detailed_status_)
     {
-      URGStatus status;
+      URGCWrapper::URGStatus status;
       if (urg_->getAR00Status(status))
       {
         urg_node::Status msg;
         msg.operating_mode = status.operating_mode;
-        msg.error_status = status.error_status;
+        msg.error_status = status.error_state;
         msg.error_code = status.error_code;
-        msg.lockout_status = status.lockout_status;
+        msg.lockout_status = status.lockout_state;
+        msg.area_number = status.area_number;
+        msg.ossd1_state = status.ossd1_state;
+        msg.ossd2_state = status.ossd2_state;
+        msg.warning1_state = status.warning1_state;
+        msg.warning2_state = status.warning2_state;
+        msg.optical_window_contaminated = status.optical_window_contaminated;
 
-        lockout_status_ = status.lockout_status;
-        error_code_ = status.error_code;
-
-        UrgDetectionReport report;
-        if (urg_->getDL00Status(report))
-        {
-          msg.area_number = report.area;
-          msg.distance = report.distance;
-          msg.angle = report.angle;
-        }
-        else
-        {
-           ROS_WARN("Failed to get detection report.");
-        }
+        //TODO: Detection log should not be requested together with status.
+        // For now keep the old code commented out.
+        // UrgDetectionReport report;
+        // if (urg_->getDL00Status(report))
+        // {
+        //   msg.area_number = report.area;
+        //   msg.distance = report.distance;
+        //   msg.angle = report.angle;
+        // }
+        // else
+        // {
+        //   ROS_WARN("Failed to get detection report.");
+        // }
 
         // Publish the status on the latched topic for inspection.
         status_pub_.publish(msg);
