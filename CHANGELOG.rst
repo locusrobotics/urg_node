@@ -2,6 +2,243 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Rst 5623 improve hokuyo lidar driver so it can communicate safety scanner error codes (#3)
+  * Add support for URG-04LX in SCIP 1.1 mode
+  The urg_node does not support SCIP 1.1. The Hokuyo URG-04LX supports both
+  SCIP 1.1 and SCIP 2.0, but needs to be switched to SCIP 2.0 at every startup
+  in its default configuration. For this purpose the function
+  URGCWrapper::setToSCIP2() was added.
+  A URG-04LX in SCIP 1.1 mode used to lead to an exception being thrown in
+  URGCwrapper::initialize. Now, before throwing the exception an attempt to
+  switch the sensor to SCIP 2.0 is made.
+  * Changes.
+  * 0.1.11
+  * Fixed linter errors.
+  * Add Travis config.
+  * synchronize system clock to hardware time
+  Remove jitter from the system clock by synchronizing it to the change
+  in hardware time stamps. This does not synchrnoize it in an absolute
+  sense (i.e., doesn't remove system latench). However, coupled with
+  calibrating system latency, this results in a stable, accurate clock.
+  * synchronize_time: reset when clock is warped
+  If either the hardware clock or system clock warp, reset the EMA to
+  prevent incorrect clock values from being used. Detect the warp by
+  putting a limit on the absolute error between the synchronized clock
+  and the system clock. When a warp is detected, reset the EMA to force
+  the clocks to resynchronize. Use the system clock until the EMA has
+  stabalized again.
+  * fix(updateStatus): Update status on diagnostics update
+  Otherwise the diagnostics information does not really reflect the device
+  status.
+  * Updated TravisCI config.
+  * Updated roslint to only check files in this repo.
+  * Fix path typo.
+  * Changes.
+  * 0.1.12
+  * Revert "fix(updateStatus): Update status on diagnostics update"
+  * Changes.
+  * 0.1.13
+  * Removed trailing whitespace.
+  * Bumped CMake version.
+  * Changes.
+  * 0.1.14
+  * Function setSkip() set as void
+  This function as no return type causing undefined behavior. This function
+  has been declared as void.
+  * Changes.
+  * 0.1.15
+  * Diagnostic Analyzers (#93)
+  * Added diagnostic analyzers to organize robot_monitor
+  * Update Change Log
+  * Moved addDiagnostics call to the diagnostics thread
+  * Changed parameter prefix from "/" to ""
+  * Removed edits to the CHANGELOG
+  * roslint fixes.
+  * Changes.
+  * 0.1.16
+  * Add URDF and STL of Hokuyo UST-10LX
+  * Add collision to URDF
+  * Update UST10 (#96)
+  * Fix typo for package name
+  * Replace UST10 URDF with one used in CPR robots ; remove lx suffix from UST10 files
+  * Fix typo in package name
+  * Add installation of urdf, meshes, and launch directories to CMakeLists.txt
+  * Changes.
+  * 0.1.17
+  * Install Python helper script using catkin_install_python() so the correct Python version is selected automatically; ensure socket sends message as byte object for Python3, while ensuring backwards compatability with Python2.
+  * RST-484 Adding range offset parameter
+  * Removing limits on range offset
+  * Changelogs
+  * Tailor: Creating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Update changelogs
+  * 0.2.0
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Update changelogs
+  * 0.3.0
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Update changelogs
+  * 0.4.0
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Update changelogs
+  * 0.5.0
+  * Tailor: Updating Jenkinsfile
+  * Removed travis.yml
+  * Refactored deserialization to include new fields
+  * Bugfix: Added missing returns
+  * Bugfix: uint8_t is a char leading faulty conversion from ascii to hex
+  * Corrected after review findings
+  * Function setSkip() set as void
+  This function as no return type causing undefined behavior. This function
+  has been declared as void.
+  * Renamed accessor to visitor, updated license
+  Co-authored-by: Benjamin Scholz <2scholz@informatik.uni-hamburg.de>
+  Co-authored-by: Tony Baltovski <tony.baltovski@gmail.com>
+  Co-authored-by: Tony Baltovski <tbaltovski@clearpathrobotics.com>
+  Co-authored-by: C. Andy Martin <cam@badger-technologies.com>
+  Co-authored-by: Tony Baltovski <tony@baltovski.ca>
+  Co-authored-by: Rein Appeldoorn <reinzor@gmail.com>
+  Co-authored-by: bostoncleek <bocl8874@colorado.edu>
+  Co-authored-by: luis-camero <88782189+luis-camero@users.noreply.github.com>
+  Co-authored-by: Joey Yang <jyang@clearpathrobotics.com>
+  Co-authored-by: Tom Moore <ayrton04@gmail.com>
+  Co-authored-by: locus-services <33065330+locus-services@users.noreply.github.com>
+  Co-authored-by: Paul Bovbel <paul@bovbel.com>
+* Sync remote (#7)
+  * Add support for URG-04LX in SCIP 1.1 mode
+  The urg_node does not support SCIP 1.1. The Hokuyo URG-04LX supports both
+  SCIP 1.1 and SCIP 2.0, but needs to be switched to SCIP 2.0 at every startup
+  in its default configuration. For this purpose the function
+  URGCWrapper::setToSCIP2() was added.
+  A URG-04LX in SCIP 1.1 mode used to lead to an exception being thrown in
+  URGCwrapper::initialize. Now, before throwing the exception an attempt to
+  switch the sensor to SCIP 2.0 is made.
+  * Changes.
+  * 0.1.11
+  * Fixed linter errors.
+  * Add Travis config.
+  * synchronize system clock to hardware time
+  Remove jitter from the system clock by synchronizing it to the change
+  in hardware time stamps. This does not synchrnoize it in an absolute
+  sense (i.e., doesn't remove system latench). However, coupled with
+  calibrating system latency, this results in a stable, accurate clock.
+  * synchronize_time: reset when clock is warped
+  If either the hardware clock or system clock warp, reset the EMA to
+  prevent incorrect clock values from being used. Detect the warp by
+  putting a limit on the absolute error between the synchronized clock
+  and the system clock. When a warp is detected, reset the EMA to force
+  the clocks to resynchronize. Use the system clock until the EMA has
+  stabalized again.
+  * fix(updateStatus): Update status on diagnostics update
+  Otherwise the diagnostics information does not really reflect the device
+  status.
+  * Updated TravisCI config.
+  * Updated roslint to only check files in this repo.
+  * Fix path typo.
+  * Changes.
+  * 0.1.12
+  * Revert "fix(updateStatus): Update status on diagnostics update"
+  * Changes.
+  * 0.1.13
+  * Removed trailing whitespace.
+  * Bumped CMake version.
+  * Changes.
+  * 0.1.14
+  * Function setSkip() set as void
+  This function as no return type causing undefined behavior. This function
+  has been declared as void.
+  * Changes.
+  * 0.1.15
+  * Diagnostic Analyzers (#93)
+  * Added diagnostic analyzers to organize robot_monitor
+  * Update Change Log
+  * Moved addDiagnostics call to the diagnostics thread
+  * Changed parameter prefix from "/" to ""
+  * Removed edits to the CHANGELOG
+  * roslint fixes.
+  * Changes.
+  * 0.1.16
+  * Add URDF and STL of Hokuyo UST-10LX
+  * Add collision to URDF
+  * Update UST10 (#96)
+  * Fix typo for package name
+  * Replace UST10 URDF with one used in CPR robots ; remove lx suffix from UST10 files
+  * Fix typo in package name
+  * Add installation of urdf, meshes, and launch directories to CMakeLists.txt
+  * Changes.
+  * 0.1.17
+  * Install Python helper script using catkin_install_python() so the correct Python version is selected automatically; ensure socket sends message as byte object for Python3, while ensuring backwards compatability with Python2.
+  * RST-484 Adding range offset parameter
+  * Removing limits on range offset
+  * Changelogs
+  * Tailor: Creating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Update changelogs
+  * 0.2.0
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Update changelogs
+  * 0.3.0
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Update changelogs
+  * 0.4.0
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Tailor: Updating Jenkinsfile
+  * Update changelogs
+  * 0.5.0
+  * Tailor: Updating Jenkinsfile
+  * Removed travis.yml
+  Co-authored-by: Benjamin Scholz <2scholz@informatik.uni-hamburg.de>
+  Co-authored-by: Tony Baltovski <tony.baltovski@gmail.com>
+  Co-authored-by: Tony Baltovski <tbaltovski@clearpathrobotics.com>
+  Co-authored-by: C. Andy Martin <cam@badger-technologies.com>
+  Co-authored-by: Tony Baltovski <tony@baltovski.ca>
+  Co-authored-by: Rein Appeldoorn <reinzor@gmail.com>
+  Co-authored-by: bostoncleek <bocl8874@colorado.edu>
+  Co-authored-by: luis-camero <88782189+luis-camero@users.noreply.github.com>
+  Co-authored-by: Joey Yang <jyang@clearpathrobotics.com>
+  Co-authored-by: Tom Moore <ayrton04@gmail.com>
+  Co-authored-by: locus-services <33065330+locus-services@users.noreply.github.com>
+  Co-authored-by: Paul Bovbel <paul@bovbel.com>
+* Tailor: Updating Jenkinsfile
+* Contributors: Carlos Mendes, locus-services
+
 0.5.0 (2020-10-02)
 ------------------
 * Tailor: Updating Jenkinsfile
