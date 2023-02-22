@@ -2,8 +2,8 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.0 (2023-02-22)
+------------------
 * Rst 5623 improve hokuyo lidar driver so it can communicate safety scanner error codes (#3)
   * Add support for URG-04LX in SCIP 1.1 mode
   The urg_node does not support SCIP 1.1. The Hokuyo URG-04LX supports both
