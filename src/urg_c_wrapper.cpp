@@ -385,7 +385,7 @@ bool URGCWrapper::deserializeSensingData(
   size_t idx { start_position };
   if (sizeof(URGStatus) > (f_buffer.size() + start_position))
   {
-    std::cout << "Deserialization not feasible, please check input buffer!" << std::endl;
+    ROS_ERROR_STREAM("Deserialization not feasible, please check input buffer!");
     return false;
   }
   protocol::sensing_data::SensingDataReplyHelper deserialize(&f_buffer, idx);

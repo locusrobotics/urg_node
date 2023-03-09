@@ -78,6 +78,7 @@ private:
   void updateDiagnostics();
   void populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrapper &stat);
   void scanThread();
+  bool sensorStatusOk(const std::string& status) const;
 
   bool statusCallback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
@@ -96,18 +97,24 @@ private:
 
   boost::mutex lidar_mutex_;
 
-  /* Non-const device properties.  If you poll the driver for these
-  * while scanning is running, then the scan will probably fail.
-  */
-  std::string device_status_;
-  std::string vendor_name_;
-  std::string product_name_;
-  std::string firmware_version_;
-  std::string firmware_date_;
-  std::string protocol_version_;
-  std::string device_id_;
-  uint16_t error_code_;
-  bool lockout_status_;
+  /**
+   * @brief Detailed device status,
+   */
+  struct DeviceStatus
+  {
+	std::string status_str;
+    std::string vendor_name;
+    std::string product_name;
+    std::string firmware_version;
+    std::string firmware_date;
+    std::string protocol_version;
+    std::string device_id;
+    /**
+     * @brief Detailed status, when this is available (ex: UAM-05LP)
+     */
+    URGCWrapper::URGStatus detailed_status;
+  }
+  device_status_;
 
   int error_count_;
   double freq_min_;
@@ -127,7 +134,7 @@ private:
   double diagnostics_window_time_;
   bool detailed_status_;
 
-  volatile bool service_yield_;
+  std::atomic_bool service_yield_;
 
   ros::Publisher laser_pub_;
   laser_proc::LaserPublisher echoes_pub_;

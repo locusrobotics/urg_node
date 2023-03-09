@@ -41,7 +41,6 @@
 
 namespace urg_node
 {
-
 // Useful typedefs
 typedef diagnostic_updater::FrequencyStatusParam FrequencyStatusParam;
 
@@ -65,8 +64,9 @@ void UrgNode::initSetup()
   close_scan_ = true;
   service_yield_ = false;
 
-  error_code_ = 0;
-  lockout_status_ = false;
+  device_status_.detailed_status.error_code = 0;
+  device_status_.detailed_status.lockout_state = false;
+
   // Initialize node and nodehandles
 
   // Get parameters so we can change these later.
@@ -96,7 +96,7 @@ void UrgNode::initSetup()
   status_service_ = nh_.advertiseService("update_laser_status", &UrgNode::statusCallback, this);
   status_pub_ = nh_.advertise<urg_node::Status>("laser_status", 1, true);
 
-  diagnostic_updater_.reset(new diagnostic_updater::Updater);
+  diagnostic_updater_.reset(new diagnostic_updater::Updater());
   diagnostic_updater_->add("Hardware Status", this, &UrgNode::populateDiagnosticsStatus);
 }
 
@@ -123,26 +123,23 @@ bool UrgNode::updateStatus()
 
   if (urg_)
   {
-    device_status_ = urg_->getSensorStatus();
-
+    device_status_.status_str = urg_->getSensorStatus();
     if (detailed_status_)
     {
-      URGCWrapper::URGStatus status;
-      if (urg_->getAR00Status(status))
+      if (urg_->getAR00Status(device_status_.detailed_status))
       {
         urg_node::Status msg;
-        msg.operating_mode = status.operating_mode;
-        msg.error_status = status.error_state;
-        msg.error_code = status.error_code;
-        msg.lockout_status = status.lockout_state;
-        msg.area_number = status.area_number;
-        msg.ossd1_state = status.ossd1_state;
-        msg.ossd2_state = status.ossd2_state;
-        msg.warning1_state = status.warning1_state;
-        msg.warning2_state = status.warning2_state;
-        msg.optical_window_contaminated = status.optical_window_contaminated;
-
-        //TODO: Detection log should not be requested together with status.
+        msg.operating_mode = device_status_.detailed_status.operating_mode;
+        msg.error_status = device_status_.detailed_status.error_state;
+        msg.error_code = device_status_.detailed_status.error_code;
+        msg.lockout_status = device_status_.detailed_status.lockout_state;
+        msg.area_number = device_status_.detailed_status.area_number;
+        msg.ossd1_state = device_status_.detailed_status.ossd1_state;
+        msg.ossd2_state = device_status_.detailed_status.ossd2_state;
+        msg.warning1_state = device_status_.detailed_status.warning1_state;
+        msg.warning2_state = device_status_.detailed_status.warning2_state;
+        msg.optical_window_contaminated = device_status_.detailed_status.optical_window_contaminated;
+        // TODO: Detection log should not be requested together with status.
         // For now keep the old code commented out.
         // UrgDetectionReport report;
         // if (urg_->getDL00Status(report))
@@ -162,10 +159,7 @@ bool UrgNode::updateStatus()
       }
       else
       {
-        ROS_WARN("Failed to retrieve status");
-
-        urg_node::Status msg;
-        status_pub_.publish(msg);
+        ROS_ERROR_STREAM("Failed to retrieve detailed status. Sensor is reporting: " << device_status_.status_str);
       }
     }
   }
@@ -349,7 +343,7 @@ void UrgNode::addDiagnostics()
   // Call AddDiagnostics Service
   diagnostic_msgs::AddDiagnostics srv;
   srv.request.load_namespace = node_namespace;
-    if (!ros::service::waitForService("/diagnostics_agg/add_diagnostics", 1000))
+  if (!ros::service::waitForService("/diagnostics_agg/add_diagnostics", 1000))
   {
     return;
   }
@@ -363,13 +357,14 @@ void UrgNode::updateDiagnostics()
   addDiagnostics();
   while (!close_diagnostics_)
   {
+    boost::mutex::scoped_lock lock(lidar_mutex_);
     diagnostic_updater_->update();
     boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   }
 }
 
 // Populate a diagnostics status message.
-void UrgNode::populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrapper &stat)
+void UrgNode::populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrapper& stat)
 {
   if (!urg_)
   {
@@ -391,48 +386,43 @@ void UrgNode::populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrap
 
   if (!urg_->isStarted())
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR,
-        "Not Connected: " + device_status_);
+    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Not Connected: " + device_status_.status_str);
   }
-  else if (device_status_ != std::string("Sensor works well.") &&
-           device_status_ != std::string("Stable 000 no error.") &&
-           device_status_ != std::string("sensor is working normally"))
+  else if (!sensorStatusOk(device_status_.status_str))
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR,
-        "Abnormal status: " + device_status_);
+    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Abnormal status: " + device_status_.status_str);
   }
-  else if (error_code_ != 0)
+  else if (device_status_.detailed_status.error_code != 0)
   {
-    stat.summaryf(diagnostic_msgs::DiagnosticStatus::ERROR,
-        "Lidar reporting error code: %X",
-        error_code_);
+    stat.summaryf(
+      diagnostic_msgs::DiagnosticStatus::ERROR,
+      "Lidar reporting error code: %X",
+      device_status_.detailed_status.error_code);
   }
-  else if (lockout_status_)
+  else if (device_status_.detailed_status.lockout_state)
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR,
-        "Lidar locked out.");
+    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Lidar locked out.");
   }
   else
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::OK,
-        "Streaming");
+    stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "Streaming");
   }
 
-  stat.add("Vendor Name", vendor_name_);
-  stat.add("Product Name", product_name_);
-  stat.add("Firmware Version", firmware_version_);
-  stat.add("Firmware Date", firmware_date_);
-  stat.add("Protocol Version", protocol_version_);
-  stat.add("Device ID", device_id_);
+  stat.add("Vendor Name", device_status_.vendor_name);
+  stat.add("Product Name", device_status_.product_name);
+  stat.add("Firmware Version", device_status_.firmware_version);
+  stat.add("Firmware Date", device_status_.firmware_date);
+  stat.add("Protocol Version", device_status_.protocol_version);
+  stat.add("Device ID", device_status_.device_id);
   stat.add("Computed Latency", urg_->getComputedLatency());
   stat.add("User Time Offset", urg_->getUserTimeOffset());
 
   // Things not explicitly required by REP-0138, but still interesting.
-  stat.add("Device Status", device_status_);
+  stat.add("Device Status", device_status_.status_str);
   stat.add("Scan Retrieve Error Count", error_count_);
 
-  stat.add("Lidar Error Code", error_code_);
-  stat.add("Locked out", lockout_status_);
+  stat.add("Lidar Error Code", device_status_.detailed_status.error_code);
+  stat.add("Locked out", device_status_.detailed_status.lockout_state);
 }
 
 bool UrgNode::connect()
@@ -477,13 +467,13 @@ bool UrgNode::connect()
     ss << " ID: " << urg_->getDeviceID();
     ROS_INFO_STREAM(ss.str());
 
-    device_status_ = urg_->getSensorStatus();
-    vendor_name_ = urg_->getVendorName();
-    product_name_ = urg_->getProductName();
-    firmware_version_ = urg_->getFirmwareVersion();
-    firmware_date_ = urg_->getFirmwareDate();
-    protocol_version_ = urg_->getProtocolVersion();
-    device_id_ = urg_->getDeviceID();
+    device_status_.status_str = urg_->getSensorStatus();
+    device_status_.vendor_name = urg_->getVendorName();
+    device_status_.product_name = urg_->getProductName();
+    device_status_.firmware_version = urg_->getFirmwareVersion();
+    device_status_.firmware_date = urg_->getFirmwareDate();
+    device_status_.protocol_version = urg_->getProtocolVersion();
+    device_status_.device_id = urg_->getDeviceID();
 
     if (diagnostic_updater_ && urg_)
     {
@@ -535,7 +525,7 @@ void UrgNode::scanThread()
     // service next.
     ros::spinOnce();
 
-    if (!urg_ || !ros::ok)
+    if (!urg_ || !ros::ok())
     {
       continue;
     }
@@ -560,7 +550,7 @@ void UrgNode::scanThread()
       {
         continue;  // Return to top of main loop, not connected.
       }
-      device_status_ = urg_->getSensorStatus();
+      device_status_.status_str = urg_->getSensorStatus();
       urg_->start();
       ROS_INFO("Streaming data.");
       // Clear the error count.
@@ -598,7 +588,7 @@ void UrgNode::scanThread()
           else
           {
             ROS_WARN_THROTTLE(10.0, "Could not grab multi echo scan.");
-            device_status_ = urg_->getSensorStatus();
+            device_status_.status_str = urg_->getSensorStatus();
             error_count_++;
           }
         }
@@ -613,7 +603,7 @@ void UrgNode::scanThread()
           else
           {
             ROS_WARN_THROTTLE(10.0, "Could not grab single echo scan.");
-            device_status_ = urg_->getSensorStatus();
+            device_status_.status_str = urg_->getSensorStatus();
             error_count_++;
           }
         }
@@ -643,6 +633,19 @@ void UrgNode::scanThread()
   }
 }
 
+bool UrgNode::sensorStatusOk(const std::string& status) const
+{
+  static std::string NOT_CONNECTED = std::string("not connected.");
+  static std::string RECEIVE_ERROR_MESSAGE = std::string("not connected.");
+  static std::string SENSOR_WORKS_WELL = std::string("Sensor works well.");
+  static std::string SENSOR_STABLE_NO_ERROR = std::string("Stable 000 no error.");
+  static std::string SENSOR_WORKING_NORMALLY = std::string("sensor is working normally");
+
+  return (status != NOT_CONNECTED && status != RECEIVE_ERROR_MESSAGE) &&
+         (status == std::string("Sensor works well.") || status == std::string("Stable 000 no error.") ||
+          status == std::string("sensor is working normally"));
+}
+
 void UrgNode::run()
 {
   // Setup initial connection
@@ -657,15 +660,17 @@ void UrgNode::run()
 
   if (publish_multiecho_)
   {
-    echoes_freq_.reset(new diagnostic_updater::HeaderlessTopicDiagnostic("Laser Echoes",
-          *diagnostic_updater_,
-          FrequencyStatusParam(&freq_min_, &freq_min_, diagnostics_tolerance_, diagnostics_window_time_)));
+    echoes_freq_.reset(new diagnostic_updater::HeaderlessTopicDiagnostic(
+      "Laser Echoes",
+      *diagnostic_updater_,
+      FrequencyStatusParam(&freq_min_, &freq_min_, diagnostics_tolerance_, diagnostics_window_time_)));
   }
   else
   {
-    laser_freq_.reset(new diagnostic_updater::HeaderlessTopicDiagnostic("Laser Scan",
-          *diagnostic_updater_,
-          FrequencyStatusParam(&freq_min_, &freq_min_, diagnostics_tolerance_, diagnostics_window_time_)));
+    laser_freq_.reset(new diagnostic_updater::HeaderlessTopicDiagnostic(
+      "Laser Scan",
+      *diagnostic_updater_,
+      FrequencyStatusParam(&freq_min_, &freq_min_, diagnostics_tolerance_, diagnostics_window_time_)));
   }
 
   // Now that we are setup, kick off diagnostics.
