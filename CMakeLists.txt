@@ -12,6 +12,7 @@ generate_dynamic_reconfigure_options(cfg/URG.cfg)
 
 add_message_files(FILES
   Status.msg
+  Hack.msg
 )
 
 generate_messages(
@@ -29,14 +30,18 @@ catkin_package(
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-## Declare a cpp library
-add_library(urg_c_wrapper src/urg_c_wrapper.cpp)
-target_link_libraries(urg_c_wrapper ${catkin_LIBRARIES})
 
+
+## Declare a cpp library
+add_library(uam_workers src/uam/uam_command_workers.cpp)
+target_link_libraries(uam_workers ${catkin_LIBRARIES})
+add_library(urg_c_wrapper src/urg_c_wrapper.cpp)
+target_link_libraries(urg_c_wrapper uam_workers ${catkin_LIBRARIES})
 # Declare the cpp as a lib also
 add_library(urg_node_driver src/urg_node_driver.cpp)
 add_dependencies(urg_node_driver ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_gencpp)
 target_link_libraries(urg_node_driver urg_c_wrapper ${catkin_LIBRARIES})
+
 
 ## Declare a cpp executable
 add_executable(urg_node src/urg_node.cpp)
@@ -45,6 +50,10 @@ target_link_libraries(urg_node urg_node_driver ${catkin_LIBRARIES})
 ## Declare getID tool
 add_executable(getID src/getID.cpp)
 target_link_libraries(getID urg_c_wrapper ${catkin_LIBRARIES})
+
+add_executable (uam_test_node src/uam_test_node.cpp)
+target_link_libraries(uam_test_node urg_c_wrapper ${catkin_LIBRARIES})
+
 
 ## Mark executables and/or libraries for installation
 install(TARGETS urg_c_wrapper urg_node urg_node_driver getID

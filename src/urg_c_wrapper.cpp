@@ -37,6 +37,7 @@
 #include <string>
 #include <vector>
 #include <boost/crc.hpp>
+#include <urg_node/uam/uam_command_workers.h>
 
 namespace urg_node
 {
@@ -340,81 +341,97 @@ bool URGCWrapper::grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg)
   return true;
 }
 
-bool URGCWrapper::getAR00Status(URGStatus& status)
+bool URGCWrapper::getAR00Status(uam::protocol::AR00CommandReply& status)
 {
-  // Construct and write AR00 command.
-  std::string str_cmd;
-  str_cmd += 0x02;  // STX
-  str_cmd.append("000EAR00A012");  // AR00 cmd with length and checksum.
-  str_cmd += 0x03;  // ETX
-
-  // Get the response
-  std::string response = sendCommand(str_cmd);
-
-  ROS_DEBUG_STREAM("Full response: " << response);
-
-  // Strip STX and ETX before calculating the CRC.
-  response.erase(0, 1);
-  response.erase(response.size() - 1, 1);
-
-  // Get the CRC, it's the last 4 chars.
-  std::stringstream ss;
-  ss << response.substr(response.size() - 4, 4);
-  uint16_t crc;
-  ss >> std::hex >> crc;
-
-  // Remove the CRC from the check.
-  std::string msg = response.substr(0, response.size() - 4);
-  // Check the checksum.
-  uint16_t checksum_result = checkCRC(msg.data(), msg.size());
-
-  if (checksum_result != crc)
+  static uam::AR00Worker ar00;
+  std::string response = sendCommand(ar00.getCommand());
+  if (!ar00.process(&response, status))
   {
-    ROS_WARN("Received bad frame, incorrect checksum");
-    return false;
+	  return false;
   }
+  return true;
 
-  return this->deserializeSensingData(response, status, protocol::sensing_data::c_sensing_data_start_idx);
+  //return this->deserializeSensingData(response, status, uam::protocol::c_sensing_data_start_idx);
+}
+
+bool URGCWrapper::getOtherStatus(const uint16_t req)
+{
+	static uam::AR00Worker ar00;
+	static uam::AR01Worker ar01;
+	static uam::XR00Worker xr00;
+	static uam::VR00Worker vr00;
+
+	std::string response;
+
+	switch (req)
+	{
+	case 0:
+	{
+		response = sendCommand(ar00.getCommand());
+		break;
+	}
+	case 1:
+	{
+		response = sendCommand(ar01.getCommand());
+		break;
+	}
+	case 2:
+	{
+		response = sendCommand(vr00.getCommand());
+		break;
+	}
+	case 3:
+	{
+		response =  sendCommand(xr00.getCommand());
+		break;
+	}
+	default:
+		break;
+	}
+
+	ROS_WARN_STREAM("Received:\n " << response );
+	return true;
 }
 
 bool URGCWrapper::deserializeSensingData(
   const std::string& f_buffer,
-  URGStatus& sensing_data,
+  UAMStatus& sensing_data,
   const size_t& start_position) const
 {
   size_t idx { start_position };
-  if (sizeof(URGStatus) > (f_buffer.size() + start_position))
+  if (sizeof(UAMStatus) > (f_buffer.size() + start_position))
   {
     ROS_ERROR_STREAM("Deserialization not feasible, please check input buffer!");
     return false;
   }
-  protocol::sensing_data::SensingDataReplyHelper deserialize(&f_buffer, idx);
-  // Get Status
-  deserialize.status.get(sensing_data.status);
-  if (sensing_data.status != 0)
-  {
-    ROS_WARN("Received bad status");
-    return false;
-  }
-
-  deserialize.operating_mode.get(sensing_data.operating_mode);
-  deserialize.area_number.get(sensing_data.area_number);
-
-  // Grab the Error Status
-  deserialize.error_state.get(sensing_data.error_state);
-  // Grab the error code and offset by 0x40 if non-zero as per documentation
-  deserialize.error_code.get(sensing_data.error_code);
-  if (sensing_data.error_code != 0)
-  {
-    sensing_data.error_code += 0x40;
-  }
-  // Grab the lockout_state
-  deserialize.lockout_state.get(sensing_data.lockout_state);
-  deserialize.ossd1_state.get(sensing_data.ossd1_state);
-  deserialize.ossd2_state.get(sensing_data.ossd2_state);
-  deserialize.warning1_state.get(sensing_data.warning1_state);
-  deserialize.warning2_state.get(sensing_data.warning2_state);
-  deserialize.optical_window_contaminated.get(sensing_data.optical_window_contaminated);
+//  uam::AR00Worker worker;
+//  worker.process(f_buffer, reply)deserialize(&f_buffer, idx);
+//  // Get Status
+//  deserialize.status.get(sensing_data.status);
+//  if (sensing_data.status != 0)
+//  {
+//    ROS_WARN("Received bad status");
+//    return false;
+//  }
+//
+//  deserialize.operating_mode.get(sensing_data.operating_mode);
+//  deserialize.area_number.get(sensing_data.area_number);
+//
+//  // Grab the Error Status
+//  deserialize.error_state.get(sensing_data.error_state);
+//  // Grab the error code and offset by 0x40 if non-zero as per documentation
+//  deserialize.error_code.get(sensing_data.error_code);
+//  if (sensing_data.error_code != 0)
+//  {
+//    sensing_data.error_code += 0x40;
+//  }
+//  // Grab the lockout_state
+//  deserialize.lockout_state.get(sensing_data.lockout_state);
+//  deserialize.ossd1_state.get(sensing_data.ossd1_state);
+//  deserialize.ossd2_state.get(sensing_data.ossd2_state);
+//  deserialize.warning1_state.get(sensing_data.warning1_state);
+//  deserialize.warning2_state.get(sensing_data.warning2_state);
+//  deserialize.optical_window_contaminated.get(sensing_data.optical_window_contaminated);
   return true;
 }
 

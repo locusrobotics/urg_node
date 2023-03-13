@@ -35,8 +35,49 @@
 #ifndef INCLUDE_URG_NODE_VISITOR_H_
 #define INCLUDE_URG_NODE_VISITOR_H_
 
+#include <array>
 #include <sstream>
 #include <string>
+
+template <class T>
+struct is_array : std::is_array<T>
+{
+};
+template <class T, std::size_t N>
+struct is_array<std::array<T, N>> : std::true_type
+{
+};
+template <typename TField>
+typename std::enable_if<is_array<TField>::value>::type toFieldFromBuffer(
+  const std::string* buffer,
+  const size_t index,
+  const uint32_t param_offset,
+  const uint32_t width,
+  TField& array)
+{
+  const auto step = sizeof(typename TField::value_type);
+  for (size_t idx { 0 }; idx < array.size(); idx++)
+  {
+    std::stringstream ss;
+    ss << buffer->substr(index + (step * idx), step);
+    ss >> std::hex >> array[idx];
+    array[idx] += param_offset;
+  }
+}
+
+template <typename TField>
+typename std::enable_if<!is_array<TField>::value>::type toFieldFromBuffer(
+  const std::string* buffer,
+  const size_t index,
+  const uint32_t param_offset,
+  const uint32_t width,
+  TField& field)
+{
+  std::stringstream ss;
+  ss << buffer->substr(index, width);
+  ss >> std::hex >> field;
+  field += param_offset;
+}
 
 /**
  * @brief A visitor class for the field of type TField
@@ -52,44 +93,35 @@ public:
    * @param field_index Index of the field in the buffer
    * @param offset Custom offset that needs to be applied to the field
    */
-  Visitor(const std::string* buffer, const uint8_t idx_offset = 0, const uint8_t param_offset = 0) :
-    buffer_(buffer),
-    index(TIndex + idx_offset),
+  Visitor(const uint32_t idx_offset = 0, const uint32_t param_offset = 0) :
+    index_(TIndex + idx_offset),
     offset_(param_offset),
-    width(sizeof(TField))
+    width_(sizeof(TField))
   {
   }
-
   /**
-   * @brief Method to retrieve field from buffer
+   * @brief
    * @param field
    */
-  void get(TField& field) const
-  {
-    std::stringstream ss;
-    ss << buffer_->substr(this->index, this->width);
-    ss >> std::hex >> field;
-    field += offset_;
-  }
+  void get(const std::string* buffer, TField& field) {
+	  toFieldFromBuffer(buffer, this->index_, this->offset_, this->width_, field); }
+
 
 private:
   /**
-   * @brief Pointer to buffer
-   */
-  const std::string* buffer_;
-  /**
    * @brief Index of the field in the buffer
    */
-  const uint8_t index;
+  const uint32_t index_;
   /**
    * @brief Custom offset that need to be added into the field
    */
-  const uint8_t offset_;
+  const uint32_t offset_;
   /**
    * @brief Size of the field in the buffer in bytes
    */
-  const uint8_t width;
+  const uint32_t width_;
 };
+
 /**
  * @brief Usefull macro to declare an accessor.
  */

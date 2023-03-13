@@ -44,7 +44,7 @@
 #include <urg_node/URGConfig.h>
 #include <std_srvs/Trigger.h>
 #include <bondcpp/bond.h>
-
+#include <urg_node/Hack.h>
 #include "urg_node/urg_c_wrapper.h"
 
 namespace urg_node
@@ -81,6 +81,7 @@ private:
   bool sensorStatusOk(const std::string& status) const;
 
   bool statusCallback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  void hackCallback(const urg_node::HackConstPtr& hack_msg);
 
   ros::NodeHandle nh_;
   ros::NodeHandle pnh_;
@@ -112,7 +113,7 @@ private:
     /**
      * @brief Detailed status, when this is available (ex: UAM-05LP)
      */
-    URGCWrapper::URGStatus detailed_status;
+    uam::protocol::sensing_data::SensingDataHeader detailed_status;
   }
   device_status_;
 
@@ -141,6 +142,7 @@ private:
   ros::Publisher status_pub_;
 
   ros::ServiceServer status_service_;
+  ros::Subscriber hack_sub_;
 };
 
 }  // namespace urg_node

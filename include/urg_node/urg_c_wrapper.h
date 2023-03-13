@@ -33,7 +33,6 @@
 
 #ifndef URG_NODE_URG_C_WRAPPER_H
 #define URG_NODE_URG_C_WRAPPER_H
-
 #include <stdexcept>
 #include <sstream>
 #include <vector>
@@ -44,7 +43,8 @@
 
 #include <urg_c/urg_sensor.h>
 #include <urg_c/urg_utils.h>
-#include <urg_node/uam_protocol_types.h>
+#include <urg_node/uam/uam_protocol_types.h>
+#include <urg_node/uam/uam_visitors.h>
 
 
 
@@ -71,7 +71,7 @@ public:
 class URGCWrapper
 {
 public:  
-  using URGStatus = protocol::sensing_data::SensingDataReply;
+  using UAMStatus = uam::protocol::AR00CommandReply;
   URGCWrapper(const std::string& ip_address, const int ip_port,
       bool& using_intensity, bool& using_multiecho, bool synchronize_time);
 
@@ -148,7 +148,9 @@ public:
 
   bool grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg);
 
-  bool getAR00Status(URGStatus& status);
+  bool getAR00Status(uam::protocol::AR00CommandReply& status);
+
+  bool getOtherStatus(const uint16_t req);
 
   bool getDL00Status(UrgDetectionReport& report);
 
@@ -196,13 +198,13 @@ private:
   std::string sendCommand(std::string cmd);
 
   /**
-   * @brief Deserialize URGStatus from received data (which has ASCII encoding)
+   * @brief Deserialize UAMStatus from received data (which has ASCII encoding)
    * @param f_buffer Received buffer
    * @param sensing_data Sensing data
    * @param start_position Start index in the buffer, case an offset is wanted
    * @return true if success, false otherwise
    */
-  bool deserializeSensingData(const std::string& f_buffer, URGStatus& sensing_data, const size_t& start_position = 0) const;
+  bool deserializeSensingData(const std::string& f_buffer, UAMStatus& sensing_data, const size_t& start_position = 0) const;
 
   std::string frame_id_;  ///< Output frame_id for each laserscan.
 

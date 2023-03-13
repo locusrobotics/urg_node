@@ -82,7 +82,7 @@ void UrgNode::initSetup()
   pnh_.param<double>("diagnostics_tolerance", diagnostics_tolerance_, 0.05);
   pnh_.param<double>("diagnostics_window_time", diagnostics_window_time_, 5.0);
   pnh_.param<bool>("get_detailed_status", detailed_status_, false);
-
+  detailed_status_ = false;
   // Set up publishers and diagnostics updaters, we only need one
   if (publish_multiecho_)
   {
@@ -92,6 +92,8 @@ void UrgNode::initSetup()
   {
     laser_pub_ = nh_.advertise<sensor_msgs::LaserScan>("scan", 20);
   }
+
+  hack_sub_ = nh_.subscribe<urg_node::Hack>("hack_test", 1, &UrgNode::hackCallback,this);
 
   status_service_ = nh_.advertiseService("update_laser_status", &UrgNode::statusCallback, this);
   status_pub_ = nh_.advertise<urg_node::Status>("laser_status", 1, true);
@@ -126,8 +128,11 @@ bool UrgNode::updateStatus()
     device_status_.status_str = urg_->getSensorStatus();
     if (detailed_status_)
     {
-      if (urg_->getAR00Status(device_status_.detailed_status))
+    	uam::protocol::AR00CommandReply reply;
+
+      if (urg_->getAR00Status(reply))
       {
+        device_status_.detailed_status = reply.sensing_data;
         urg_node::Status msg;
         msg.operating_mode = device_status_.detailed_status.operating_mode;
         msg.error_status = device_status_.detailed_status.error_state;
@@ -184,6 +189,19 @@ bool UrgNode::statusCallback(std_srvs::Trigger::Request &req, std_srvs::Trigger:
   }
 
   return true;
+}
+
+void UrgNode::hackCallback(const urg_node::HackConstPtr& hack_msg)
+{
+  bool result = false;
+  service_yield_ = true;
+  boost::mutex::scoped_lock lock(lidar_mutex_);
+
+  if (urg_)
+  {
+    result = urg_->getOtherStatus(hack_msg->code);
+  }
+  ROS_ERROR_STREAM_COND(!result, "Failed!");
 }
 
 bool UrgNode::reconfigure_callback(urg_node::URGConfig& config, int level)
