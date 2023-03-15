@@ -56,7 +56,7 @@ target_link_libraries(uam_test_node urg_c_wrapper ${catkin_LIBRARIES})
 
 
 ## Mark executables and/or libraries for installation
-install(TARGETS urg_c_wrapper urg_node urg_node_driver getID
+install(TARGETS uam_workers urg_c_wrapper urg_node urg_node_driver getID
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

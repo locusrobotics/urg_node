@@ -40,8 +40,10 @@
 
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/MultiEchoLaserScan.h>
+#include <ros/ros.h>
 
 #include <urg_c/urg_sensor.h>
+#include <urg_c/urg_connection.h>
 #include <urg_c/urg_utils.h>
 #include <urg_node/uam/uam_protocol_types.h>
 #include <urg_node/uam/uam_visitors.h>
@@ -195,7 +197,61 @@ private:
    * @param cmd The arbitrary command fully formatted to be sent as provided
    * @returns The textual response of the Lidar, empty if, but may return lidar's own error string.
    */
-  std::string sendCommand(std::string cmd);
+  std::string sendCommand(const std::string& cmd);
+
+  template <typename T>
+  bool sendAndReceive(T& worker, typename T::Reply& reply, const int timeout = 60)
+  {
+    bool restart = false;
+    const decltype(uam::protocol::CommandReplyHeader::cmd_size) expected_size = sizeof(typename T::Reply);
+    const auto& cmd = worker.getCommand();
+    if (connection_write(&urg_.connection, cmd.c_str(), cmd.size()) < 0)
+    {
+      ROS_ERROR_STREAM("Failed to send message. Skipping!");
+      return false;
+    }
+    std::string recv_buffer;
+    recv_buffer.resize(expected_size);
+
+    const size_t stx_cmd_size_len =
+      sizeof(uam::protocol::CommandReplyHeader::stx) + sizeof(uam::protocol::CommandReplyHeader::cmd_size);
+
+    auto recv_bytes =
+      connection_read(&urg_.connection, &recv_buffer.at(0), static_cast<int>(stx_cmd_size_len), timeout);
+    if (recv_bytes <= 0)
+    {
+      ROS_ERROR_STREAM("Failed to send message. Skipping!");
+      recv_buffer.clear();
+      return false;
+    }
+    uam::CommandHeaderVisitor header(0);
+    decltype(uam::protocol::CommandReplyHeader::cmd_size) incoming_size;
+    header.cmd_size.get(&recv_buffer,incoming_size);
+    if (incoming_size != expected_size)
+    {
+      ROS_ERROR_STREAM(
+        "Failed to recv message as incoming size  differs from expected size: " << incoming_size << " and "
+                                                                                << expected_size);
+	  return false;
+    }
+    recv_bytes = connection_read(
+    	      &urg_.connection,
+              &recv_buffer.at(stx_cmd_size_len),
+    	      incoming_size - static_cast<int>(stx_cmd_size_len),
+    	      timeout);
+    if (recv_bytes <= 0)
+    {
+      ROS_ERROR("Read socket failed: %s", strerror(errno));
+      recv_buffer.clear();
+      return false;
+    }
+    if (!worker.process(&recv_buffer,reply))
+    {
+      ROS_ERROR_STREAM("Failed while parsing reply!");
+      return false;
+    }
+    return true;
+  }
 
   /**
    * @brief Deserialize UAMStatus from received data (which has ASCII encoding)
@@ -209,7 +265,7 @@ private:
   std::string frame_id_;  ///< Output frame_id for each laserscan.
 
   urg_t urg_;
-  bool started_;
+  std::atomic_bool started_;
 
   std::vector<long> data_;
   std::vector<unsigned short> intensity_;

@@ -82,7 +82,6 @@ void UrgNode::initSetup()
   pnh_.param<double>("diagnostics_tolerance", diagnostics_tolerance_, 0.05);
   pnh_.param<double>("diagnostics_window_time", diagnostics_window_time_, 5.0);
   pnh_.param<bool>("get_detailed_status", detailed_status_, false);
-  detailed_status_ = false;
   // Set up publishers and diagnostics updaters, we only need one
   if (publish_multiecho_)
   {

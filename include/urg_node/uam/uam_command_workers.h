@@ -22,6 +22,7 @@ namespace uam
 class AR00Worker : public WorkerBase<'A', 'R', '0', '0'>
 {
 public:
+  using Reply = protocol::AR00CommandReply;
   /**
    * @brief Default C'tor
    */
@@ -70,6 +71,7 @@ private:
 class AR01Worker : public WorkerBase<'A', 'R', '0', '1'>
 {
 public:
+  using Reply = protocol::AR01CommandReply;
   /**
    * @brief Default C'tor
    */
@@ -93,6 +95,7 @@ private:
 class XR00Worker : public WorkerBase<'X', 'R', '0', '0'>
 {
 public:
+  using Reply = protocol::XR00CommandReply;
   /**
    * @brief Default C'tor
    */
@@ -109,6 +112,7 @@ private:
 class VR00Worker : public WorkerBase<'V', 'R', '0', '0'>
 {
 public:
+  using Reply = protocol::VR00CommandReply;
   /**
    * @brief Default C'tor
    */
