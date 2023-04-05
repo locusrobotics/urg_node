@@ -14,14 +14,23 @@ Proprietary and confidential.
 #include <boost/assign/list_of.hpp>
 #include <map>
 
+#include <type_traits>
+
 namespace uam
 {
+template<typename T>
+constexpr auto getUnderlyingType(T f_enum) -> typename std::underlying_type<T>::type
+{
+    return static_cast<typename std::underlying_type<T>::type>(f_enum);
+}
+
+
 namespace error_codes
 {
 /**
  * @brief
  */
-enum class EStatusErrorCodes : uint8_t
+enum class EStatusErrorCodes : uint16_t
 {
   // No Error
   NO_ERROR = 0x00, /**< NO_ERROR */
@@ -44,23 +53,23 @@ enum class EStatusErrorCodes : uint8_t
                                       in setting mode).*/
 };
 
-const auto StatusErrorCodeToString = std::map<EStatusErrorCodes, std::string>(
-  { { EStatusErrorCodes::NO_ERROR, "No error" },
-    { EStatusErrorCodes::COMMAND_INVALID_FIELDS,
+const auto StatusErrorCodeToString = std::map<uint16_t, std::string>(
+  { { getUnderlyingType(EStatusErrorCodes::NO_ERROR), "No error" },
+    { getUnderlyingType(EStatusErrorCodes::COMMAND_INVALID_FIELDS),
       "Received command does not contain the minimum "
       "required fields or received data size exceeds the maximum "
       "size of internal buffer" },
-    { EStatusErrorCodes::COMMAND_WITHOUT_STX, "Command is received without STX " },
-    { EStatusErrorCodes::COMMAND_HEADER_WITH_UNSPECIFIED_CHARS, "Command header contains unspecified characters" },
-    { EStatusErrorCodes::DATA_WITH_UNSPECIFIED_CHARS, "Data contains unspecified characters" },
-    { EStatusErrorCodes::DATA_SIZE_MISMATCH, "Data size is not equal to the size mentioned in the command" },
-    { EStatusErrorCodes::CRC_MISMATCH, "CRC of received data is not equal to CRC in the command" },
-    { EStatusErrorCodes::UNSPECIFIED_COMMAND_0, "Unspecified command is received" },
-    { EStatusErrorCodes::UNSPECIFIED_COMMAND_1, "Unspecified command is received" },
-    { EStatusErrorCodes::SUB_HEADER_OUT_OF_RANGE, "Sub header is out-of-range" },
-    { EStatusErrorCodes::SUB_HEADER_NAN, "Sub header is not a number " },
-    { EStatusErrorCodes::INCOMPLETE_CONFIGURATION, "Configuration of UAM is incomplete" },
-    { EStatusErrorCodes::CANNOT_PROCESS_COMMANDS,
+    { getUnderlyingType(EStatusErrorCodes::COMMAND_WITHOUT_STX), "Command is received without STX " },
+    { getUnderlyingType(EStatusErrorCodes::COMMAND_HEADER_WITH_UNSPECIFIED_CHARS), "Command header contains unspecified characters" },
+    { getUnderlyingType(EStatusErrorCodes::DATA_WITH_UNSPECIFIED_CHARS), "Data contains unspecified characters" },
+    { getUnderlyingType(EStatusErrorCodes::DATA_SIZE_MISMATCH), "Data size is not equal to the size mentioned in the command" },
+    { getUnderlyingType(EStatusErrorCodes::CRC_MISMATCH), "CRC of received data is not equal to CRC in the command" },
+    { getUnderlyingType(EStatusErrorCodes::UNSPECIFIED_COMMAND_0), "Unspecified command is received" },
+    { getUnderlyingType(EStatusErrorCodes::UNSPECIFIED_COMMAND_1), "Unspecified command is received" },
+    { getUnderlyingType(EStatusErrorCodes::SUB_HEADER_OUT_OF_RANGE), "Sub header is out-of-range" },
+    { getUnderlyingType(EStatusErrorCodes::SUB_HEADER_NAN), "Sub header is not a number " },
+    { getUnderlyingType(EStatusErrorCodes::INCOMPLETE_CONFIGURATION), "Configuration of UAM is incomplete" },
+    { getUnderlyingType(EStatusErrorCodes::CANNOT_PROCESS_COMMANDS),
       "Unable to process commands (AR02 and AR04) as the device is in setting"
       "mode (Continuous data output mode can not be started when the device is in setting mode)" } });
 }  // namespace error_codes

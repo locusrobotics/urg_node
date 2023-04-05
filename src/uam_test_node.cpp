@@ -6,10 +6,11 @@
  */
 
 #include <ros/ros.h>
+#include <uam/io/tcp_client.h>
+#include <uam/workers/uam_command_worker.h>
 
-#include <urg_node/uam/uam_command_workers.h>
-
-const std::string ar00_resp = { "2111BAR000000000000000000000000000020B592B0000000023F524062415241B2432243223F022FD23212"
+const std::string ar00_resp = { "2111BAR000000000000000000000000000020B592B0000000023F524062415241B2432243223F022FD2321"
+                                "2"
                                 "456247E248B24992"
                                 "4A224B824BF24C424DD24E524FC250A252125292537254F254F252924A1241D2459259425C325D125EA25F"
                                 "32609262A263B265"
@@ -95,7 +96,8 @@ const std::string ar00_resp = { "2111BAR000000000000000000000000000020B592B00000
                                 "A068E0698069A069"
                                 "906940695069A069A069A069A06A006A406A406A906A906A906AF06AF06AF06AD069C068B037E02B202B20"
                                 "1FB13F03" };
-const std::string ar01_resp = { "221FFAR010000000001111000000000000056DF9D8000000001C031BEC1BE51BC51BB71BB51BCD1C071C3E1"
+const std::string ar01_resp = { "221FFAR010000000001111000000000000056DF9D8000000001C031BEC1BE51BC51BB71BB51BCD1C071C3E"
+                                "1"
                                 "C7A1C7B1C6D1C621C4E1C401C301C1B1C0B1BF71BE91BDC1BC61BB81BA61B981B861B771B6E1B5B1B4C1B4"
                                 "31B381B2E1B131B0D1AFF1AF41AE41AD51ACD1AC51AB01A9D1A991A8B1A761A6B1A601A591A491A421A351"
                                 "A341A261A1D1A161A0C1A0019F819EF19E919E019D019C819BA19B219AF19A1199F1994199319871981197"
@@ -198,149 +200,535 @@ const std::string ar01_resp = { "221FFAR010000000001111000000000000056DF9D800000
                                 "800D000300000000000000000000002A003B803B003A803A803A8039803A00398039803980158018001B00"
                                 "19801D80268D6BE3" };
 
+const std::string vr00_resp = "2007BVR0000UAM-05LP                     ,02.02.00                     ,ABCDEFGH         "
+                              "            ,00,0000,H1818384,B6CA3";
+const std::string xr00_resp = "2006AXR000000000000000000000000000000000000000000000005980491000000000000000000000000000"
+                              "000000000000029963";
 
-const std::string vr00_resp = "2007BVR0000UAM-05LP                     ,02.02.00                     ,ABCDEFGH                     ,00,0000,H1818384,B6CA3";
-const std::string xr00_resp = "2006AXR000000000000000000000000000000000000000000000005980491000000000000000000000000000000000000000029963";
+const std::string ar00_resp0 = "2111BAR00000000000111100000000000005C6A64D000000001C8E1C901CDD1D241D601D601D511D441D2D1"
+                               "D"
+                               "151D071CF31CE51CD11CBC1CAC1CA81C911C821C781C691C5B1C4E1C451C301C2B1C1D1C0A1C001BF51BE81"
+                               "BDE1BCE1BC41BBA1BAD1BA01B931B851B821B7A1B6B1B611B531B481B471B3E1B2F1B2A1B1A1B1A1B0E1B02"
+                               "1AFC1AEF1AE71AE11AD61ACF1ACB1ABC1AB91AB01AA61A9D1A9B1A8C1A831A7B1A741A6D1A621A581A4A1A2"
+                               "019FC19E419E41A381A381A351A321A2D1A291A271A221A201A171A161A161A0E1A0D1A041A051A0319FF19"
+                               "FF19F819F619F319F319F019F119ED19E619E619E619E619E719E319E319E219E519E119E319E119E119DD1"
+                               "9DD19DD19E119E119E219E219E219E319E219E319E319E319EC19EC19EC19ED19F019F419F819F819F819F8"
+                               "19FF19FF1A031A051A0D1A0F1A121A19FFFEFFFEFFFEFFFEFFFEFFFEFFFEFFFEFFFEFFFEFFFEFFFE1111111"
+                               "4112311151110110F11121116111B111D111F1121112C113F113F1143114C1153115A117211DD11F5120912"
+                               "0F11FB11B211AE11AE11B411B611CB11DE11E711050F3F0F070F030EEC0ECF0E590E2B0DF70DF20DEE0DEB0"
+                               "DEF0DF20DF90DFD0E040E0B0E0C0E100E100E1F0E210E2C0E2D0DC50BB10B8A0B6A0B4F0B580B580B260B11"
+                               "0AF80AD90AAB0A940A740A6D0A630A5F0A590A590A600A670A670A720A740A750A770A7B0A830A840A8F0A9"
+                               "A0AA10AA80AAA0AB40ABE0AC60ACA0ACC0AD90AE00B070BE30BE30BE10BC50BC10BAC0B9B0B890B770B6A0B"
+                               "530B430B390B290B190B060AFB0AEB0AE20AD10ACA0AC10AB30AA90A950A870A820A6B0A5A0A4F0A420A390"
+                               "A2B0A250A0F0A0A09F909F009E609E109CF09C509BB09AB0999086D07AC079E07950794078A078707790774"
+                               "076B0765075E075A075107510748073F073A07380731072807210721071C071E0724072E073B074D0757076"
+                               "D077C078E079207A407B007C907D707F307F707FB08010809080907AA072A071E0711070C070606FB06FB07"
+                               "0A071207250725073607400749075D076507770781079407C507D307D307D307CE07C907C307C307C107B90"
+                               "7B407AB07AB07AA07A207A207A207A007950795078F078F078E0780078107810780075D073607350733072E"
+                               "072E07270727072707250724071D071B071B0717070D070D070D070D070D070D07020702070107010703072"
+                               "6073B073B07360734072D071D070F0707070706FE06FE06FE06B4066606620662065D065D06580658065806"
+                               "580650065006500650065006570658065F065F066306630663065F065F065F065F065F065F065F065806580"
+                               "6580658065806590659065906590650064C0648064806480650064F064F064F06510651064A06490649064C"
+                               "064C06500651065106590659065906580658065806580658066006600660066006600665066506650665066"
+                               "406640668066A066F066F066F0668066F066F066F066E066E066F066F0674067406750679067A067A067A06"
+                               "7E067F06830683068406880688068E068E068E068E068E0696069506960696069B069B069E06A206A606A60"
+                               "6AE06A606AD06AF06AF06B706B906B906B906BE06C806C806C806C806C906CD06CF06D606D606DE06DE06E6"
+                               "06E906E906EE06F106F606F606FE0708070807080712071207120719071B072107220722072E072E0733073"
+                               "9073C074107420746074B075207580760076107610766076D076D07770779077A0784078F078F0796079B07"
+                               "A307A307AC07B207B707BD07C207C707D207D407DF07DF07E607EF07F307FC0806080C081D081E0827082F0"
+                               "8390843084A08510857085F086B0871087408760885088C0898089A08A108A108A308AB08B108B708C308CB"
+                               "08D908EE090109090922092909300942094D095709660973097C09880993099F09A909B709C309D809DF09E"
+                               "D0A010A070A190A210A330A3D0A4E0A640A7E0A8E0A970AAC0ABB0AC70AD90AE20AF50B020B160B200B2E0B"
+                               "440B520B6B0B820B950BAA0BBC0BCE0BDF0BF80C000C220C320C490C5C0C790C980CAD0CCF0CE10CFA0D180"
+                               "D2F0D4D0D6D0D880DAB0DCB0DE90E0A0E290E430E640E840E930EA70EDD0F2E0F500F790F9C0FC80FED101A"
+                               "10431068109810C010F4111C115B118611B811F512211256128C12C213011337137613B413FC143C149114E"
+                               "51521152D15A1180118A918FE196A19C01A261A9A1AF91B7A1BF11C7A1CF11D6F1DF61E831F101F601EEA1E"
+                               "EA1F5E1F8F1F9120AF21A3229222DF240724B125F126FE27DA2CB42C132A8630C831C4334C3380364B370A3"
+                               "7D33868270639883A3B3AA43B103B793BF83C5834AD3D253D70332538BC26E7FFFE3980394438F338DF38B7"
+                               "33C233C23695369736973690368434D74238426942A042E34303430C436A438A43A843DC44043ECC4451446"
+                               "1FFFEFFFE3C4F429B3CB63CC73CD13CE03CE13CE43CEC45A73BDE3B6D3B6A3B9C3BB73BC63BC83BD33BE03B"
+                               "E83156314330263175317A3187318F319F31A531AA31BF31C931CD16871687165415E5152514C3146414041"
+                               "3AB135612D912B012B212B312B922272239224022492258226D22752280228622A5229722722182218222E2"
+                               "22E622FA23092317232A2330234B23562362236F2389239323A523B423D023D923D9239222B0229F22EF243"
+                               "92449245C2473247E24A624B224C924DE24ED25002511252B25502550252C24DF245224312447245D247024"
+                               "9124B124CC24DE24FE251F252F2553256825831A951A7F1AB11AB31A7E1A0B19D819BF19B41974195919371"
+                               "6E1140413F914DC14E114FD15101527153B1550155014DF1383134C13290C150BFB0BF30BDA0BC90BB20BAA"
+                               "0B9B0B8D0B880B700B660B5C0B5C0B550B630B4E0B530B530B470B440B480B520B520B420B510B490B4E0B4"
+                               "D0B590B540B5C0B6A0B6C0B880BA40B970C180BB90BB90C0D115C118B11A911B711DE11F0120B1218108D0F"
+                               "CC0F9F0F880F630F620F7D0FC30FE00FFA100C1026104B1065108510A310C010CA10F111141114110710F60"
+                               "F07014B014B014B014B0149EC9A3";
+
+const std::string ar04_resp0 = "20010AR0400873B21FFAR04000000000000000000000000002D57FFF000000000978097C097B098A099F09A1"
+                               "09AA09CF09DD09DD09EF09FB09FF0A0C0A160A1F0A310A3D0A440A4F0A580A660A6C0A730A880A940A9B0A9"
+                               "F0AA70AB90AC20AC90ADD0AE30AEC0AFF0B0B0B190B1C0B290B3A0B480B5E0B690B730B830B910BA50BAA0B"
+                               "BA0BCF0BDC0BE20BEF0C0E0C110C290C3A0C460C570C6D0C830C930CB10CC10CCC0CDF0CED0D0D0D190D2F0"
+                               "D3E0D590D710D8C0DA40DB90DD10DEA0DFC0E1C0E320E560E750E970EAF0EC80EDA0EE50EF30F150F320F72"
+                               "0F8C0FB10FD00FEA101610351058107C109410C410EC11091134115C118411B411D8120712351258128612A"
+                               "D12E613171345138313BF13EC14211460149E14D5151F15551556155B15BB1741183B189018D81929197119"
+                               "BF1A1B1A701AC61B241B891BF01C511CBB1D241D8D1DFF1E6E1EE11F5E1FD7205820A420DE2086205F206F2"
+                               "19421B422B5233B23EC24D72503264A271B275628302BA32D2A2F163033315031E6336133CF361536E426E5"
+                               "383B38C62B7A382E3A593AB33B2A3B9A3BFD3C4C3CB732592695384F2B32385F38593875389538D63943324"
+                               "03336387B40B540BE411D415A418E41C441F74203425F428C42B442E743083DF44343438543A043CC43EA3B"
+                               "684379429A425F42413C643C643C403C403C443C423C42452245453AF93AF93B333B413B4E3B593B603B5C3"
+                               "2052FA230EA3102310A15F815E215D5157F152F13FE139D131C129311EE11ED11EE11EE11F22193219821A0"
+                               "21A821AD21BB21C121CF21D521D921E221ED21F5220222132213221C22082176211221C8224F22632277227"
+                               "C22882299229D22BB22BC22CA22DE22E522F42300231523212321089A088508690857085408500846083908"
+                               "320826081D0814080F080207E707EB07E307D307CF07CD07CD07C207A407BB07BB07BE07B907B707B007B00"
+                               "7B207B307B407B407B607B907B707C107C107D907CF07DE07E907EE07E007E407E007F007FF07F908020814"
+                               "082208300831084F089208AE08D8122C1212120712171236124D12611267127D129212A412B712CB12CB115"
+                               "010CF10BF10B410AB10AB10D110F9110F11191128113E1158116311711187119E11AA10840FA90F7F0F680F"
+                               "500F4D0F5C0F900FA90FBC0FCC0FDD0FFB1010101F1035104710651079109210930EE80E600E3D0E230DFC0"
+                               "DFC0DFE0E4B0E5C0E730E8B0EAC0EC30EDA0EF30F0D0F240F370F520F6F0F800FA00FA40F980DC70D510D13"
+                               "0D0C0D090D060D060D030CF90CFB0D620D9F0DB60DCF0DE90E040E150E360E5C0E690E950EB30EC80ECA0EC"
+                               "60EBC0EB40EAE0E9E0E8D0CF80C620C490C430C3E0C380C3C0C310C300C2F0C4C0CE50D060D290D4D0D7E0D"
+                               "9B0DC20DEC0E0D0E110E110E110E050E000DFB0DF10DEE0DE10DE00DDE0DD90DC70C330BBB0BB00BAD0BA70"
+                               "BA70BA70B9F0B9E0B940B960C530CAF0CEF0D260D5E0D830D850D850D790D790D770D790D6E0D6A0D6A0D67"
+                               "0D610D5F0D580D570D590D570D570D520D390B6F0B4A0B3E0B3B0B3D0B3D0B3D0B390B2B0B2B0B3A0B630D2"
+                               "F0D400D400D440D440D400D3A0D390D410D3B0D3B0D3A0D3A0D360D360D360D360D350D350D350D350D350D"
+                               "350D360D300D0B0B470B260B210B210B210B2C0B360B370B380B380B810D2F0D3E0D450D450D470D470D460"
+                               "D480D4E0D4F0D4F0D4C0D4C0D530D540D540D540D570D570D5C0D5C0D5E0D600D5E0D410D150B690B520B59"
+                               "0B5E0B660B750B770B7A0B7B0B820BAD0D750D890D970D9A0DA00DA10DA20DAA0DAC0DB40DB50DBA0DBD0DB"
+                               "D0DC40DC60DC80DC90DBB0DA90D6F0D360D0C0CD10C150BD70BD70BDA0BD80BDC0BD90BDB0BE10BEB0BEC0B"
+                               "EC0BF10BF60BF80C010C010C040C070C0F0C190C1C0C1F0C210C260C370C390C3F0C3F0C4C0C560C560C5A0"
+                               "C650C6B0C710C750C7C0C860CF50EDB0EE30EF40EFE0F0A0F0A0F010EEA0EC70EAB0E880E6B0E560E2E0E1D"
+                               "0E050DE60DCC0DB00D480D360D420D580D910DD30FEF102C1030102510080FF70FC70FBB0F970F800F720F5"
+                               "30F400F2C0F170F060EDC0E9B0E9A0E9A0E950E960EA30EF0112C11351125110B10E710D710BD10A0108E10"
+                               "721058104C10321017100F0FA60FA60FB60FE30FE30FD70FDC0FEC106111FC11FC11E111D611CC11B611A31"
+                               "18D117F116C115F11271127116911AF1362136D136813611348133013211313130912F212CC12FA131B1463"
+                               "14FD14FB14E714D314BD14B214A2148F148F15231C671C4F1C3C1C4F1C851CE81CE81CD81CD81D171D441D8"
+                               "71DC01E171E171E051DEC1DDB1DCA1DB71DA21D881C771C3C1C271C1B1C061BFE1BFE1C1B1C691CB61CD71C"
+                               "D01CBE1CB31CA61C961C881C741C6A1C581C521C3D1C351C1D1C0E1C021BF71BEE1BE31BD31BCE1BC71BBB1"
+                               "BB41BA21B9A1B8C1B891B7E1B6C1B5F1B581B511B4C1B3E1B341B291B1F1B181B171B061B021AFE1AF11AEE"
+                               "1AEA1ADB1ADA1ACF1AC71ABF1ABD1AB51AA81AA01A991A971A8C1A851A7C1A761A721A6D1A6B1A5C1A5C1A5"
+                               "C1A571A501A231A0019F519C819C81A291A2E1A281A221A221A251A1D1A1D1A181A171A171A171A121A101A"
+                               "0D1A0D1A0D1A071A061A061A061A061A001A001A061A071A0619FD1A051A061A061A091A091A081A061A061"
+                               "A0B1A0B1A0B1A081A0B1A0F1A0F1A131A0F1A131A181A1E1A1D1A1D1A1E1A211A271A281A281A2D1A321A3C"
+                               "1A3B1A3C1A3D1A441A4F1A571A5A1A5C1A661A661A671A721A741A7F1A881A8F1A971A9F1AA41AA51AAB1AB"
+                               "61AB9FFFEFFFEFFFEFFFEFFFE11EF11D911C211A411A6119011901198119811A111A411B011B311BC11C311"
+                               "C611DE11DE11E611FD122912A2129F129F129D124F1247125412521255126B1284128B1292129B128510290"
+                               "FE40FB70FA10F840F610F390EFE0ED50EB90EAF0EA90EAF0EB10EB80EBF0EC70ECF0ED30ED90EE20EE70EF7"
+                               "0EFD0F050F0A0F190F190E380CB70C580C460C320C340C2B0BFA0BEA0BD00BC30BA60B820B760B610B4C0B4"
+                               "20B3C0B340140013F014201420146014601410778058005780510057805880560061806180618060805F806"
+                               "000600061005F005D805F0061005E805D805D005C005D005B805B805A0059005A005A0058805A8058005880"
+                               "568055005580540055805480540053005180520050004F004F004F804E804F004E804C004C804C004B004B8"
+                               "04A804A804A8048004800488046804580458046004580458045004400448044004400440044804480448044"
+                               "0044804480450044804500448045004500450044004B8055804300430044004400440043804300430042804"
+                               "300430041804200408040804080408040003F803F803F003E803E003D803D803D003C803C003B003B003A80"
+                               "3A803A803A003A003C804480448044003B003F003B003A803A003A003980390039003880380038003700370"
+                               "031803680360036003580358035003480340033803600388035802F002E00308031002F8033802A802B002A"
+                               "802900278024000D0010802D002700278027002D8035002780240021802300288028801B002C002A002A802"
+                               "B002B002B002B802C000B801D8023801D8028002B0026802400270017002D804B801B80268029002D802E80"
+                               "2E002E002D802C002E002E802E802E002E0027802B002F002E802E002500128018001780198029003180318"
+                               "0338033803380360031802C002C802880288031802E002F002F0031003080128027002E002D802D80160036"
+                               "004080330037002700228024002D003A003F803D803E8030803580360035803580360036003580350035803"
+                               "500358035803580350035003500350036003A803A0039003500348034803480350034803400340036003480"
+                               "34003480350034003400340034002D80378044004B8073807B8071006900560062807700680054805E80480"
+                               "055807B808280858043803B004200448057805C0072006C00820087009200928091805E0042804300408031"
+                               "0027802A002D002D8030002F802E002D802B802B80298032003E003880230020002100350032802D802C000"
+                               "D803B003E803F00428042804300418041804180410041804180410041004B003D8043804200418041804380"
+                               "420042804280428042804200428041804200420041804B804A8041804280438043004400438043004280438"
+                               "0430042804280420042004180418042004180418050804B8043004400448044804500438043804380440043"
+                               "0043804280420042804300420041804280420043004580448054804F8043804480450044804480478045804"
+                               "580448043004380438043004380430043004300428043804300438046004500440045004500450045805400"
+                               "550045003D804C004C004B804E804F004E80490043804300428044004280428042004280458046804A80488"
+                               "049004900490048804800488049004980490049805480560059805A005B005C8057005A0059805A00538042"
+                               "80418040804100438046004D804E804E004E004D804E004E004E004E004F0050804E004F804F0050004F004"
+                               "F0050005000568062005E0062805D005D005F0058804600570059805E805D805E005E005C805C805D005D80"
+                               "5C805E805E005D005D005D805D805D805E805E805E005E005E005D805E005E005F805E80610064006E80700"
+                               "070806E80680067006700660067005B00540052805300530054805480520052805280530053005180518052"
+                               "005280528053805100510051805180528053805280448040804C8047804F805200628064806580638065006"
+                               "00056004F004D804E004D804C804D004D004D004D004C004C804D004C004C004C004C004D004D0045004200"
+                               "4100418041804180478051805180510052004C005780610060805F805F005F005E005B805D805C005C005A0"
+                               "05A805B8059005900578057805700570057805300530051805080508050804B0049004C804C804C804D0056"
+                               "804600450045804480448044804380430043004300430044004300438044004380438043004380458044804"
+                               "480450047005480468045004480440043804300438043804480448044804480458044804500450044803F80"
+                               "418041804500450045005400450042004200418042004200420043004280420042804280430042804280440"
+                               "044004400438043804400448044004F00438043804380430043804300430043004300430043804380438041"
+                               "804580418041004180408041804180420041804180420039803D00408045004080400040804000408040004"
+                               "080418041806D003C803E003E003A803F803D003D003D003D0034003300320032803A003A003F003E803A00"
+                               "360037003D003E0041003D003C803D003D003D003D003400348036804080400040003F80400040804000400"
+                               "03F8040003F8040803F80400040004000408040004080400040804080408040804080410041004100408040"
+                               "804100410040804080410041004100410041004180410041004100418041804180418041004180410042004"
+                               "180418042004200420041804200418041804180420041804200420042004200420041803F00380037003880"
+                               "388042004100420042004200428042004200418042804280428042804200418042004200420042004200420"
+                               "042004200420042004200420041804180420042004280428041004200420041804180418041804180420042"
+                               "004180420042004180420042004200418041804180418042004180418041804200410041804180418041004"
+                               "1804200418041004180410041004100410041004180410041004100410041002A0000000000000000000000"
+                               "09800D0013802100310037803780300030003B804100430042804300398043002F002F002B8027801C00230"
+                               "042804280288029002F002D802E802E002E8030002E802E8030802C80330032003300388041004180388034"
+                               "003380368038003B803C8039803980398039803900390039003880388038803A8035803480348034803F803"
+                               "B803480350036003A00528045004480450044803D8038803800380038003A003C003B802D80348038803F0"
+                               "03";
+
+#include <urg_node/Hack.h>
+#include <locus_cpp/ros_util.h>
 int main(int argc, char** argv)
 {
-  ros::Time::init();
-
-  // Initialize node and nodehandles
-  ros::init(argc, argv, "urg_node");
-
-  uam::AR01Worker ar01;
-  uam::AR00Worker ar00;
-  uam::XR00Worker xr;
-  uam::VR00Worker vr;
-
-
-
-  ROS_WARN_STREAM("AR00 cmd: " << ar00.getCommand());
-  uam::protocol::AR00CommandReply reply;
-  ar00.process(&ar00_resp, reply);
-  ROS_WARN_STREAM("Area Number: " << reply.sensing_data.area_number);
-    ROS_WARN_STREAM("encoder_speed: " << reply.sensing_data.encoder_speed);
-    ROS_WARN_STREAM("erro_code: " << reply.sensing_data.error_code);
-    ROS_WARN_STREAM("error_state: " << reply.sensing_data.error_state);
-    ROS_WARN_STREAM("laser_state_off: " << reply.sensing_data.laser_state_off);
-    ROS_WARN_STREAM("lockout_state: " << reply.sensing_data.lockout_state);
-    ROS_WARN_STREAM("muting_state1: " << reply.sensing_data.muting_state1);
-    ROS_WARN_STREAM("muting_state2: " << reply.sensing_data.muting_state2);
-    ROS_WARN_STREAM("operating_mode: " << reply.sensing_data.operating_mode);
-    ROS_WARN_STREAM("optical_window_contaminated: " << reply.sensing_data.optical_window_contaminated);
-    ROS_WARN_STREAM("ossd1_state: " << reply.sensing_data.ossd1_state);
-    ROS_WARN_STREAM("ossd2_state: " << reply.sensing_data.ossd2_state);
-    ROS_WARN_STREAM("ossd3_state: " << reply.sensing_data.ossd3_state);
-    ROS_WARN_STREAM("ossd4_state: " << reply.sensing_data.ossd4_state);
-    ROS_WARN_STREAM("warning1_state: " << reply.sensing_data.warning1_state);
-    ROS_WARN_STREAM("warning2_state: " << reply.sensing_data.warning2_state);
-
-    ROS_WARN_STREAM("reset_request1: " << reply.sensing_data.reset_request1);
-    ROS_WARN_STREAM("reset_request2: " << reply.sensing_data.reset_request2);
-
-
-    ROS_WARN_STREAM("timestamp: " << reply.sensing_data.timestamp);
-
-//  for (auto& range : reply.ranges)
-//  {
-//	  if (range == (0xFFFC))
-//	  {
-//		  ROS_WARN_STREAM("Laser off");
-//	  }
-//    else if (range <= 0xFFFD)
-//      ROS_WARN_STREAM("range: " << static_cast<float>(range)*0.01);
+   ros::Time::init();
+//locus_cpp::init(argc, argv, "uam_test_node");
+//  // Initialize node and nodehandles
 //
+//  int ip_port;
+//  std::string ip_address;
+//  // Get parameters so we can change these later.
+//  ros::NodeHandle("~").param<std::string>("ip_address", ip_address, "127.0.0.1");
+//  ros::NodeHandle("~").param<int>("ip_port", ip_port, 10940);
+//  uam::TcpClient client;
+//  if(!client.connect(ip_address, ip_port))
+//  {
+//	 ROS_WARN_STREAM("Failed!");
+//	 std::cout << "Done" << std::endl;
+//	 return -1;
 //  }
+//
+//
+//  uam::AR00Worker ar00;
+//  uam::AR01Worker ar01;
+//  uam::XR00Worker xr00;
+//  uam::VR00Worker vr00;
+//  auto hack_sub = ros::NodeHandle().subscribe<urg_node::Hack>(
+//    "hack_test",
+//    1,
+//    [&](const urg_node::Hack::ConstPtr& msg)
+//    {
+//      bool success { false };
+//      switch (msg->code)
+//      {
+//        case 0:
+//        {
+//          uam::protocol::AR00CommandReply status;
+//          success = client.sendAndReceive(ar00, status);
+//          if (success)
+//          {
+//            std::cout <<"area_number is: " << status.sensing_data.area_number<<std::endl;
+//            std::cout <<"encoder_speed is: " << status.sensing_data.encoder_speed<<std::endl;
+//            std::cout <<"error_code is: " << status.sensing_data.error_code<<std::endl;
+//            std::cout <<"error_state is: " << status.sensing_data.error_state<<std::endl;
+//            std::cout <<"laser_state_off is: " << status.sensing_data.laser_state_off<<std::endl;
+//            std::cout <<"lockout_state is: " << status.sensing_data.lockout_state<<std::endl;
+//            std::cout <<"muting_state1 is: " << status.sensing_data.muting_state1<<std::endl;
+//            std::cout <<"muting_state2 is: " << status.sensing_data.muting_state2<<std::endl;
+//            std::cout <<"operating_mode is: " << status.sensing_data.operating_mode<<std::endl;
+//            std::cout <<"optical_window_contaminated is: " << status.sensing_data.optical_window_contaminated<<std::endl;
+//            std::cout <<"ossd1_state is: " << status.sensing_data.ossd1_state<<std::endl;
+//            std::cout <<"ossd2_state is: " << status.sensing_data.ossd2_state<<std::endl;
+//            std::cout <<"ossd3_state is: " << status.sensing_data.ossd3_state<<std::endl;
+//            std::cout <<"ossd4_state is: " << status.sensing_data.ossd4_state<<std::endl;
+//            std::cout <<"reset_request1 is: " << status.sensing_data.reset_request1<<std::endl;
+//            std::cout <<"reset_request2 is: " << status.sensing_data.reset_request2<<std::endl;
+//            std::cout <<"timestamp is: " << status.sensing_data.timestamp<<std::endl;
+//            std::cout <<"warning1_state is: " << status.sensing_data.warning1_state<<std::endl;
+//            std::cout <<"warning2_state is: " << status.sensing_data.warning2_state<<std::endl;
+//          }
+//          break;
+//        }
+//        case 1:
+//        {
+//          uam::protocol::AR01CommandReply status;
+//          success = client.sendAndReceive(ar01, status);
+//          if (success)
+//          {
+//            ROS_WARN_STREAM("area_number is: " << status.sensing_data.area_number);
+//            ROS_WARN_STREAM("encoder_speed is: " << status.sensing_data.encoder_speed);
+//            ROS_WARN_STREAM("error_code is: " << status.sensing_data.error_code);
+//            ROS_WARN_STREAM("error_state is: " << status.sensing_data.error_state);
+//            ROS_WARN_STREAM("laser_state_off is: " << status.sensing_data.laser_state_off);
+//            ROS_WARN_STREAM("lockout_state is: " << status.sensing_data.lockout_state);
+//            ROS_WARN_STREAM("muting_state1 is: " << status.sensing_data.muting_state1);
+//            ROS_WARN_STREAM("muting_state2 is: " << status.sensing_data.muting_state2);
+//            ROS_WARN_STREAM("operating_mode is: " << status.sensing_data.operating_mode);
+//            ROS_WARN_STREAM("optical_window_contaminated is: " << status.sensing_data.optical_window_contaminated);
+//            ROS_WARN_STREAM("ossd1_state is: " << status.sensing_data.ossd1_state);
+//            ROS_WARN_STREAM("ossd2_state is: " << status.sensing_data.ossd2_state);
+//            ROS_WARN_STREAM("ossd3_state is: " << status.sensing_data.ossd3_state);
+//            ROS_WARN_STREAM("ossd4_state is: " << status.sensing_data.ossd4_state);
+//            ROS_WARN_STREAM("reset_request1 is: " << status.sensing_data.reset_request1);
+//            ROS_WARN_STREAM("reset_request2 is: " << status.sensing_data.reset_request2);
+//            ROS_WARN_STREAM("timestamp is: " << status.sensing_data.timestamp);
+//            ROS_WARN_STREAM("warning1_state is: " << status.sensing_data.warning1_state);
+//            ROS_WARN_STREAM("warning2_state is: " << status.sensing_data.warning2_state);
+//          }
+//          break;
+//        }
+//        case 2:
+//        {
+//          uam::protocol::VR00CommandReply status;
+//          success = client.sendAndReceive(vr00, status);
+//          if (success)
+//          {
+//            std::cout << "firmware_version is: "
+//                      << std::string(
+//                           status.version_details.firmware_version.data(),
+//                           status.version_details.firmware_version.size())
+//                      << std::endl;
+//            std::cout << "sensor_model is: "
+//                      << std::string(
+//                           status.version_details.sensor_model.data(),
+//                           status.version_details.sensor_model.size())
+//                      << std::endl;
+//            std::cout << "serial_number is: "
+//                      << std::string(
+//                           status.version_details.serial_number.data(),
+//                           status.version_details.serial_number.size())
+//                      << std::endl;
+//          }
+//          break;
+//        }
+//        case 3:
+//        {
+//          uam::protocol::XR00CommandReply status;
+//          success = client.sendAndReceive(xr00, status);
+//          if (success)
+//          {
+//            std::cout <<"area_number is: " << status.data.area_number << std::endl;
+//            std::cout <<"encoder_speed is: " << status.data.encoder_speed << std::endl;
+//            std::cout <<"error_code is: " << status.data.error_code << std::endl;
+//            std::cout <<"error_state is: " << status.data.error_state << std::endl;
+//            std::cout <<"laser_state_off is: " << status.data.laser_state_off << std::endl;
+//            std::cout <<"lockout_state is: " << status.data.lockout_state << std::endl;
+//            std::cout <<"muting_state1 is: " << status.data.muting_state1 << std::endl;
+//            std::cout <<"muting_state2 is: " << status.data.muting_state2 << std::endl;
+//            std::cout <<"operating_mode is: " << status.data.operating_mode << std::endl;
+//            std::cout <<"optical_window_contaminated is: " << status.data.optical_window_contaminated << std::endl;
+//            std::cout <<"ossd1_state is: " << status.data.ossd1_state << std::endl;
+//            std::cout <<"ossd2_state is: " << status.data.ossd2_state << std::endl;
+//            std::cout <<"ossd3_state is: " << status.data.ossd3_state << std::endl;
+//            std::cout <<"ossd4_state is: " << status.data.ossd4_state << std::endl;
+//            std::cout <<"reset_request1 is: " << status.data.reset_request1 << std::endl;
+//            std::cout <<"reset_request2 is: " << status.data.reset_request2 << std::endl;
+//
+//            std::cout <<"slave1_error_state is: " << status.data.slave1_error_state << std::endl;
+//            std::cout <<"slave1_laser_off_state is: " << status.data.slave1_laser_off_state << std::endl;
+//            std::cout <<"slave1_ossd1_2_state is: " << status.data.slave1_ossd1_2_state << std::endl;
+//            std::cout <<"slave1_ossd3_4_state is: " << status.data.slave1_ossd3_4_state << std::endl;
+//            std::cout <<"slave1_warning_1_state is: " << status.data.slave1_warning_1_state << std::endl;
+//            std::cout <<"slave1_warning_2_state is: " << status.data.slave1_warning_2_state << std::endl;
+//
+//            std::cout <<"slave2_error_state is: " << status.data.slave2_error_state << std::endl;
+//            std::cout <<"slave2_laser_off_state is: " << status.data.slave2_laser_off_state << std::endl;
+//            std::cout <<"slave2_ossd1_2_state is: " << status.data.slave2_ossd1_2_state << std::endl;
+//            std::cout <<"slave2_ossd3_4_state is: " << status.data.slave2_ossd3_4_state << std::endl;
+//            std::cout <<"slave2_warning_1_state is: " << status.data.slave2_warning_1_state << std::endl;
+//            std::cout <<"slave2_warning_2_state is: " << status.data.slave2_warning_2_state << std::endl;
+//
+//            std::cout <<"slave3_error_state is: " << status.data.slave3_error_state << std::endl;
+//            std::cout <<"slave3_laser_off_state is: " << status.data.slave3_laser_off_state << std::endl;
+//            std::cout <<"slave3_ossd1_2_state is: " << status.data.slave3_ossd1_2_state << std::endl;
+//            std::cout <<"slave3_ossd3_4_state is: " << status.data.slave3_ossd3_4_state << std::endl;
+//            std::cout <<"slave3_warning_1_state is: " << status.data.slave3_warning_1_state << std::endl;
+//            std::cout <<"slave3_warning_2_state is: " << status.data.slave3_warning_2_state << std::endl;
+//
+//            std::cout <<"timestamp is: " << status.data.timestamp << std::endl;
+//            std::cout <<"warning1_state is: " << status.data.warning1_state << std::endl;
+//            std::cout <<"warning2_state is: " << status.data.warning2_state << std::endl;
+//          }
+//          break;
+//        }
+//        default:
+//          break;
+//      }
+//
+//      ROS_ERROR_STREAM_COND(!success, "Failed to request command!");
+//    });
+//  ros::spin();
 
-  ROS_WARN_STREAM("AR01 cmd: " << ar01.getCommand());
-  ROS_ERROR_STREAM("AR01");
-  uam::protocol::AR01CommandReply reply1;
-  ar01.process(&ar01_resp, reply1);
-
-  ROS_WARN_STREAM("Area Number: " << reply1.sensing_data.area_number);
-  ROS_WARN_STREAM("encoder_speed: " << reply1.sensing_data.encoder_speed);
-  ROS_WARN_STREAM("erro_code: " << reply1.sensing_data.error_code);
-  ROS_WARN_STREAM("error_state: " << reply1.sensing_data.error_state);
-  ROS_WARN_STREAM("laser_state_off: " << reply1.sensing_data.laser_state_off);
-  ROS_WARN_STREAM("lockout_state: " << reply1.sensing_data.lockout_state);
-  ROS_WARN_STREAM("muting_state1: " << reply1.sensing_data.muting_state1);
-  ROS_WARN_STREAM("muting_state2: " << reply1.sensing_data.muting_state2);
-  ROS_WARN_STREAM("operating_mode: " << reply1.sensing_data.operating_mode);
-  ROS_WARN_STREAM("optical_window_contaminated: " << reply1.sensing_data.optical_window_contaminated);
-  ROS_WARN_STREAM("ossd1_state: " << reply1.sensing_data.ossd1_state);
-  ROS_WARN_STREAM("ossd2_state: " << reply1.sensing_data.ossd2_state);
-  ROS_WARN_STREAM("ossd3_state: " << reply1.sensing_data.ossd3_state);
-  ROS_WARN_STREAM("ossd4_state: " << reply1.sensing_data.ossd4_state);
-  ROS_WARN_STREAM("warning1_state: " << reply1.sensing_data.warning1_state);
-  ROS_WARN_STREAM("warning2_state: " << reply1.sensing_data.warning2_state);
-
-  ROS_WARN_STREAM("reset_request1: " << reply1.sensing_data.reset_request1);
-  ROS_WARN_STREAM("reset_request2: " << reply1.sensing_data.reset_request2);
-
-
-  ROS_WARN_STREAM("timestamp: " << reply1.sensing_data.timestamp);
-//   for (auto& range : reply1.ranges)
-//   {
-// 	  if (range == (0xFFFC))
-// 	  {
-// 		  ROS_WARN_STREAM("Laser off");
-// 	  }
-//     else if (range <= 0xFFFD)
-//       ROS_WARN_STREAM("range: " << static_cast<float>(range)*0.01);
-//   }
-
-
-  ROS_ERROR_STREAM("XR00");
-  ROS_WARN_STREAM("XR00Worker cmd: " << xr.getCommand());
-  uam::protocol::XR00CommandReply replyxr;
-  xr.process(&xr00_resp, replyxr);
-  ROS_WARN_STREAM("Area Number: " << replyxr.data.area_number);
-  ROS_WARN_STREAM("encoder_speed: " << replyxr.data.encoder_speed);
-  ROS_WARN_STREAM("erro_code: " << replyxr.data.error_code);
-  ROS_WARN_STREAM("error_state: " << replyxr.data.error_state);
-  ROS_WARN_STREAM("laser_state_off: " << replyxr.data.laser_state_off);
-  ROS_WARN_STREAM("lockout_state: " << replyxr.data.lockout_state);
-  ROS_WARN_STREAM("muting_state1: " << replyxr.data.muting_state1);
-  ROS_WARN_STREAM("muting_state2: " << replyxr.data.muting_state2);
-  ROS_WARN_STREAM("operating_mode: " << replyxr.data.operating_mode);
-  ROS_WARN_STREAM("optical_window_contaminated: " << replyxr.data.optical_window_contaminated);
-  ROS_WARN_STREAM("ossd1_state: " << replyxr.data.ossd1_state);
-  ROS_WARN_STREAM("ossd2_state: " << replyxr.data.ossd2_state);
-  ROS_WARN_STREAM("ossd3_state: " << replyxr.data.ossd3_state);
-  ROS_WARN_STREAM("ossd4_state: " << replyxr.data.ossd4_state);
-  ROS_WARN_STREAM("warning1_state: " << replyxr.data.warning1_state);
-  ROS_WARN_STREAM("warning2_state: " << replyxr.data.warning2_state);
-
-  ROS_WARN_STREAM("reset_request1: " << replyxr.data.reset_request1);
-  ROS_WARN_STREAM("reset_request2: " << replyxr.data.reset_request2);
-
-  ROS_WARN_STREAM("slave1_error_state: " << replyxr.data.slave1_error_state);
-  ROS_WARN_STREAM("slave1_laser_off_state: " << replyxr.data.slave1_laser_off_state);
-  ROS_WARN_STREAM("slave1_ossd1_2_state: " << replyxr.data.slave1_ossd1_2_state);
-  ROS_WARN_STREAM("slave1_ossd3_4_state: " << replyxr.data.slave1_ossd3_4_state);
-  ROS_WARN_STREAM("slave1_warning_1_state: " << replyxr.data.slave1_warning_1_state);
-  ROS_WARN_STREAM("slave1_warning_2_state: " << replyxr.data.slave1_warning_2_state);
-
-  ROS_WARN_STREAM("slave2_error_state: " << replyxr.data.slave2_error_state);
-  ROS_WARN_STREAM("slave2_laser_off_state: " << replyxr.data.slave2_laser_off_state);
-  ROS_WARN_STREAM("slave2_ossd1_2_state: " << replyxr.data.slave2_ossd1_2_state);
-  ROS_WARN_STREAM("slave2_ossd3_4_state: " << replyxr.data.slave2_ossd3_4_state);
-  ROS_WARN_STREAM("slave2_warning_1_state: " << replyxr.data.slave2_warning_1_state);
-  ROS_WARN_STREAM("slave2_warning_2_state: " << replyxr.data.slave2_warning_2_state);
-
-  ROS_WARN_STREAM("slave3_error_state: " << replyxr.data.slave3_error_state);
-  ROS_WARN_STREAM("slave3_laser_off_state: " << replyxr.data.slave3_laser_off_state);
-  ROS_WARN_STREAM("slave3_ossd1_2_state: " << replyxr.data.slave3_ossd1_2_state);
-  ROS_WARN_STREAM("slave3_ossd3_4_state: " << replyxr.data.slave3_ossd3_4_state);
-  ROS_WARN_STREAM("slave3_warning_1_state: " << replyxr.data.slave3_warning_1_state);
-  ROS_WARN_STREAM("slave3_warning_2_state: " << replyxr.data.slave3_warning_2_state);
-
-  ROS_WARN_STREAM("timestamp: " << replyxr.data.timestamp);
-  ROS_WARN_STREAM("VR00Worker cmd: " << vr.getCommand());
-  uam::protocol::VR00CommandReply replyvr;
-  vr.process(&vr00_resp, replyvr);
-  auto fwVesion = std::string(replyvr.version_details.firmware_version.data(),replyvr.version_details.firmware_version.size());
-  auto sensorModel = std::string(replyvr.version_details.sensor_model.data(),replyvr.version_details.sensor_model.size());
-  ROS_WARN_STREAM("FW version: " << fwVesion);
-  ROS_WARN_STREAM("Sensor Model: "<< sensorModel);
+//  ros::Time::init();
+//
+//  // Initialize node and nodehandles
+//  ros::init(argc, argv, "uam_test_node");
+//  uam::AR01Worker ar01;
+//  uam::AR00Worker ar00;
+//  uam::XR00Worker xr;
+//  uam::VR00Worker vr;
+//  uam::protocol::UBufferType reply;
+//  ROS_WARN_STREAM("AR00 cmd: " << ar00.getCommand());
+//  strncpy(reply.raw_buffer.data(), ar00_resp.c_str(), ar00_resp.size());
+//  uam::protocol::AR00CommandReply relpy_from_buffer;
+//
+//  ar00.process(&ar00_resp, relpy_from_buffer);
+//  ar00.process(reply.ar00_reply);
+//  ROS_WARN_STREAM("Area Number: " << reply.ar00_reply.sensing_data.area_number);
+//  ROS_WARN_STREAM("encoder_speed: " << reply.ar00_reply.sensing_data.encoder_speed);
+//  ROS_WARN_STREAM("erro_code: " << reply.ar00_reply.sensing_data.error_code);
+//  ROS_WARN_STREAM("error_state: " << reply.ar00_reply.sensing_data.error_state);
+//  ROS_WARN_STREAM("laser_state_off: " << reply.ar00_reply.sensing_data.laser_state_off);
+//  ROS_WARN_STREAM("lockout_state: " << reply.ar00_reply.sensing_data.lockout_state);
+//  ROS_WARN_STREAM("muting_state1: " << reply.ar00_reply.sensing_data.muting_state1);
+//  ROS_WARN_STREAM("muting_state2: " << reply.ar00_reply.sensing_data.muting_state2);
+//  ROS_WARN_STREAM("operating_mode: " << reply.ar00_reply.sensing_data.operating_mode);
+//  ROS_WARN_STREAM("optical_window_contaminated: " << reply.ar00_reply.sensing_data.optical_window_contaminated);
+//  ROS_WARN_STREAM("ossd1_state: " << reply.ar00_reply.sensing_data.ossd1_state);
+//  ROS_WARN_STREAM("ossd2_state: " << reply.ar00_reply.sensing_data.ossd2_state);
+//  ROS_WARN_STREAM("ossd3_state: " << reply.ar00_reply.sensing_data.ossd3_state);
+//  ROS_WARN_STREAM("ossd4_state: " << reply.ar00_reply.sensing_data.ossd4_state);
+//  ROS_WARN_STREAM("warning1_state: " << reply.ar00_reply.sensing_data.warning1_state);
+//  ROS_WARN_STREAM("warning2_state: " << reply.ar00_reply.sensing_data.warning2_state);
+//
+//  ROS_WARN_STREAM("reset_request1: " << reply.ar00_reply.sensing_data.reset_request1);
+//  ROS_WARN_STREAM("reset_request2: " << reply.ar00_reply.sensing_data.reset_request2);
+//
+//  ROS_WARN_STREAM("timestamp: " << reply.ar00_reply.sensing_data.timestamp);
+//
+//    for (auto& range : reply.ar00_reply.ranges)
+//    {
+//  	  if (range == (0xFFFC))
+//  	  {
+//  		  ROS_WARN_STREAM("Laser off");
+//  	  }
+//      else if (range <= 0xFFFD)
+//        ROS_WARN_STREAM("range: " << static_cast<float>(range)*0.01);
+//
+//    }
+//
+//    ROS_WARN_STREAM("AR01 cmd: " << ar01.getCommand());
+//    ROS_ERROR_STREAM("AR01");
+//    uam::protocol::AR01CommandReply reply1;
+//    ar01.process(&ar01_resp, reply1);
+//
+//    ROS_WARN_STREAM("Area Number: " << reply1.sensing_data.area_number);
+//    ROS_WARN_STREAM("encoder_speed: " << reply1.sensing_data.encoder_speed);
+//    ROS_WARN_STREAM("erro_code: " << reply1.sensing_data.error_code);
+//    ROS_WARN_STREAM("error_state: " << reply1.sensing_data.error_state);
+//    ROS_WARN_STREAM("laser_state_off: " << reply1.sensing_data.laser_state_off);
+//    ROS_WARN_STREAM("lockout_state: " << reply1.sensing_data.lockout_state);
+//    ROS_WARN_STREAM("muting_state1: " << reply1.sensing_data.muting_state1);
+//    ROS_WARN_STREAM("muting_state2: " << reply1.sensing_data.muting_state2);
+//    ROS_WARN_STREAM("operating_mode: " << reply1.sensing_data.operating_mode);
+//    ROS_WARN_STREAM("optical_window_contaminated: " << reply1.sensing_data.optical_window_contaminated);
+//    ROS_WARN_STREAM("ossd1_state: " << reply1.sensing_data.ossd1_state);
+//    ROS_WARN_STREAM("ossd2_state: " << reply1.sensing_data.ossd2_state);
+//    ROS_WARN_STREAM("ossd3_state: " << reply1.sensing_data.ossd3_state);
+//    ROS_WARN_STREAM("ossd4_state: " << reply1.sensing_data.ossd4_state);
+//    ROS_WARN_STREAM("warning1_state: " << reply1.sensing_data.warning1_state);
+//    ROS_WARN_STREAM("warning2_state: " << reply1.sensing_data.warning2_state);
+//
+//    ROS_WARN_STREAM("reset_request1: " << reply1.sensing_data.reset_request1);
+//    ROS_WARN_STREAM("reset_request2: " << reply1.sensing_data.reset_request2);
+//
+//    ROS_WARN_STREAM("timestamp: " << reply1.sensing_data.timestamp);
+//    //   for (auto& range : reply1.ranges)
+//    //   {
+//    // 	  if (range == (0xFFFC))
+//    // 	  {
+//    // 		  ROS_WARN_STREAM("Laser off");
+//    // 	  }
+//    //     else if (range <= 0xFFFD)
+//    //       ROS_WARN_STREAM("range: " << static_cast<float>(range)*0.01);
+//    //   }
+//
+//    ROS_ERROR_STREAM("XR00");
+//    ROS_WARN_STREAM("XR00Worker cmd: " << xr.getCommand());
+//    uam::protocol::XR00CommandReply replyxr;
+//    xr.process(&xr00_resp, replyxr);
+//    ROS_WARN_STREAM("Area Number: " << replyxr.data.area_number);
+//    ROS_WARN_STREAM("encoder_speed: " << replyxr.data.encoder_speed);
+//    ROS_WARN_STREAM("erro_code: " << replyxr.data.error_code);
+//    ROS_WARN_STREAM("error_state: " << replyxr.data.error_state);
+//    ROS_WARN_STREAM("laser_state_off: " << replyxr.data.laser_state_off);
+//    ROS_WARN_STREAM("lockout_state: " << replyxr.data.lockout_state);
+//    ROS_WARN_STREAM("muting_state1: " << replyxr.data.muting_state1);
+//    ROS_WARN_STREAM("muting_state2: " << replyxr.data.muting_state2);
+//    ROS_WARN_STREAM("operating_mode: " << replyxr.data.operating_mode);
+//    ROS_WARN_STREAM("optical_window_contaminated: " << replyxr.data.optical_window_contaminated);
+//    ROS_WARN_STREAM("ossd1_state: " << replyxr.data.ossd1_state);
+//    ROS_WARN_STREAM("ossd2_state: " << replyxr.data.ossd2_state);
+//    ROS_WARN_STREAM("ossd3_state: " << replyxr.data.ossd3_state);
+//    ROS_WARN_STREAM("ossd4_state: " << replyxr.data.ossd4_state);
+//    ROS_WARN_STREAM("warning1_state: " << replyxr.data.warning1_state);
+//    ROS_WARN_STREAM("warning2_state: " << replyxr.data.warning2_state);
+//
+//    ROS_WARN_STREAM("reset_request1: " << replyxr.data.reset_request1);
+//    ROS_WARN_STREAM("reset_request2: " << replyxr.data.reset_request2);
+//
+//    ROS_WARN_STREAM("slave1_error_state: " << replyxr.data.slave1_error_state);
+//    ROS_WARN_STREAM("slave1_laser_off_state: " << replyxr.data.slave1_laser_off_state);
+//    ROS_WARN_STREAM("slave1_ossd1_2_state: " << replyxr.data.slave1_ossd1_2_state);
+//    ROS_WARN_STREAM("slave1_ossd3_4_state: " << replyxr.data.slave1_ossd3_4_state);
+//    ROS_WARN_STREAM("slave1_warning_1_state: " << replyxr.data.slave1_warning_1_state);
+//    ROS_WARN_STREAM("slave1_warning_2_state: " << replyxr.data.slave1_warning_2_state);
+//
+//    ROS_WARN_STREAM("slave2_error_state: " << replyxr.data.slave2_error_state);
+//    ROS_WARN_STREAM("slave2_laser_off_state: " << replyxr.data.slave2_laser_off_state);
+//    ROS_WARN_STREAM("slave2_ossd1_2_state: " << replyxr.data.slave2_ossd1_2_state);
+//    ROS_WARN_STREAM("slave2_ossd3_4_state: " << replyxr.data.slave2_ossd3_4_state);
+//    ROS_WARN_STREAM("slave2_warning_1_state: " << replyxr.data.slave2_warning_1_state);
+//    ROS_WARN_STREAM("slave2_warning_2_state: " << replyxr.data.slave2_warning_2_state);
+//
+//    ROS_WARN_STREAM("slave3_error_state: " << replyxr.data.slave3_error_state);
+//    ROS_WARN_STREAM("slave3_laser_off_state: " << replyxr.data.slave3_laser_off_state);
+//    ROS_WARN_STREAM("slave3_ossd1_2_state: " << replyxr.data.slave3_ossd1_2_state);
+//    ROS_WARN_STREAM("slave3_ossd3_4_state: " << replyxr.data.slave3_ossd3_4_state);
+//    ROS_WARN_STREAM("slave3_warning_1_state: " << replyxr.data.slave3_warning_1_state);
+//    ROS_WARN_STREAM("slave3_warning_2_state: " << replyxr.data.slave3_warning_2_state);
+//
+//    ROS_WARN_STREAM("timestamp: " << replyxr.data.timestamp);
+//    ROS_WARN_STREAM("VR00Worker cmd: " << vr.getCommand());
+//
+//
+//    ROS_ERROR_STREAM("XR00 New ");
+//       ROS_WARN_STREAM("XR00Worker cmd: " << xr.getCommand());
+//    strncpy((char*)reply.raw_buffer.data(), xr00_resp.c_str(), xr00_resp.size());
+//
+//       xr.process(reply.xr00_reply);
+//       ROS_WARN_STREAM("Area Number: " << reply.xr00_reply.data.area_number);
+//       ROS_WARN_STREAM("encoder_speed: " << reply.xr00_reply.data.encoder_speed);
+//       ROS_WARN_STREAM("erro_code: " << reply.xr00_reply.data.error_code);
+//       ROS_WARN_STREAM("error_state: " << reply.xr00_reply.data.error_state);
+//       ROS_WARN_STREAM("laser_state_off: " << reply.xr00_reply.data.laser_state_off);
+//       ROS_WARN_STREAM("lockout_state: " << reply.xr00_reply.data.lockout_state);
+//       ROS_WARN_STREAM("muting_state1: " << reply.xr00_reply.data.muting_state1);
+//       ROS_WARN_STREAM("muting_state2: " << reply.xr00_reply.data.muting_state2);
+//       ROS_WARN_STREAM("operating_mode: " << reply.xr00_reply.data.operating_mode);
+//       ROS_WARN_STREAM("optical_window_contaminated: " << reply.xr00_reply.data.optical_window_contaminated);
+//       ROS_WARN_STREAM("ossd1_state: " << reply.xr00_reply.data.ossd1_state);
+//       ROS_WARN_STREAM("ossd2_state: " << reply.xr00_reply.data.ossd2_state);
+//       ROS_WARN_STREAM("ossd3_state: " << reply.xr00_reply.data.ossd3_state);
+//       ROS_WARN_STREAM("ossd4_state: " << reply.xr00_reply.data.ossd4_state);
+//       ROS_WARN_STREAM("warning1_state: " << reply.xr00_reply.data.warning1_state);
+//       ROS_WARN_STREAM("warning2_state: " << reply.xr00_reply.data.warning2_state);
+//
+//       ROS_WARN_STREAM("reset_request1: " << reply.xr00_reply.data.reset_request1);
+//       ROS_WARN_STREAM("reset_request2: " << reply.xr00_reply.data.reset_request2);
+//
+//       ROS_WARN_STREAM("slave1_error_state: " << reply.xr00_reply.data.slave1_error_state);
+//       ROS_WARN_STREAM("slave1_laser_off_state: " << reply.xr00_reply.data.slave1_laser_off_state);
+//       ROS_WARN_STREAM("slave1_ossd1_2_state: " << reply.xr00_reply.data.slave1_ossd1_2_state);
+//       ROS_WARN_STREAM("slave1_ossd3_4_state: " << reply.xr00_reply.data.slave1_ossd3_4_state);
+//       ROS_WARN_STREAM("slave1_warning_1_state: " << reply.xr00_reply.data.slave1_warning_1_state);
+//       ROS_WARN_STREAM("slave1_warning_2_state: " << reply.xr00_reply.data.slave1_warning_2_state);
+//
+//       ROS_WARN_STREAM("slave2_error_state: " << reply.xr00_reply.data.slave2_error_state);
+//       ROS_WARN_STREAM("slave2_laser_off_state: " << reply.xr00_reply.data.slave2_laser_off_state);
+//       ROS_WARN_STREAM("slave2_ossd1_2_state: " << reply.xr00_reply.data.slave2_ossd1_2_state);
+//       ROS_WARN_STREAM("slave2_ossd3_4_state: " << reply.xr00_reply.data.slave2_ossd3_4_state);
+//       ROS_WARN_STREAM("slave2_warning_1_state: " << reply.xr00_reply.data.slave2_warning_1_state);
+//       ROS_WARN_STREAM("slave2_warning_2_state: " << reply.xr00_reply.data.slave2_warning_2_state);
+//
+//       ROS_WARN_STREAM("slave3_error_state: " << reply.xr00_reply.data.slave3_error_state);
+//       ROS_WARN_STREAM("slave3_laser_off_state: " << reply.xr00_reply.data.slave3_laser_off_state);
+//       ROS_WARN_STREAM("slave3_ossd1_2_state: " << reply.xr00_reply.data.slave3_ossd1_2_state);
+//       ROS_WARN_STREAM("slave3_ossd3_4_state: " << reply.xr00_reply.data.slave3_ossd3_4_state);
+//       ROS_WARN_STREAM("slave3_warning_1_state: " << reply.xr00_reply.data.slave3_warning_1_state);
+//       ROS_WARN_STREAM("slave3_warning_2_state: " << reply.xr00_reply.data.slave3_warning_2_state);
+//
+//       ROS_WARN_STREAM("timestamp: " << reply.xr00_reply.data.timestamp);
+//       ROS_WARN_STREAM("VR00Worker cmd: " << vr.getCommand());
+//
+//
+//  strncpy((char*)reply.raw_buffer.data(), vr00_resp.c_str(), vr00_resp.size());
+//
+//  printf("this is %d\n", reply.vr00_reply.footer.crc);
+//
+//  ROS_WARN_STREAM("Copied: " << vr00_resp.size() << " " << sizeof(uam::protocol::VR00CommandReply));
+//
+//  vr.process(reply.vr00_reply);
+//  auto fwVesion = std::string(
+//    reply.vr00_reply.version_details.firmware_version.data(),
+//    reply.vr00_reply.version_details.firmware_version.size());
+//  auto sensorModel = std::string(
+//    reply.vr00_reply.version_details.sensor_model.data(),
+//    reply.vr00_reply.version_details.sensor_model.size());
+//  ROS_WARN_STREAM("FW version: " << fwVesion);
+//  ROS_WARN_STREAM("Sensor Model: " << sensorModel);
 }
+

@@ -34,7 +34,7 @@
 
 #ifndef URG_NODE_URG_NODE_DRIVER_H
 #define URG_NODE_URG_NODE_DRIVER_H
-
+#include <uam/uam_driver.h>
 #include <string>
 #include <ros/ros.h>
 #include <dynamic_reconfigure/server.h>
@@ -120,7 +120,7 @@ private:
   int error_count_;
   double freq_min_;
   bool close_diagnostics_;
-  bool close_scan_;
+  std::atomic_bool close_scan_;
 
   int ip_port_;
   std::string ip_address_;

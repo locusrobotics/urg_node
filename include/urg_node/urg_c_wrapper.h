@@ -45,8 +45,8 @@
 #include <urg_c/urg_sensor.h>
 #include <urg_c/urg_connection.h>
 #include <urg_c/urg_utils.h>
-#include <urg_node/uam/uam_protocol_types.h>
-#include <urg_node/uam/uam_visitors.h>
+#include <uam/protocol_types/uam_protocol_types.h>
+#include <uam/uam_visitors.h>
 
 
 
@@ -199,11 +199,11 @@ private:
    */
   std::string sendCommand(const std::string& cmd);
 
-  template <typename T>
-  bool sendAndReceive(T& worker, typename T::Reply& reply, const int timeout = 60)
+  template <typename T, typename TReply = typename T::Reply>
+  bool sendAndReceive(T& worker, TReply& reply, const int timeout = 60)
   {
     bool restart = false;
-    const decltype(uam::protocol::CommandReplyHeader::cmd_size) expected_size = sizeof(typename T::Reply);
+    const decltype(uam::protocol::CommandReplyHeader::cmd_size) expected_size = sizeof(TReply);
     const auto& cmd = worker.getCommand();
     if (connection_write(&urg_.connection, cmd.c_str(), cmd.size()) < 0)
     {
@@ -213,43 +213,28 @@ private:
     std::string recv_buffer;
     recv_buffer.resize(expected_size);
 
-    const size_t stx_cmd_size_len =
-      sizeof(uam::protocol::CommandReplyHeader::stx) + sizeof(uam::protocol::CommandReplyHeader::cmd_size);
+    int recv_bytes = -1;
+    ssize_t nr_bytes_read = 0;
+    do
+    {
+      recv_bytes =
+        connection_read(&urg_.connection, &recv_buffer.at(nr_bytes_read), expected_size - nr_bytes_read, urg_.timeout);
+      if (recv_bytes <= 0)
+      {
+        ROS_ERROR("Read socket failed: %s", strerror(errno));
+        recv_buffer.clear();
+        return false;
+      }
+      nr_bytes_read += recv_bytes;
+    } while (nr_bytes_read != expected_size && ros::ok());
 
-    auto recv_bytes =
-      connection_read(&urg_.connection, &recv_buffer.at(0), static_cast<int>(stx_cmd_size_len), timeout);
-    if (recv_bytes <= 0)
-    {
-      ROS_ERROR_STREAM("Failed to send message. Skipping!");
-      recv_buffer.clear();
-      return false;
-    }
-    uam::CommandHeaderVisitor header(0);
-    decltype(uam::protocol::CommandReplyHeader::cmd_size) incoming_size;
-    header.cmd_size.get(&recv_buffer,incoming_size);
-    if (incoming_size != expected_size)
-    {
-      ROS_ERROR_STREAM(
-        "Failed to recv message as incoming size  differs from expected size: " << incoming_size << " and "
-                                                                                << expected_size);
-	  return false;
-    }
-    recv_bytes = connection_read(
-    	      &urg_.connection,
-              &recv_buffer.at(stx_cmd_size_len),
-    	      incoming_size - static_cast<int>(stx_cmd_size_len),
-    	      timeout);
-    if (recv_bytes <= 0)
-    {
-      ROS_ERROR("Read socket failed: %s", strerror(errno));
-      recv_buffer.clear();
-      return false;
-    }
-    if (!worker.process(&recv_buffer,reply))
-    {
-      ROS_ERROR_STREAM("Failed while parsing reply!");
-      return false;
-    }
+//    auto opt_reply = worker.process(&recv_buffer);
+//    if (!opt_reply.has_data())
+//    {
+//      ROS_ERROR_STREAM("Failed while parsing reply!");
+//      return false;
+//    }
+//    reply = *opt_reply;
     return true;
   }
 

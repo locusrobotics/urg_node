@@ -5,7 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
   diagnostic_updater dynamic_reconfigure laser_proc message_generation
   nodelet rosconsole roscpp sensor_msgs std_msgs std_srvs tf urg_c
 )
-set_directory_properties(PROPERTIES COMPILE_OPTIONS "-std=c++11")
+set_directory_properties(PROPERTIES COMPILE_OPTIONS "-std=c++17")
 
 # Dynamic reconfigure support
 generate_dynamic_reconfigure_options(cfg/URG.cfg)
@@ -33,7 +33,15 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 
 
 ## Declare a cpp library
-add_library(uam_workers src/uam/uam_command_workers.cpp)
+add_library(uam_workers 
+  src/uam/workers/sensing_data/ar00_worker.cpp
+  src/uam/workers/sensing_data/ar01_worker.cpp
+  src/uam/workers/sensing_data/ar06_worker.cpp
+  src/uam/workers/vr00_worker.cpp
+  src/uam/workers/xr00_worker.cpp
+  #src/uam/smart_buffer.cpp
+  src/uam/io/tcp_client.cpp
+  )
 target_link_libraries(uam_workers ${catkin_LIBRARIES})
 add_library(urg_c_wrapper src/urg_c_wrapper.cpp)
 target_link_libraries(urg_c_wrapper uam_workers ${catkin_LIBRARIES})
@@ -54,9 +62,12 @@ target_link_libraries(getID urg_c_wrapper ${catkin_LIBRARIES})
 add_executable (uam_test_node src/uam_test_node.cpp)
 target_link_libraries(uam_test_node urg_c_wrapper ${catkin_LIBRARIES})
 
+add_executable (uam_driver_node src/uam/uam_driver_node.cpp)
+target_link_libraries(uam_driver_node uam_workers ${catkin_LIBRARIES})
+ 
 
 ## Mark executables and/or libraries for installation
-install(TARGETS uam_workers urg_c_wrapper urg_node urg_node_driver getID
+install(TARGETS uam_workers urg_c_wrapper urg_node urg_node_driver getID uam_driver_node uam_test_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -90,12 +101,14 @@ if(CATKIN_ENABLE_TESTING)
   # long, etc. Wrapper must also use these
   set(ROSLINT_CPP_OPTS "--filter=-runtime/references,-runtime/int")
   roslint_cpp(
-    include/urg_node/urg_c_wrapper.h
-    include/urg_node/urg_node_driver.h
-    src/getID.cpp
-    src/urg_c_wrapper.cpp
-    src/urg_node_driver.cpp
-    src/urg_node.cpp
+#    include/urg_node/urg_c_wrapper.h
+#    include/urg_node/urg_node_driver.h
+#    src/getID.cpp
+#    src/urg_c_wrapper.cpp
+#    src/urg_node_driver.cpp
+#    src/urg_node.cpp
+    
+    src/uam/io/tcp_client.cpp
   )
   roslint_add_test()
 

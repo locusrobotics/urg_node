@@ -696,6 +696,6 @@ void UrgNode::run()
 
   // Start scanning now that everything is configured.
   close_scan_ = false;
-  scan_thread_ = boost::thread(boost::bind(&UrgNode::scanThread, this));
+  //scan_thread_ = boost::thread(boost::bind(&UrgNode::scanThread, this));
 }
 }  // namespace urg_node

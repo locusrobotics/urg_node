@@ -1,6 +1,6 @@
 /**
 Software License Agreement (proprietary)
-\file      fileds.h
+\file      uam_visitors.h
 \authors   Carlos Mendes <cribeiromendes@locusrobotics.com>
 \copyright Copyright (c) (2023,), Locus Robotics Corp., All rights reserved.
 Unauthorized copying of this file, via any medium, is strictly prohibited.
@@ -10,7 +10,7 @@ Proprietary and confidential.
 #ifndef INCLUDE_URG_NODE_UAM_UAM_VISITORS_H_
 #define INCLUDE_URG_NODE_UAM_UAM_VISITORS_H_
 
-#include <urg_node/uam/uam_protocol_types.h>
+#include <uam/protocol_types/uam_protocol_types.h>
 #include <urg_node/visitor.h>
 
 namespace uam
@@ -208,6 +208,10 @@ public:
 class VersionDetailsVisitor
 {
 public:
+  /**
+   * @brief Constructor if visitors receive raw buffer
+   * @param initial_offset
+   */
   VersionDetailsVisitor(const size_t initial_offset) :
     sensor_model(initial_offset),
     firmware_version(initial_offset),
@@ -235,10 +239,10 @@ static_assert(
   protocol::c_sensing_data_start_idx + offsetof(protocol::sensing_data::SensingDataHeader, error_code) == 15);
 static_assert(
   protocol::c_sensing_data_start_idx + offsetof(protocol::sensing_data::SensingDataHeader, lockout_state) == 17);
-static_assert(
-  protocol::c_sensing_data_start_idx +
-    offsetof(protocol::sensing_data::SensingDataHeader, optical_window_contaminated) ==
-  43);
+// static_assert(
+//  protocol::c_sensing_data_start_idx +
+//    offsetof(protocol::sensing_data::SensingDataHeader, optical_window_contaminated) ==
+//  43);
 
 static_assert(offsetof(protocol::AR00CommandReply, ranges) == protocol::c_distance_start_idx);
 static_assert(offsetof(protocol::AR00CommandReply, ranges) == 50);

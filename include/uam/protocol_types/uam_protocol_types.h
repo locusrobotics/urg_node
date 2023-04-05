@@ -121,6 +121,7 @@ namespace version_details
 /**
  * @brief
  */
+#pragma pack(1)
 struct VersionDetails
 {
   /**
@@ -156,6 +157,7 @@ struct VersionDetails
    */
   char comma3;
 };
+#pragma pack()
 
 }  // namespace version_details
 
@@ -186,6 +188,7 @@ using IntensityData = uint32_t;
 template <size_t TSize>
 using IntensityDataArray = std::array<IntensityData, TSize>;
 
+
 /**
  * @brief Sensing data reply without distance and intensity
  */
@@ -197,63 +200,63 @@ struct SensingDataHeader
    * 0 - normal
    * 1 - setting
    */
-  bool operating_mode { 0 };
+  bool operating_mode;
   /**
    * @brief Current Safety Area - This is the value that appears in the laser display
    */
-  uint16_t area_number { 0 };
+  uint16_t area_number;
   /**
    * @brief Inform error status
    * 0 - no error
    * 1 - error is detected
    */
-  bool error_state { false };
+  bool error_state;
   /**
    * @brief Error code, used together with error status to show the error number.
    * Check datasheet to see error codes
    */
-  uint16_t error_code { 0 };
+  uint16_t error_code;
   /**
    * @brief Use this information with Error Code to show the error status.
    * Also check the Error State.
    */
-  bool lockout_state { false };
+  bool lockout_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool ossd1_state { false };
+  bool ossd1_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool ossd2_state { false };
+  bool ossd2_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool warning1_state { false };
+  bool warning1_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool warning2_state { false };
+  bool warning2_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool ossd3_state { false };
+  bool ossd3_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool ossd4_state { false };
+  bool ossd4_state;
   /**
    * @brief reserved
    */
@@ -263,45 +266,45 @@ struct SensingDataHeader
    * 0 - not active
    * 1 - active
    */
-  bool muting_state1 { false };
+  bool muting_state1;
   /**
    * @brief
    * 0 - not active
    * 1 - active
    */
-  bool muting_state2 { false };
+  bool muting_state2;
   /**
    * @brief
    * 0 - Off
    * 1 - On
    */
-  bool reset_request1 { false };
+  bool reset_request1;
   /**
    * @brief
    * 0 - Off
    * 1 - On
    */
-  bool reset_request2 { false };
+  bool reset_request2;
   /**
    * @brief Encoder Speed
    */
-  uint32_t encoder_speed { 0 };
+  uint32_t encoder_speed;
   /**
    * @brief Unit is millisecond
    */
-  uint64_t timestamp { 0 };
+  uint64_t timestamp;
   /**
    * @brief
    * 0 - Laser is emitting
    * 1 - Laser is stopped
    */
-  bool laser_state_off { false };
+  bool laser_state_off;
   /**
    * @brief Data will be 1 when optical window starts to accumulate dust.
    * Use this information to clean the optical window before it
    * becomes severe leading the device to error state (error 85, b1 ~ c1).
    */
-  bool optical_window_contaminated { false };
+  bool optical_window_contaminated;
   /**
    * @brief reserved
    */
@@ -321,63 +324,63 @@ struct StatusData
    * 0 - normal
    * 1 - setting
    */
-  bool operating_mode { 0 };
+  bool operating_mode;
   /**
    * @brief Current Safety Area - This is the value that appears in the laser display
    */
-  uint16_t area_number { 0 };
+  uint16_t area_number;
   /**
    * @brief Inform error status
    * 0 - no error
    * 1 - error is detected
    */
-  bool error_state { false };
+  bool error_state;
   /**
    * @brief Error code, used together with error status to show the error number.
    * Check datasheet to see error codes
    */
-  uint16_t error_code { 0 };
+  uint16_t error_code ;
   /**
    * @brief Use this information with Error Code to show the error status.
    * Also check the Error State.
    */
-  bool lockout_state { false };
+  bool lockout_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool ossd1_state { false };
+  bool ossd1_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool ossd2_state { false };
+  bool ossd2_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool warning1_state { false };
+  bool warning1_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool warning2_state { false };
+  bool warning2_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool ossd3_state { false };
+  bool ossd3_state;
   /**
    * @brief
    * 0 - no detection
    * 1 - detection
    */
-  bool ossd4_state { false };
+  bool ossd4_state;
   /**
    * @brief reserved
    */
@@ -387,119 +390,119 @@ struct StatusData
    * 0 - not active
    * 1 - active
    */
-  bool muting_state1 { false };
+  bool muting_state1;
   /**
    * @brief
    * 0 - not active
    * 1 - active
    */
-  bool muting_state2 { false };
+  bool muting_state2;
   /**
    * @brief
    * 0 - Off
    * 1 - On
    */
-  bool reset_request1 { false };
+  bool reset_request1;
   /**
    * @brief
    * 0 - Off
    * 1 - On
    */
-  bool reset_request2 { false };
+  bool reset_request2;
   /**
    * @brief Encoder Speed
    */
-  uint32_t encoder_speed { 0 };
+  uint32_t encoder_speed;
   /**
    * @brief
    * 0 - Laser is emitting
    * 1 - Laser is stopped
    */
-  bool laser_state_off { false };
+  bool laser_state_off;
   /**
    * @brief
    */
-  bool slave1_ossd1_2_state { false };
+  bool slave1_ossd1_2_state;
   /**
    * @brief
    */
-  bool slave2_ossd1_2_state { false };
+  bool slave2_ossd1_2_state;
   /**
    * @brief
    */
-  bool slave3_ossd1_2_state { false };
+  bool slave3_ossd1_2_state;
   /**
    * @brief
    */
-  bool slave1_ossd3_4_state { false };
+  bool slave1_ossd3_4_state;
   /**
    * @brief
    */
-  bool slave2_ossd3_4_state { false };
+  bool slave2_ossd3_4_state;
   /**
    * @brief
    */
-  bool slave3_ossd3_4_state { false };
+  bool slave3_ossd3_4_state;
   /**
    * @brief
    */
-  bool slave1_warning_1_state { false };
+  bool slave1_warning_1_state;
   /**
    * @brief
    */
-  bool slave2_warning_1_state { false };
+  bool slave2_warning_1_state;
   /**
    * @brief
    */
-  bool slave3_warning_1_state { false };
+  bool slave3_warning_1_state;
   /**
    * @brief
    */
-  bool slave1_warning_2_state { false };
+  bool slave1_warning_2_state;
   /**
    * @brief
    */
-  bool slave2_warning_2_state { false };
+  bool slave2_warning_2_state;
   /**
    * @brief
    */
-  bool slave3_warning_2_state { false };
+  bool slave3_warning_2_state;
   /**
    * @brief
    */
-  bool slave1_error_state { false };
+  bool slave1_error_state;
   /**
    * @brief
    */
-  bool slave2_error_state { false };
+  bool slave2_error_state;
   /**
    * @brief
    */
-  bool slave3_error_state { false };
+  bool slave3_error_state;
 
   /**
    * @brief
    */
-  bool slave1_laser_off_state { false };
+  bool slave1_laser_off_state;
   /**
    * @brief
    */
-  bool slave2_laser_off_state { false };
+  bool slave2_laser_off_state;
   /**
    * @brief
    */
-  bool slave3_laser_off_state { false };
+  bool slave3_laser_off_state;
 
   /**
    * @brief Unit is millisecond
    */
-  uint64_t timestamp { 0 };
+  uint64_t timestamp;
   /**
    * @brief Data will be 1 when optical window starts to accumulate dust.
    * Use this information to clean the optical window before it
    * becomes severe leading the device to error state (error 85, b1 ~ c1).
    */
-  bool optical_window_contaminated { false };
+  bool optical_window_contaminated;
   /**
    * @brief Reserved bytes
    */
@@ -516,6 +519,16 @@ struct StatusData
 struct CommandRequest
 {
   CommandRequestHeader header;
+  CommandFooter footer;
+};
+#pragma pack()
+/**
+ * @brief Host to UAM command struct
+ */
+#pragma pack(1)
+struct EmptyCommandReply
+{
+  CommandReplyHeader header;
   CommandFooter footer;
 };
 #pragma pack()
@@ -552,19 +565,19 @@ struct AR01CommandReply
 /**
  * @brief AR02 first reply, later sends only AR00CommandReply replies types
  */
-using AR02CommandReply = CommandRequest;
+using AR02CommandReply = EmptyCommandReply;
 /**
  * @brief AR03 reply to the the stop continuous data initiated by AR02 request
  */
-using AR03CommandReply = CommandRequest;
+using AR03CommandReply = EmptyCommandReply;
 /**
  * @brief AR04 first reply, later sends only AR01CommandReply replies types
  */
-using AR04CommandReply = CommandRequest;
+using AR04CommandReply = EmptyCommandReply;
 /**
  * @brief AR05 reply to the the stop continuous data initiated by AR04 request
  */
-using AR05CommandReply = CommandRequest;
+using AR05CommandReply = EmptyCommandReply;
 
 /**
  * @brief Command reply
@@ -581,11 +594,11 @@ struct AR06CommandReply
 /**
  * @brief AR07 first reply, later sends only AR06CommandReply replies types
  */
-using AR07CommandReply = CommandRequest;
+using AR07CommandReply = EmptyCommandReply;
 /**
  * @brief AR05 reply to the the stop continuous data initiated by AR07 request
  */
-using AR08CommandReply = CommandRequest;
+using AR08CommandReply = EmptyCommandReply;
 
 #pragma pack(1)
 struct XR00CommandReply
@@ -595,6 +608,8 @@ struct XR00CommandReply
   CommandFooter footer;
 };
 #pragma pack()
+
+
 
 constexpr size_t c_sensing_data_start_idx { sizeof(protocol::CommandReplyHeader) };
 constexpr size_t c_distance_start_idx { sizeof(protocol::CommandReplyHeader) +

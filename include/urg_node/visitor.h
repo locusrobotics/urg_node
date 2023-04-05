@@ -38,7 +38,7 @@
 #include <array>
 #include <sstream>
 #include <string>
-
+#include <iostream>
 template <class T>
 struct is_array : std::is_array<T>
 {
@@ -53,7 +53,7 @@ typename std::enable_if<is_array<TField>::value>::type toFieldFromBuffer(
   const size_t index,
   const uint32_t param_offset,
   const uint32_t width,
-  TField& array)
+  TField& array, bool print)
 {
   const auto step = sizeof(typename TField::value_type);
   for (size_t idx { 0 }; idx < array.size(); idx++)
@@ -71,12 +71,40 @@ typename std::enable_if<!is_array<TField>::value>::type toFieldFromBuffer(
   const size_t index,
   const uint32_t param_offset,
   const uint32_t width,
-  TField& field)
+  TField& field, bool print)
 {
   std::stringstream ss;
+
+  if (print)
+  {
+	  std::cout << "This: " << std::string(buffer->substr(index, width)) << std::endl;
+  }
   ss << buffer->substr(index, width);
   ss >> std::hex >> field;
   field += param_offset;
+}
+
+
+template <typename TField>
+typename std::enable_if<!is_array<TField>::value>::type decodeField(TField& field, bool print = false)
+{
+  std::stringstream ss;
+  if (print)
+  {
+	  std::cout << "This: " << std::string(reinterpret_cast<char*>(&field),sizeof(TField)) << std::endl;
+  }
+  ss << std::string(reinterpret_cast<char*>(&field),sizeof(TField));
+  ss >> std::hex >> field;
+}
+
+template <typename TField>
+typename std::enable_if<is_array<TField>::value>::type decodeField(TField& array)
+{
+  const auto step = sizeof(typename TField::value_type);
+  for (auto& elem : array)
+  {
+    decodeField(elem);
+  }
 }
 
 /**
@@ -93,20 +121,23 @@ public:
    * @param field_index Index of the field in the buffer
    * @param offset Custom offset that needs to be applied to the field
    */
-  Visitor(const uint32_t idx_offset = 0, const uint32_t param_offset = 0) :
+  Visitor(const uint32_t idx_offset, const uint32_t param_offset = 0) :
     index_(TIndex + idx_offset),
     offset_(param_offset),
     width_(sizeof(TField))
   {
   }
   /**
+   * @brief Default c'tor,
+   */
+  Visitor() = default;
+
+  /**
    * @brief
    * @param field
    */
-  void get(const std::string* buffer, TField& field) {
-	  toFieldFromBuffer(buffer, this->index_, this->offset_, this->width_, field); }
-
-
+  void get(const std::string* buffer, TField& field, bool print = false) const {
+	  toFieldFromBuffer(buffer, this->index_, this->offset_, this->width_, field, print); }
 private:
   /**
    * @brief Index of the field in the buffer
