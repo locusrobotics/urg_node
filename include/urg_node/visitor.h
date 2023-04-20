@@ -86,13 +86,9 @@ typename std::enable_if<!is_array<TField>::value>::type toFieldFromBuffer(
 
 
 template <typename TField>
-typename std::enable_if<!is_array<TField>::value>::type decodeField(TField& field, bool print = false)
+typename std::enable_if<!is_array<TField>::value>::type decodeField(TField& field)
 {
   std::stringstream ss;
-  if (print)
-  {
-	  std::cout << "This: " << std::string(reinterpret_cast<char*>(&field),sizeof(TField)) << std::endl;
-  }
   ss << std::string(reinterpret_cast<char*>(&field),sizeof(TField));
   ss >> std::hex >> field;
 }

@@ -39,12 +39,13 @@ add_library(uam_workers
   src/uam/workers/sensing_data/ar06_worker.cpp
   src/uam/workers/vr00_worker.cpp
   src/uam/workers/xr00_worker.cpp
-  #src/uam/smart_buffer.cpp
+  src/uam/workers/uam_command_worker.cpp
   src/uam/io/tcp_client.cpp
   )
 target_link_libraries(uam_workers ${catkin_LIBRARIES})
 add_library(urg_c_wrapper src/urg_c_wrapper.cpp)
 target_link_libraries(urg_c_wrapper uam_workers ${catkin_LIBRARIES})
+
 # Declare the cpp as a lib also
 add_library(urg_node_driver src/urg_node_driver.cpp)
 add_dependencies(urg_node_driver ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_gencpp)

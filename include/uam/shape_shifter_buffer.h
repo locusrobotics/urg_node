@@ -38,7 +38,8 @@ class ShapeShifterBuffer
     return (
       std::is_same<AR00CommandReply, T>::value || std::is_same<AR01CommandReply, T>::value ||
       std::is_same<EmptyCommandReply, T>::value || std::is_same<AR06CommandReply, T>::value ||
-      std::is_same<XR00CommandReply, T>::value || std::is_same<VR00CommandReply, T>::value);
+      std::is_same<XR00CommandReply, T>::value || std::is_same<VR00CommandReply, T>::value ||
+      std::is_same<YRCommandReply, T>::value);
   }
   /**
    * @brief Buffer type
@@ -54,6 +55,7 @@ class ShapeShifterBuffer
     AR06CommandReply ar06_reply;
     XR00CommandReply xr00_reply;
     VR00CommandReply vr00_reply;
+    YRCommandReply yr_reply;
     std::array<char, sizeof(AR01CommandReply)> raw_buffer;
   } buffer;
 
@@ -102,40 +104,46 @@ private:
 };
 
 template <>
-const AR00CommandReply& ShapeShifterBuffer::getImplementation() const
+inline const AR00CommandReply& ShapeShifterBuffer::getImplementation() const
 {
   return buffer.ar00_reply;
 }
 
 template <>
-const AR01CommandReply& ShapeShifterBuffer::getImplementation() const
+inline const AR01CommandReply& ShapeShifterBuffer::getImplementation() const
 {
   return buffer.ar01_reply;
 }
 
 template <>
-const EmptyCommandReply& ShapeShifterBuffer::getImplementation() const
+inline const EmptyCommandReply& ShapeShifterBuffer::getImplementation() const
 {
   return buffer.empty_reply;
 }
 
 template <>
-const AR06CommandReply& ShapeShifterBuffer::getImplementation() const
+inline const AR06CommandReply& ShapeShifterBuffer::getImplementation() const
 {
   return buffer.ar06_reply;
 }
 
 template <>
-const VR00CommandReply& ShapeShifterBuffer::getImplementation() const
+inline const VR00CommandReply& ShapeShifterBuffer::getImplementation() const
 {
   return buffer.vr00_reply;
 }
 
 template <>
-const XR00CommandReply& ShapeShifterBuffer::getImplementation() const
+inline const XR00CommandReply& ShapeShifterBuffer::getImplementation() const
 {
   return buffer.xr00_reply;
 }
+template <>
+inline const YRCommandReply& ShapeShifterBuffer::getImplementation() const
+{
+  return buffer.yr_reply;
+}
+
 }  // namespace protocol
 }  // namespace uam
 

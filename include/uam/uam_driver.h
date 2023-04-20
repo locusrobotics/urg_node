@@ -19,6 +19,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <string>
 #include <uam/workers/uam_command_worker.h>
+#include <uam/workers/yr_worker.h>
 
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/iter_find.hpp>
@@ -41,12 +42,35 @@ struct ScanDetails
   double range_max { 0. };
 };
 
+struct AreaDataUint32_t
+{
+  union
+  {
+    struct
+    {
+      uint32_t reserved_bits : 17;
+      uint32_t value : 15;
+    } s;
+    uint32_t v;
+  };
+};
+
+static_assert(sizeof(AreaDataUint32_t) == 4);
+
+/**
+ * @brief
+ */
 class UamDriver
 {
 public:
+	/**
+	 *
+	 * @param ip_address
+	 * @param ip_port
+	 */
   UamDriver(const std::string& ip_address, const int ip_port) :
     worker_(),
-    client_(std::bind(&UamDriver::processAsync, this, std::placeholders::_1))
+    client_(std::bind(&UamDriver::packetCallback, this, std::placeholders::_1))
   {
     // Try to connect to the lidar
     bool success = client_.connect(ip_address, ip_port);
@@ -63,14 +87,62 @@ public:
   }
 
   /**
-   * @brief
-   * @param packet
+   * @brief Packet Callback from the io handlers
+   * @param Stamped packet
    */
-  inline void processAsync(const uam::protocol::ShapeShifterBuffer& packet)
+  inline void packetCallback(const uam::protocol::ShapeShifterBuffer& packet)
   {
-    auto success = worker_.subscribeCallback(packet);
+    auto success = worker_.processByHandler(packet);
     ROS_ERROR_STREAM_COND(!success, "Failed processing packet");
   }
+
+
+  inline void processYR(const uam::protocol::YRCommandReply& message)
+  {
+    sensor_msgs::LaserScan msg;
+    msg.header.frame_id = scan_details_.frame_id;
+    msg.angle_min = scan_details_.angle_min;
+    msg.angle_max = scan_details_.angle_max;
+    msg.angle_increment = scan_details_.angle_increment;
+    msg.scan_time = scan_details_.scan_period;
+    msg.time_increment = scan_details_.time_increment;
+    msg.range_min = scan_details_.range_min;
+    msg.range_max = scan_details_.range_max;
+
+    // Grab scan
+    long time_stamp = 0;
+    unsigned long long system_time_stamp = 0;
+
+    // Fill scan
+    if (synchronize_time_)
+    {
+      msg.header.stamp = ros::Time::now();
+    }
+    else
+    {
+      msg.header.stamp.fromNSec((uint64_t)system_time_stamp);
+    }
+    // msg.header.stamp = msg.header.stamp + system_latency_ + user_latency_ + getAngularTimeOffset();
+    msg.ranges.resize(message.area_data.size());
+
+    for (size_t i = 0; i < message.area_data.size(); i++)
+    {
+      AreaDataUint32_t range;
+      range.v = message.area_data[i];
+      auto adjusted_range = range.s.value;
+      if (adjusted_range != 0)
+      {
+        msg.ranges[i] = /*range_offset_ +*/ static_cast<float>(adjusted_range) / 1000.0f;
+      }
+      else
+      {
+        msg.ranges[i] = std::numeric_limits<float>::quiet_NaN();
+        continue;
+      }
+    }
+    pub_test_.publish(msg);
+  }
+
 
   ~UamDriver()
   {
@@ -98,8 +170,27 @@ public:
     manualUpdateSensorStatus();
     // Get sensor laser scan details (min angle, max angle, angle increment)
     getScanDetails();
+    // Get and publish safety areas
+    getSafetyAreas();
     // We can start
     can_start_ = true;
+  }
+
+  void getSafetyAreas()
+  {
+    auto reply = client_.syncSendAndReceive<decltype(yr_worker)::Reply>(
+      yr_worker.getCommand(0, uam::EAreaType::protectetion_1, 0, 1080));
+    if (!reply)
+    {
+      std::stringstream ss;
+      ss << "Could not retrieve scan detailsn";
+      throw std::runtime_error(ss.str());
+    }
+    processYR(*reply);
+    ROS_WARN_STREAM("Done for protection zone 1");
+    ROS_WARN_STREAM("Done for protection zone 2");
+    ROS_WARN_STREAM("Done for warning zone 1");
+    ROS_WARN_STREAM("Done for warning zone 2");
   }
 
   void fillScanDetails(const uam::scip_protocol::PPReply& scan_params)
@@ -151,13 +242,7 @@ public:
       throw std::runtime_error(ss.str());
     }
 
-    if (!client_.startAsyncRead(scan_details_.timeout))
-    {
-      std::stringstream ss;
-      ss << "Failed to start async read!";
-      throw std::runtime_error(ss.str());
-    }
-
+    client_.startAsyncRead();
     ROS_INFO_STREAM("Subscription successful!");
     started_continuous_mode_ = true;
   }
@@ -321,6 +406,7 @@ private:
   uam::TcpClient client_;
 
   uam::UamPacketWorker worker_;
+  uam::YRWorker yr_worker;
   uam::PPWorker scip_pp_worker_;
   ros::Publisher pub_test_;
 };

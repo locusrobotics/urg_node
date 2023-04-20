@@ -127,7 +127,7 @@ struct VersionDetails
   /**
    * @brief Sensor model
    */
-  std::array<char,29> sensor_model;
+  std::array<char, 29> sensor_model;
   /**
    * @brief Reserved byte
    */
@@ -135,7 +135,7 @@ struct VersionDetails
   /**
    * @brief Sensor model
    */
-  std::array<char,29> firmware_version;
+  std::array<char, 29> firmware_version;
   /**
    * @brief Reserved byte
    */
@@ -151,7 +151,7 @@ struct VersionDetails
   /**
    * @brief Reserved byte
    */
-  std::array<char,8> serial_number;
+  std::array<char, 8> serial_number;
   /**
    * @brief Reserved byte
    */
@@ -187,7 +187,6 @@ using DistanceDataArray = std::array<DistanceData, TSize>;
 using IntensityData = uint32_t;
 template <size_t TSize>
 using IntensityDataArray = std::array<IntensityData, TSize>;
-
 
 /**
  * @brief Sensing data reply without distance and intensity
@@ -339,7 +338,7 @@ struct StatusData
    * @brief Error code, used together with error status to show the error number.
    * Check datasheet to see error codes
    */
-  uint16_t error_code ;
+  uint16_t error_code;
   /**
    * @brief Use this information with Error Code to show the error status.
    * Also check the Error State.
@@ -609,7 +608,145 @@ struct XR00CommandReply
 };
 #pragma pack()
 
+#pragma pack(1)
+struct YRCommandRequest
+{
+  /**
+   * @brief start of frame
+   */
+  uint8_t stx;
+  /**
+   * @brief It is the total length of ASCII characters in a command.
+   * Command size is encoded to hexadecimal strings.
+   */
+  uint32_t cmd_size;
 
+  /**
+   * @brief It is a unique code to differentiate the type of command.
+   */
+  char header[2];
+  /**
+   * @brief
+   * 00: Protection Zone 1
+   * 01: Protection Zone 2
+   * 02: Warning Zone 1
+   * 03: Warning Zone 2
+   * 04: Muting Area 1
+   * 05: Muting Area 2
+   * 06: Reference Area (Centre)
+   * 07: Reference Area (Max value)
+   * 08: Reference Area (Min Value)
+   */
+  uint16_t area_type;
+
+  /**
+   * @brief Provide the area numbers in hexadecimal equivalent
+   * characters ( 0 to 1F).
+   * Area number should not exceed the configured active area count
+   *
+   * 00: Area 1
+   * 01: Area 2
+   * …
+   * …
+   * 1F: Area 32
+   */
+  uint16_t area_number;
+
+  /**
+   * @brief
+   * Provide the step values in hexadecimal equivalent
+   * characters
+   * - Step values should not exceed the maximum range 0438 (1081 in decimal).
+   * - Start step should not be greater than the end step.
+   */
+  uint32_t start_step;
+  uint32_t end_step;
+  /**
+   * @brief
+   *
+   * this might to what the documentation refers as grouping?
+   * 00/01: No grouping
+   * 02: Grouping two data
+   * 03: Group three data
+   * …
+   * …
+   * 09: Group nine data
+   */
+  uint16_t resolution;
+  CommandFooter footer;
+};
+#pragma pack()
+
+#pragma pack(1)
+struct YRCommandReply
+{
+  /**
+   * @brief start of frame
+   */
+  uint8_t stx;
+  /**
+   * @brief It is the total length of ASCII characters in a command.
+   * Command size is encoded to hexadecimal strings.
+   */
+  uint32_t cmd_size;
+
+  /**
+   * @brief It is a unique code to differentiate the type of command.
+   */
+  char header[2];
+  /**
+   * @brief
+   * 00: Protection Zone 1
+   * 01: Protection Zone 2
+   * 02: Warning Zone 1
+   * 03: Warning Zone 2
+   * 04: Muting Area 1
+   * 05: Muting Area 2
+   * 06: Reference Area (Centre)
+   * 07: Reference Area (Max value)
+   * 08: Reference Area (Min Value)
+   */
+  uint16_t area_type;
+
+  /**
+   * @brief Provide the area numbers in hexadecimal equivalent
+   * characters ( 0 to 1F).
+   * Area number should not exceed the configured active area count
+   *
+   * 00: Area 1
+   * 01: Area 2
+   * …
+   * …
+   * 1F: Area 32
+   */
+  uint16_t area_number;
+
+  /**
+   * @brief
+   * Provide the step values in hexadecimal equivalent
+   * characters
+   * - Step values should not exceed the maximum range 0438 (1081 in decimal).
+   * - Start step should not be greater than the end step.
+   */
+  uint32_t start_step;
+  uint32_t end_step;
+  /**
+   * @brief
+   *
+   * this might to what the documentation refers as grouping?
+   * 00/01: No grouping
+   * 02: Grouping two data
+   * 03: Group three data
+   * …
+   * …
+   * 09: Group nine data
+   */
+  uint16_t resolution;
+  uint16_t status;
+  std::array<uint32_t,1080> area_data;
+  CommandFooter footer;
+};
+#pragma pack()
 
 constexpr size_t c_sensing_data_start_idx { sizeof(protocol::CommandReplyHeader) };
 constexpr size_t c_distance_start_idx { sizeof(protocol::CommandReplyHeader) +

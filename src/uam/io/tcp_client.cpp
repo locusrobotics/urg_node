@@ -22,7 +22,9 @@ TcpClient::TcpClient(OnNewDataCallback callback) :
   io_service_owner_(true),
   io_service_(std::make_shared<boost::asio::io_service>()),
   socket_(*io_service_),
-  callback_(callback)
+  callback_(callback),
+  async_read_in_progress_(false),
+  async_read_should_be_active_(false)
 {
   // Add a fake task to the io_service to prevent it from exiting until desired
   io_work_ = std::make_unique<boost::asio::io_service::work>(*io_service_);
@@ -100,12 +102,15 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
   return true;
 }
 
-bool TcpClient::startAsyncRead(const double timeout)
+void TcpClient::asyncReadData()
 {
-  if (async_read_started_)
-    return true;
-  if (!connected_)
-    return false;
+  if (!connected_ || async_read_should_be_active_)
+  {
+    async_read_in_progress_ = false;
+    return;
+  }
+
+  async_read_in_progress_ = true;
   boost::asio::async_read(
     socket_,
     boost::asio::buffer(receive_buffer_.getRawPacket()),
@@ -115,8 +120,6 @@ bool TcpClient::startAsyncRead(const double timeout)
       this,
       boost::asio::placeholders::error,
       boost::asio::placeholders::bytes_transferred));
-      async_read_started_= true;
-  return true;
 }
 
 void TcpClient::handleReceive(const boost::system::error_code& error_code, size_t bytes_transferred)
@@ -170,15 +173,7 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
       callback_(receive_buffer_);
     }
   }
-  boost::asio::async_read(
-    socket_,
-    boost::asio::buffer(receive_buffer_.getRawPacket()),
-    boost::asio::transfer_exactly(sizeof(protocol::CommandReplyHeader)),
-    boost::bind(
-      &TcpClient::handleReceive,
-      this,
-      boost::asio::placeholders::error,
-      boost::asio::placeholders::bytes_transferred));
+  asyncReadData();
 }
 
 }  // namespace uam

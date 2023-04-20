@@ -83,8 +83,6 @@ public:
    */
   using PacketEventCallback = std::function<void(const Reply)>;
 
-  bool isNull()const{return callback_ == nullptr;}
-
   /**
    * @brief Return encoded request
    *

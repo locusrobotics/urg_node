@@ -15,7 +15,7 @@ Proprietary and confidential.
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <ros/console.h>
+#include <ros/init.h>
 #include <uam/shape_shifter_buffer.h>
 #include <uam/uam_visitors.h>
 
@@ -59,10 +59,39 @@ public:
 
   /**
    * @brief Start Async Read in the worker thread
-   *
-   * @return true if success, false otherwise
    */
-  bool startAsyncRead(const double timeout);
+  void asyncReadData();
+
+  /**
+   * @brief
+   * @return
+   */
+  inline void startAsyncRead()
+  {
+    if (!connected_)
+      return;
+    async_read_should_be_active_ = true;
+    asyncReadData();
+  }
+
+  /**
+   * @brief
+   *
+   * @return
+   */
+  inline void stopAsyncRead()
+  {
+    if (!connected_)
+      return;
+    async_read_should_be_active_ = false;
+
+    while (ros::ok() && async_read_in_progress_)
+    {
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+  }
+
 
   /**
    * @brief Receive handler for Async read
@@ -163,30 +192,37 @@ private:
    * @brief Shape shifter buffer
    */
   protocol::ShapeShifterBuffer receive_buffer_;
+
   /**
    * @brief The Boost IO Service object that manages the asynchronous operations
    */
   std::shared_ptr<boost::asio::io_service> io_service_;
+
   /**
    * @brief Flag if io_service is owned (true) or taken externally (false)
    */
   bool io_service_owner_;
+
   /**
    * @brief Logger Name
    */
   std::string name_;
+
   /**
    * @brief A dedicated thread for running the Boost ASIO event loop
    */
   std::thread io_thread_;
+
   /**
    * @brief A fake task to prevent the io_service from terminating until desired
    */
   std::unique_ptr<boost::asio::io_service::work> io_work_;
+
   /**
    * @brief Remote endpoint
    */
   boost::asio::ip::tcp::endpoint remote_endpoint_;
+
   /**
    * @brief Flag indicating the class is currently connected to the lidar
    *
@@ -194,15 +230,22 @@ private:
    * are cancelled and when the socket says it is closed.
    */
   std::atomic_bool connected_;
+
   /**
    * @brief The UDP socket used for communicating with the lidar
    */
   boost::asio::ip::tcp::socket socket_;
+
   /**
    * @brief
    */
   OnNewDataCallback callback_;
-  std::atomic_bool async_read_started_;
+
+  /**
+   * @brief Async read is in progress
+   */
+  std::atomic_bool async_read_in_progress_;
+  std::atomic_bool async_read_should_be_active_;
 };
 
 }  // namespace uam

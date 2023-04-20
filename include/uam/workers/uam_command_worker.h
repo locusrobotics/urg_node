@@ -44,20 +44,43 @@ public:
    * @brief Call specific worker and get processed message
    *
    * @param[in] packet - Packet to process
+   * return Packet decoded or std::nullopt if
    */
-  template <typename T>
-  auto process(const typename T::Reply packet)
+  template <typename TWorkerType>
+  std::string getCommand()
   {
-    return std::get<T>(workers_).process(packet);
+    return std::get<TWorkerType>(workers_).getCommand();
   }
+
+  /**
+   * @brief Call specific worker and get processed message
+   *
+   * @param[in] packet - Packet to process
+   * return Packet decoded or std::nullopt if
+   */
+  template <typename TWorkerType, typename TReply = typename TWorkerType::Reply>
+  std::optional<TReply> process(const TReply& packet)
+  {
+    return std::get<TWorkerType>(workers_).process(packet);
+  }
+
+  /**
+   * @brief This method is used to process a message which can assume different
+   * types
+   *
+   * @param[in] packet - Packet
+   * @return
+   */
+  bool processByHandler(const protocol::ShapeShifterBuffer& packet);
 
   /**
    * @brief Call specific worker and result will be processed by the registered handler
    *
    * @param[in] f_ - Callback to execute
+   * @return true if successfully processed, false otherwise
    */
   template <typename T>
-  auto processByHandler(const typename T::Reply f_)
+  bool processByHandler(const typename T::Reply f_)
   {
     return std::get<T>(workers_).processByHandler(f_);
   }
@@ -69,56 +92,8 @@ public:
    */
   template <typename T>
   inline void registerCallback(typename T::PacketEventCallback&& f_)
-  {    
+  {
     std::get<T>(workers_).registerEventCallback(std::forward<typename T::PacketEventCallback>(f_));
-  }
-
-  /**
-   *
-   * @tparam T
-   * @return
-   */
-  template <typename T>
-  std::string getCommand() const
-  {
-    return std::get<T>(workers_).getCommand();
-  }
-
-  /**
-   * @brief This method is used to process
-   * messages that were subscribed in continuous mode (AR02, AR04, AR07)
-   *
-   * @param[in] packet - Packet
-   * @return
-   */
-  bool subscribeCallback(const protocol::ShapeShifterBuffer& packet)
-  {
-    const auto packet_type = packet.getPacketHeader();
-    bool valid_packet = false;
-    bool processed_successfully = false;
-
-    if (std::get<AR02Worker>(workers_).validateReplyType(packet.getPacketHeader()))
-    {
-      valid_packet = true;
-      processed_successfully = std::get<AR00Worker>(workers_).processByHandler(packet.get<AR00Worker::Reply>());
-    }
-    else if (std::get<AR04Worker>(workers_).validateReplyType(packet.getPacketHeader()))
-    {
-      valid_packet = true;
-      processed_successfully = std::get<AR01Worker>(workers_).processByHandler(packet.get<AR01Worker::Reply>());
-    }
-    else if (std::get<AR07Worker>(workers_).validateReplyType(packet.getPacketHeader()))
-    {
-      valid_packet = true;
-      processed_successfully = std::get<AR06Worker>(workers_).processByHandler(packet.get<AR06Worker::Reply>());
-    }
-
-    ROS_ERROR_STREAM_COND(
-      !valid_packet,
-      "Invalid packet type with: " << packet_type.header[0] << packet_type.header[1] << packet_type.sub_header[0]
-                                   << packet_type.sub_header[1]);
-    ROS_ERROR_STREAM_COND(!processed_successfully, "Processed fail for packet");
-    return processed_successfully;
   }
 
 private:
