@@ -39,7 +39,8 @@ class ShapeShifterBuffer
       std::is_same<AR00CommandReply, T>::value || std::is_same<AR01CommandReply, T>::value ||
       std::is_same<EmptyCommandReply, T>::value || std::is_same<AR06CommandReply, T>::value ||
       std::is_same<XR00CommandReply, T>::value || std::is_same<VR00CommandReply, T>::value ||
-      std::is_same<YRCommandReply, T>::value);
+      std::is_same<YRCommandReply, T>::value || std::is_same<YRCommandReplyHeader, T>::value ||
+      std::is_same<CommandReplyHeader, T>::value);
   }
   /**
    * @brief Buffer type
@@ -56,6 +57,7 @@ class ShapeShifterBuffer
     XR00CommandReply xr00_reply;
     VR00CommandReply vr00_reply;
     YRCommandReply yr_reply;
+    YRCommandReplyHeader yr_reply_header;
     std::array<char, sizeof(AR01CommandReply)> raw_buffer;
   } buffer;
 
@@ -82,16 +84,11 @@ public:
   template <typename T>
   inline const T& get() const
   {
+	// Easier to understand why compilation failed with this
     static_assert(isSupportedType<T>(), "Invalid expected message type!");
-    // todo: we should do some checks here
     return getImplementation<T>();
   }
 
-  /**
-   * @brief Retrieve packet header so that we know which packet type we should request
-   * @return
-   */
-  inline CommandReplyHeader getPacketHeader() const { return buffer.header; }
 
 private:
   /**
@@ -138,10 +135,22 @@ inline const XR00CommandReply& ShapeShifterBuffer::getImplementation() const
 {
   return buffer.xr00_reply;
 }
+
 template <>
 inline const YRCommandReply& ShapeShifterBuffer::getImplementation() const
 {
   return buffer.yr_reply;
+}
+
+template <>
+inline const YRCommandReplyHeader& ShapeShifterBuffer::getImplementation() const
+{
+  return buffer.yr_reply_header;
+}
+template <>
+inline const CommandReplyHeader& ShapeShifterBuffer::getImplementation() const
+{
+  return buffer.header;
 }
 
 }  // namespace protocol

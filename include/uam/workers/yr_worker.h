@@ -1,6 +1,6 @@
 /**
 Software License Agreement (proprietary)
-\file      xr_00_worker.h
+\file      yr_worker.h
 \authors   Carlos Mendes <cribeiromendes@locusrobotics.com>
 \copyright Copyright (c) (2023,), Locus Robotics Corp., All rights reserved.
 Unauthorized copying of this file, via any medium, is strictly prohibited.
@@ -16,18 +16,9 @@ Proprietary and confidential.
 
 namespace uam
 {
-enum EAreaType : uint16_t
+enum EAreaNumber : uint16_t
 {
-  protectetion_1 = 0,
-  protectetion_2,
-  warning_1,
-  warning_2,
-  muting_1,
-  muting_2,
-  reference_center,
-  reference_max,
-  reference_min,
-  MAX
+  MAX = 32 /**< MAX */
 };
 
 /**
@@ -58,27 +49,77 @@ public:
    */
   inline void registerEventCallback(PacketEventCallback callback) { callback_ = callback; }
 
+  /**
+   * @brief
+   * @param reply
+   * @return
+   */
+  inline bool validateReplyType(const protocol::YRCommandReplyHeader& packet) const
+  {
+    return packet.header.header[0] == 'Y' && packet.header.header[1] == 'R';
+  }
 
+  /**
+   * @brief
+   * @param reply
+   * @return
+   */
+  inline bool validateReplyType(const protocol::CommandReplyHeader& packet) const
+  {
+    return packet.header[0] == 'Y' && packet.header[1] == 'R';
+  }
+  /**
+   * @brief
+   *
+   * @param[in] area_type -
+   * @param[in] area_number - from 1 to TBD
+   * @param[in] start_step
+   * @param[in] end_step
+   * @return
+   */
   std::string getCommand(
-    const uint16_t area_type,
+    const protocol::EYRAreaType area_type,
     const uint16_t area_number,
     const uint32_t start_step,
     const uint32_t end_step)
   {
     Request request;
-    request.stx = 0x02;
-    request.header[0] = 'Y';
-    request.header[1] = 'R';
-    request.cmd_size = sizeof(Request);
-    request.area_number = area_number;
-    request.area_type = area_type;
-    request.start_step = start_step;
-    request.end_step = end_step;
-    request.resolution = 1;
+    request.header.stx = 0x02;
+    request.header.header[0] = 'Y';
+    request.header.header[1] = 'R';
+    request.header.cmd_size = sizeof(Request);
+    request.header.area_number = area_number;
+    request.header.area_type = area_type;
+    request.header.start_step = start_step;
+    request.header.end_step = end_step;
+    request.header.resolution = 1;
     request.footer.etx = 0x03;
     request.footer.crc = calculateCrc(request);
     return encodeCommand(request);
   }
+
+
+  std::optional<Reply> process(const Reply& raw_reply) const
+  {
+    Reply reply = raw_reply;
+    decodeHeaderAndfooter(reply);
+    decodeField(reply.area_data);
+    return reply;
+  }
+
+  bool processByHandler(const Reply& raw_reply)
+  {
+    auto reply = process(raw_reply);
+    if (!reply)
+      return false;
+
+    if (callback_)
+    {
+      callback_(*reply);
+    }
+    return true;
+  }
+
 protected:
   /**
    * @bief Convert value to Hexadecimal in string form
@@ -99,15 +140,15 @@ protected:
   {
     std::string encoded_request;
     encoded_request.reserve(sizeof(Request));
-    encoded_request += request.stx;
-    encoded_request += toHexString(request.cmd_size);
-    encoded_request += request.header[0];
-    encoded_request += request.header[1];
-    encoded_request += toHexString(request.area_type);
-    encoded_request += toHexString(request.area_number);
-    encoded_request += toHexString(request.start_step);
-    encoded_request += toHexString(request.end_step);
-    encoded_request += toHexString(request.resolution);
+    encoded_request += request.header.stx;
+    encoded_request += toHexString(request.header.cmd_size);
+    encoded_request += request.header.header[0];
+    encoded_request += request.header.header[1];
+    encoded_request += toHexString(request.header.area_type);
+    encoded_request += toHexString(request.header.area_number);
+    encoded_request += toHexString(request.header.start_step);
+    encoded_request += toHexString(request.header.end_step);
+    encoded_request += toHexString(request.header.resolution);
     encoded_request += toHexString(request.footer.crc);
     encoded_request += request.footer.etx;
     return encoded_request;
@@ -117,9 +158,10 @@ protected:
   {
     // CRC Calculation
     // create a tmp string of cmd and header
-    std::string size_cmd_str = toHexString(msg.cmd_size) + msg.header[0] + msg.header[1] + toHexString(msg.area_type) +
-                               toHexString(msg.area_number) + toHexString(msg.start_step) + toHexString(msg.end_step) +
-                               toHexString(msg.resolution);
+    std::string size_cmd_str = toHexString(msg.header.cmd_size) + msg.header.header[0] + msg.header.header[1] +
+                               toHexString(msg.header.area_type) + toHexString(msg.header.area_number) +
+                               toHexString(msg.header.start_step) + toHexString(msg.header.end_step) +
+                               toHexString(msg.header.resolution);
     return calculateCrc(size_cmd_str.data(), size_cmd_str.size());
   }
 
@@ -161,67 +203,52 @@ protected:
    * @param[in/out] reply - Raw reply (not decoded)
    * @return true if crc and size are valid false otherwise
    */
-  bool validate(Reply& reply) const
+  bool validateCrc(Reply& reply) const
   {
     // Calculate reply crc
     auto current_crc = calculateReplyCrc(reply);
-    decodeField(reply.footer.crc);
     if (current_crc != reply.footer.crc)
     {
       ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << reply.footer.crc);
       return false;
     }
     // Parse status
-    decodeField(reply.status);
-    return validateStatus(reply);
-  }
-
-  inline bool validateStatus(Reply& reply) const
-  {
-    // Check if status is ok
-    if (reply.status != 0)
-    {
-      std::string error_msg;
-      if (error_codes::YRStatusErrorCodeToString.count(reply.status))
-      {
-        error_msg = std::string("Received bad status: ") + error_codes::YRStatusErrorCodeToString.at(reply.status);
-      }
-      else
-      {
-        error_msg = std::string("Received bad status: unknown error " + reply.status);
-      }
-      ROS_ERROR_STREAM(error_msg);
-      return false;
-    }
     return true;
   }
 
-  std::optional<Reply> process(const Reply& raw_reply) const
+  inline void decodeHeaderAndfooter(Reply& reply) const
   {
-    Reply reply = raw_reply;
-    if (!validate(reply))
-    {
-      return std::nullopt;
-    }
-    decodeField(reply.cmd_size);
-    decodeField(reply.area_type);
-    decodeField(reply.area_number);
-    decodeField(reply.start_step);
-    decodeField(reply.end_step);
-    decodeField(reply.resolution);
-    decodeField(reply.area_data);
-    return reply;
+    decodeField(reply.header.header.cmd_size);
+    decodeField(reply.header.header.area_type);
+    decodeField(reply.header.header.area_number);
+    decodeField(reply.header.header.start_step);
+    decodeField(reply.header.header.end_step);
+    decodeField(reply.header.header.resolution);
+    decodeField(reply.header.status);
+    decodeField(reply.footer.crc);
   }
 
-  bool processByHandler(const Reply& raw_reply)
+  inline bool validateStatus(const uint16_t& status) const
   {
-    auto reply = process(raw_reply);
-    if (!reply)
-      return false;
-
-    if (callback_)
+    // Check if status is ok
+    if (status != 0)
     {
-      callback_(*reply);
+      std::string error_msg;
+      if (error_codes::YRStatusErrorCodeToString.count(status))
+      {
+        error_msg = std::string("Received bad status: ") + error_codes::YRStatusErrorCodeToString.at(status);
+      }
+      else if (error_codes::StatusErrorCodeToString.count(status))
+      {
+        // If the error is not in the YR table, then it might be due to a malformed request, using the std status table
+        error_msg = std::string("Received bad status: ") + error_codes::StatusErrorCodeToString.at(status);
+      }
+      else
+      {
+        error_msg = std::string("Received bad status: unknown error " + status);
+      }
+      ROS_ERROR_STREAM(error_msg);
+      return false;
     }
     return true;
   }

@@ -21,10 +21,7 @@ XR00Worker::XR00Worker(const uint32_t idx_offset) :
 std::optional<XR00Worker::Reply> XR00Worker::decode(const std::string* buffer) const
 {
   Reply reply;
-  if (!validate(buffer, reply))
-  {
-    return std::nullopt;
-  }
+  decodeHeaderAndFooter(buffer, reply);
   decodeStatusData(buffer, reply.data);
   return reply;
 }
@@ -32,10 +29,7 @@ std::optional<XR00Worker::Reply> XR00Worker::decode(const std::string* buffer) c
 std::optional<XR00Worker::Reply> XR00Worker::decode(const Reply& raw_reply) const
 {
   Reply reply = raw_reply;
-  if (!validate(reply))
-  {
-    return std::nullopt;
-  }
+  decodeHeaderAndFooter(reply);
   decodeStatusData(reply.data);
   return reply;
 }

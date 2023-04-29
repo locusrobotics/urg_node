@@ -18,6 +18,7 @@ Proprietary and confidential.
 #include <uam/workers/sensing_data/ar06_worker.h>
 #include <uam/workers/vr00_worker.h>
 #include <uam/workers/xr00_worker.h>
+#include <uam/workers/yr_worker.h>
 
 #include <tuple>
 #include <type_traits>
@@ -46,10 +47,15 @@ public:
    * @param[in] packet - Packet to process
    * return Packet decoded or std::nullopt if
    */
-  template <typename TWorkerType>
-  std::string getCommand()
+  template <typename TWorkerType, typename... TArgs>
+  std::string getCommand(const TArgs... args)
   {
-    return std::get<TWorkerType>(workers_).getCommand();
+    return std::get<TWorkerType>(workers_).getCommand(args...);
+  }
+
+  bool validateReplyHeader(const protocol::CommandReplyHeader& header) const
+  {
+    return validateReplyImplementation(header, workers_);
   }
 
   /**
@@ -91,12 +97,27 @@ public:
    * @param[in] f_ - Callback to execute
    */
   template <typename T>
-  inline void registerCallback(typename T::PacketEventCallback&& f_)
+  inline void registerCallback(typename T::PacketEventCallback f_)
   {
-    std::get<T>(workers_).registerEventCallback(std::forward<typename T::PacketEventCallback>(f_));
+    std::get<T>(workers_).registerEventCallback(f_);
   }
 
 private:
+  /**
+   * @brief Filter function to validate if we have a valid packet based on header
+   * @param header
+   * @param f_tuple
+   * @return
+   */
+  template <typename... TWorkers>
+  static bool validateReplyImplementation(const protocol::CommandReplyHeader& header, std::tuple<TWorkers...> const& workers)
+  {
+    // Verify packet header
+    return std::apply(
+      [&header](TWorkers const&... worker) -> bool { return ((worker.validateReplyType(header)) || ...); },
+      workers);
+  }
+
   /**
    * @brief UAM tupple of packet workers
    */
@@ -111,7 +132,8 @@ private:
     uam::AR07Worker,
     uam::AR08Worker,
     uam::VR00Worker,
-    uam::XR00Worker>
+    uam::XR00Worker,
+	uam::YRWorker>
     workers_;
 };
 }  // namespace uam

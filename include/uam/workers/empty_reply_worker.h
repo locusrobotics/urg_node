@@ -44,16 +44,9 @@ public:
   std::optional<protocol::EmptyCommandReply> decode(const std::string* buffer) const
   {
     protocol::EmptyCommandReply reply;
-    if (!this->validate(buffer, reply))
+    this->decodeHeaderAndFooter(buffer, reply);
+    if (!this->validateCrc(buffer, reply))
     {
-      return std::nullopt;
-    }
-    // Check if status is ok
-    if (reply.header.status != 0)
-    {
-      ROS_WARN_STREAM(
-        "Error while processing " << HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB
-                                  << " first reply. Status is: " << static_cast<uint32_t>(reply.header.status));
       return std::nullopt;
     }
     return reply;
@@ -61,20 +54,16 @@ public:
 
   std::optional<protocol::EmptyCommandReply> decode(const protocol::EmptyCommandReply& raw_reply) const
   {
-	  protocol::EmptyCommandReply reply = raw_reply;
-    if (!this->validate(reply))
+    protocol::EmptyCommandReply reply = raw_reply;
+    this->decodeHeaderAndFooter(reply);
+    if (!this->validateCrc(reply))
     {
-      return std::nullopt;
-    }
-    // Check if status is ok
-    if (reply.header.status != 0)
-    {
-      ROS_WARN_STREAM(
-        "Error while processing reply status: " << static_cast<uint32_t>(reply.header.status));
       return std::nullopt;
     }
     return reply;
   }
+
+  inline const bool validateSize(const size_t recv_bytes) const { return recv_bytes == sizeof(protocol::EmptyCommandReply); }
 };
 }  // namespace uam
 

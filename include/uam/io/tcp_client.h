@@ -33,9 +33,23 @@ public:
   using OnNewDataCallback = std::function<void(const protocol::ShapeShifterBuffer& packet)>;
 
   /**
+   * @brief This
+   */
+  using FilterCallback = std::function<bool(const protocol::CommandReplyHeader& packet)>;
+
+  /**
    * @brief Default C'tor
    */
   TcpClient(OnNewDataCallback callback);
+
+  /**
+   * @brief
+   *
+   * @param name
+   * @param callback
+   * @param external_context
+   */
+  TcpClient(OnNewDataCallback callback, std::shared_ptr<boost::asio::io_service>& external_context);
 
   /**
    * @brief Default D'tor
@@ -58,48 +72,64 @@ public:
   bool connect(const std::string& remote_ip = "", uint16_t remote_port = 0u);
 
   /**
-   * @brief Start Async Read in the worker thread
+   * @brief Place and send order and wait for it to be sent
+   *
+   * @param[in] command - Command to send
+   * @return true if command successfully sent, false otherwise.
    */
-  void asyncReadData();
-
-  /**
-   * @brief
-   * @return
-   */
-  inline void startAsyncRead()
+  inline bool asyncSend(const std::string& command)
   {
     if (!connected_)
-      return;
-    async_read_should_be_active_ = true;
-    asyncReadData();
+      return false;
+    auto send_length = socket_.async_send(boost::asio::buffer(command, command.size()), boost::asio::use_future);
+    return (send_length.get() == command.size());
   }
 
   /**
    * @brief
-   *
    * @return
    */
-  inline void stopAsyncRead()
+  inline bool startAsyncReadTask()
   {
     if (!connected_)
-      return;
-    async_read_should_be_active_ = false;
-
-    while (ros::ok() && async_read_in_progress_)
     {
-      std::this_thread::sleep_for(std::chrono::seconds(1));
+      ROS_WARN_STREAM("Not connected, cannot start async read task");
+      return false;
     }
 
+    if (!stopped_)
+    {
+      ROS_WARN_STREAM("Async read in progress");
+      return true;
+    }
+
+    asyncReadData();
+    stopped_ = false;
+    stop_requested_ = false;
+    return true;
   }
 
-
-  /**
-   * @brief Receive handler for Async read
-   *
-   * @param[in] error_code - Error Code
-   * @param[in] bytes_transferred - Number of bytes written into the buffer
-   */
-  void handleReceive(const boost::system::error_code& error_code, size_t bytes_transferred);
+  inline bool stopAsyncReadTask()
+  {
+    if (!connected_)
+    {
+      ROS_WARN_STREAM("Not connected");
+      return false;
+    }
+    if (stopped_)
+    {
+      ROS_WARN_STREAM("Async read already stopped");
+      return true;
+    }
+    // Request stop
+    stop_requested_ = true;
+    while (ros::ok() && !stopped_)
+    {
+      ROS_INFO_STREAM_THROTTLE(1, "Waiting for the async job to finish...");
+      std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    }
+    return stopped_.load();
+  }
 
   /**
    * @brief Send and receive messages
@@ -111,14 +141,29 @@ public:
   template <typename TReply>
   std::optional<TReply> syncSendAndReceive(const std::string& command)
   {
+    if (!connected_)
+    {
+      ROS_WARN_STREAM("Not connected");
+      return std::nullopt;
+    }
+
+    if (!stopped_)
+    {
+      ROS_ERROR_STREAM("Sync operation not possible as async read is in progress.");
+      return std::nullopt;
+    }
+
     boost::system::error_code error_code;
     socket_.send(boost::asio::buffer(command), command.size(), error_code);
     if (error_code)
     {
       ROS_ERROR_STREAM("Failed to send command: " << error_code.message());
-      ROS_DEBUG_STREAM("Failed to send command: " << command);
       return std::nullopt;
     }
+
+    // We should now understand if the reply is going to be successful or not.
+    // If the device fails to correctly respond, we could get stuck here forever
+    // while expecting for the complete packet
 
     const decltype(uam::protocol::CommandReplyHeader::cmd_size) expected_size = sizeof(TReply);
     auto recv_bytes = boost::asio::read(
@@ -133,9 +178,6 @@ public:
                            << "Expected " << expected_size << " bytes");
       return std::nullopt;
     }
-    ROS_WARN_STREAM(
-      " Received " << recv_bytes << "bytes\n"
-                   << "Expected " << expected_size << " bytes");
     TReply reply = receive_buffer_.get<TReply>();
     return reply;
   }
@@ -149,7 +191,11 @@ public:
   template <typename TReply>
   std::optional<TReply> syncSendAndReadLine(const std::string& command)
   {
-    ROS_WARN_STREAM("Sending " << command);
+    if (!stopped_)
+    {
+      ROS_ERROR_STREAM("Sync operation not possible as async read is in progress.");
+      return std::nullopt;
+    }
     boost::system::error_code error_code;
     socket_.send(boost::asio::buffer(command), command.size(), error_code);
     if (error_code)
@@ -186,6 +232,36 @@ public:
     }
     return reply;
   }
+
+  void registerFilterCallback(FilterCallback f_) { filter_callback_ = f_; }
+
+private:
+  /**
+   * @brief Check deadline timer.
+   *
+   * This is the handler for the deadline and to close socket if deadline
+   * has expired. This will be run by the thread which takes care of the io_service_
+   *
+   */
+  void checkDeadline();
+
+  /**
+   * @brief
+   */
+  void handleConnect();
+
+  /**
+   * @brief Start Async Read in the worker thread
+   */
+  void asyncReadData();
+
+  /**
+   * @brief Receive handler for Async read
+   *
+   * @param[in] error_code - Error Code
+   * @param[in] bytes_transferred - Number of bytes written into the buffer
+   */
+  void handleReceive(const boost::system::error_code& error_code, size_t bytes_transferred);
 
 private:
   /**
@@ -242,10 +318,26 @@ private:
   OnNewDataCallback callback_;
 
   /**
+   * @brief
+   */
+  FilterCallback filter_callback_;
+
+  /**
    * @brief Async read is in progress
    */
-  std::atomic_bool async_read_in_progress_;
-  std::atomic_bool async_read_should_be_active_;
+  std::atomic_bool stopped_;
+
+  /**
+   * @brief Async read is in progress
+   */
+  std::atomic_bool stop_requested_;
+
+  /**
+   * @brief Filter
+   */
+  protocol::CommandReplyHeader command_header_buffer_;
+  //boost::asio::deadline_timer deadline_connect_;
+  //boost::asio::deadline_timer deadline_receive_;
 };
 
 }  // namespace uam

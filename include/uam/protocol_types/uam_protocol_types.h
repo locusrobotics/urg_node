@@ -608,8 +608,11 @@ struct XR00CommandReply
 };
 #pragma pack()
 
+/**
+ * @brief Host to UAM command struct
+ */
 #pragma pack(1)
-struct YRCommandRequest
+struct YRCommandHeader
 {
   /**
    * @brief start of frame
@@ -673,6 +676,24 @@ struct YRCommandRequest
    * 09: Group nine data
    */
   uint16_t resolution;
+};
+#pragma pack()
+
+/**
+ * @brief Host to UAM command struct
+ */
+#pragma pack(1)
+struct YRCommandReplyHeader
+{
+  YRCommandHeader header;
+  uint16_t status;
+};
+#pragma pack()
+
+#pragma pack(1)
+struct YRCommandRequest
+{
+  YRCommandHeader header;
   CommandFooter footer;
 };
 #pragma pack()
@@ -680,73 +701,34 @@ struct YRCommandRequest
 #pragma pack(1)
 struct YRCommandReply
 {
-  /**
-   * @brief start of frame
-   */
-  uint8_t stx;
-  /**
-   * @brief It is the total length of ASCII characters in a command.
-   * Command size is encoded to hexadecimal strings.
-   */
-  uint32_t cmd_size;
-
-  /**
-   * @brief It is a unique code to differentiate the type of command.
-   */
-  char header[2];
-  /**
-   * @brief
-   * 00: Protection Zone 1
-   * 01: Protection Zone 2
-   * 02: Warning Zone 1
-   * 03: Warning Zone 2
-   * 04: Muting Area 1
-   * 05: Muting Area 2
-   * 06: Reference Area (Centre)
-   * 07: Reference Area (Max value)
-   * 08: Reference Area (Min Value)
-   */
-  uint16_t area_type;
-
-  /**
-   * @brief Provide the area numbers in hexadecimal equivalent
-   * characters ( 0 to 1F).
-   * Area number should not exceed the configured active area count
-   *
-   * 00: Area 1
-   * 01: Area 2
-   * …
-   * …
-   * 1F: Area 32
-   */
-  uint16_t area_number;
-
-  /**
-   * @brief
-   * Provide the step values in hexadecimal equivalent
-   * characters
-   * - Step values should not exceed the maximum range 0438 (1081 in decimal).
-   * - Start step should not be greater than the end step.
-   */
-  uint32_t start_step;
-  uint32_t end_step;
-  /**
-   * @brief
-   *
-   * this might to what the documentation refers as grouping?
-   * 00/01: No grouping
-   * 02: Grouping two data
-   * 03: Group three data
-   * …
-   * …
-   * 09: Group nine data
-   */
-  uint16_t resolution;
-  uint16_t status;
+  YRCommandReplyHeader header;
   std::array<uint32_t,1080> area_data;
   CommandFooter footer;
 };
 #pragma pack()
+
+
+/**
+ * @brief Area Types
+ */
+enum EYRAreaType : uint16_t
+{
+  protection_1 = 0,/**< protection_1 */
+  protection_2,    /**< protection_2 */
+  warning_1,       /**< warning_1 */
+  warning_2,       /**< warning_2 */
+  muting_1,        /**< muting_1 */
+  muting_2,        /**< muting_2 */
+  reference_center,/**< reference_center */
+  reference_max,   /**< reference_max */
+  reference_min,   /**< reference_min */
+  MAX              /**< MAX */
+};
+
+/**
+ * @brief Max safety area index for this the supported fw version
+ */
+constexpr uint16_t c_max_safety_area_index = 32;
 
 constexpr size_t c_sensing_data_start_idx { sizeof(protocol::CommandReplyHeader) };
 constexpr size_t c_distance_start_idx { sizeof(protocol::CommandReplyHeader) +

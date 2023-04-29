@@ -37,8 +37,8 @@
 
 #include <ros/ros.h>
 #include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/uam_visitors.h>
 #include <uam/uam_error_codes.h>
+#include <uam/uam_visitors.h>
 
 #include <boost/crc.hpp>
 #include <iomanip>
@@ -79,6 +79,16 @@ public:
   using Reply = TReply;
 
   /**
+   * @brief Make Reply type public
+   */
+  using ReplyHeader = decltype(TReply::header);
+
+  /**
+   * @brief Make Reply type public
+   */
+  using ReplyFooter = decltype(TReply::footer);
+
+  /**
    * @brief Packet callback type
    */
   using PacketEventCallback = std::function<void(const Reply)>;
@@ -96,10 +106,10 @@ public:
    * @param[in] header - Command reply header
    * @return true if the reply is of the type TDerived::Reply, false otherwise
    */
-  inline bool validateReplyType(const protocol::CommandReplyHeader& header)
-  {  
-    return header.header[0] == HeaderMSB && header.header[1] == HeaderLSB &&
-    		header.sub_header[0] == SubHeaderMSB && header.sub_header[1] == SubHeaderLSB;
+  inline bool validateReplyType(const protocol::CommandReplyHeader& header) const
+  {
+    return header.header[0] == HeaderMSB && header.header[1] == HeaderLSB && header.sub_header[0] == SubHeaderMSB &&
+           header.sub_header[1] == SubHeaderLSB;
   }
   /**
    * @brief Method to register the callback to be called by the derived class
@@ -107,14 +117,7 @@ public:
    *
    * @param[in] callback - Callback to execute when finalising processImpl call
    */
-  inline void registerEventCallback(PacketEventCallback callback) { 
-    ROS_WARN_STREAM("REgistering for " << HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB << " and it is " << (int)(callback==nullptr));
-
-    callback_ = callback ; 
-    
-    
-    ROS_WARN_STREAM("Now should not be: " << (int)(callback==nullptr));
-    }
+  inline void registerEventCallback(PacketEventCallback callback) { callback_ = callback; }
 
   /**
    * @brief Process raw buffer and return decoded message
@@ -124,13 +127,16 @@ public:
    */
   std::optional<Reply> process(const std::string* buffer) const
   {
-    auto reply = static_cast<const TDerived*>(this)->decode(buffer);
-    if (!reply.has_value())
-    {
-      ROS_ERROR_STREAM("Failed to decode message");
-      return std::nullopt;
-    }
-    return reply;
+    // Before decoding the message we need to double check if we got the expected
+    // message size
+//    auto reply = static_cast<const TDerived*>(this)->decode(buffer);
+//    if (!reply.has_value())
+//    {
+//      ROS_ERROR_STREAM("Failed to decode message");
+//      return std::nullopt;
+//    }
+    ROS_ERROR_STREAM("Failed to decode message");
+    return std::nullopt;
   }
 
   /**
@@ -141,6 +147,41 @@ public:
    */
   std::optional<Reply> process(const Reply& raw_reply) const
   {
+    auto recv_bytes = raw_reply.header.cmd_size;
+    // Decode number of received bytes
+    decodeField(recv_bytes);
+    // Decode status
+    auto status = raw_reply.header.status;
+    decodeField(status);
+
+    // validate size
+    bool is_size_valid = static_cast<const TDerived*>(this)->validateSize(recv_bytes);
+    bool is_status_ok = validateStatus(status);
+    // Did size check or status check failed?
+    if (!is_size_valid || !is_status_ok)
+    {
+      return std::nullopt;
+    }
+    //  Validate CRC. We might get a different reply other than the official supported
+    // one (different protocol version)
+    bool is_crc_valid = false;
+
+    if (sizeof(Reply) != recv_bytes)
+    {
+      auto tmp_buffer = std::string(reinterpret_cast<const char*>(&raw_reply), recv_bytes);
+      is_crc_valid = validateCrc(&tmp_buffer);
+    }
+    else
+    {
+      is_crc_valid = validateCrc(raw_reply);
+    }
+
+    if (!is_crc_valid)
+    {
+      return std::nullopt;
+    }
+
+    // decode everything else
     auto reply = static_cast<const TDerived*>(this)->decode(raw_reply);
     if (!reply.has_value())
     {
@@ -184,8 +225,10 @@ public:
     }
     if (callback_)
       callback_(*reply);
-      else
-      ROS_WARN_STREAM("No handler for " <<  HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB << " and it is " << (int)(callback_==nullptr));
+    else
+      ROS_WARN_STREAM(
+        "No handler for " << HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB << " and it is "
+                          << (int)(callback_ == nullptr));
 
     return true;
   }
@@ -208,7 +251,6 @@ protected:
   {
     request_.footer.crc = calculateCrc(request_);
     encoded_request_ = encodeCommand(request_);
-    ROS_WARN_STREAM("Done constructing: " <<  HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB);
   }
 
   /**
@@ -280,26 +322,25 @@ protected:
   }
 
   /**
-    * @brief Calculate crc
-    *
-    * CRC Standard: Kermit
-    * Polynomial: 0x1021
-    * Shift Direction: Right
-    * Initial Value: 0x0000
-    * Byte Swap: Yes
-    * Reverse CRC Result: Yes
-    *
-    * @param[in] buffer - Buffer
-    * @param[in] byte_count - Number of bytes in the buffer to use
-    * @return checksum
-    */
-   uint16_t calculateCrc(const char* buffer, const std::size_t& byte_count) const
-   {
-     boost::crc_optimal<16, 0x1021, 0, 0, true, true> crc_kermit_type;
-     crc_kermit_type.process_bytes(buffer, byte_count);
-     return crc_kermit_type.checksum();
-   }
-
+   * @brief Calculate crc
+   *
+   * CRC Standard: Kermit
+   * Polynomial: 0x1021
+   * Shift Direction: Right
+   * Initial Value: 0x0000
+   * Byte Swap: Yes
+   * Reverse CRC Result: Yes
+   *
+   * @param[in] buffer - Buffer
+   * @param[in] byte_count - Number of bytes in the buffer to use
+   * @return checksum
+   */
+  uint16_t calculateCrc(const char* buffer, const std::size_t& byte_count) const
+  {
+    boost::crc_optimal<16, 0x1021, 0, 0, true, true> crc_kermit_type;
+    crc_kermit_type.process_bytes(buffer, byte_count);
+    return crc_kermit_type.checksum();
+  }
 
   /**
    * @brief Calulate Reply CRC using structure
@@ -326,26 +367,19 @@ protected:
    * @param[out] reply - Output message with header and footer decoded
    * @return true if crc and size are valid
    */
-  bool validate(const std::string* buffer, Reply& reply) const
+  bool validateCrc(const std::string* buffer) const
   {
-    // Process it is faster to calculate the CRC with the raw byte array:
-    const auto buffer_size = buffer->size();
-    if (buffer_size != sizeof(Reply))
-    {
-      ROS_WARN_STREAM(
-        "Invalid buffer size. Current buffer size is: " << buffer_size << " and expected is: " << sizeof(Reply));
-      return false;
-    }
     // Calculate reply crc
     auto current_crc = calculateReplyCrc(buffer);
-    footer_visitor_.crc.get(buffer, reply.footer.crc);
-    if (current_crc != reply.footer.crc)
+    uint32_t decoded_crc;
+    footer_visitor_.crc.get(buffer, decoded_crc);
+
+    if (current_crc != decoded_crc)
     {
-      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << reply.footer.crc);
+      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << decoded_crc);
       return false;
     }
     // Parse status
-    header_visitor_.status.get(buffer, reply.header.status);
     return true;
   }
 
@@ -356,19 +390,42 @@ protected:
    * @param[in/out] reply - Raw reply (not decoded)
    * @return true if crc and size are valid false otherwise
    */
-  bool validate(Reply& reply) const
+  bool validateCrc(const Reply& reply) const
   {
-    // Calculate reply crc
+    // Calculate reply crc;
     auto current_crc = calculateReplyCrc(reply);
-    decodeField(reply.footer.crc);
-    if (current_crc != reply.footer.crc)
+    auto decoded_crc = reply.footer.crc;
+    decodeField(decoded_crc);
+    if (current_crc != decoded_crc)
     {
-      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << reply.footer.crc);
+      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << decoded_crc);
       return false;
     }
-    // Parse status
+    return true;
+  }
+
+  /**
+   * @brief Decode header
+   * @param reply
+   * @return
+   */
+  void decodeHeaderAndFooter(Reply& reply) const
+  {
+    decodeField(reply.header.cmd_size);
     decodeField(reply.header.status);
-    return validateStatus(reply);
+    decodeField(reply.footer.crc);
+  }
+
+  /**
+   * @brief Decode header
+   * @param reply
+   * @return
+   */
+  void decodeHeaderAndFooter(const std::string* buffer, Reply& reply) const
+  {
+    header_visitor_.cmd_size.get(buffer, reply.header.cmd_size);
+    header_visitor_.status.get(buffer, reply.header.status);
+    footer_visitor_.crc.get(buffer, reply.footer.crc);
   }
 
   /**
@@ -380,20 +437,19 @@ protected:
    * @param[in] reply - Decoded reply
    * @return[out] true if message is valid, false otherwise
    */
-  inline bool validateStatus(Reply& reply) const
+  inline bool validateStatus(const uint16_t status) const
   {
     // Check if status is ok
-    if (reply.header.status != 0)
+    if (status != 0)
     {
       std::string error_msg;
-      if (error_codes::StatusErrorCodeToString.count(reply.header.status))
+      if (error_codes::StatusErrorCodeToString.count(status))
       {
-        error_msg =
-          std::string("Received bad status: ") + error_codes::StatusErrorCodeToString.at(reply.header.status);
+        error_msg = std::string("Received bad status: ") + error_codes::StatusErrorCodeToString.at(status);
       }
       else
       {
-        error_msg = std::string("Received bad status: unknown error " + reply.header.status);
+        error_msg = std::string("Received bad status: unknown error " + status);
       }
       ROS_ERROR_STREAM(error_msg);
       return false;
@@ -463,7 +519,7 @@ protected:
   /**
    * @brief Callback to execute when processing the packet
    */
-  PacketEventCallback callback_ {nullptr};
+  PacketEventCallback callback_ { nullptr };
 };
 
 }  // namespace uam

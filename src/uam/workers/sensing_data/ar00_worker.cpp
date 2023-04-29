@@ -26,16 +26,7 @@ AR00Worker::AR00Worker(const uint32_t idx_offset) :
 std::optional<AR00Worker::Reply> AR00Worker::decode(const std::string* buffer) const
 {
   Reply reply;
-  if (!validate(buffer, reply))
-  {
-    return std::nullopt;
-  }
-  // Check if status is ok
-  if (reply.header.status != 0)
-  {
-    ROS_ERROR_STREAM("Received bad status!");
-    return std::nullopt;
-  }
+  decodeHeaderAndFooter(buffer,reply);
   decodeSensingData(buffer, reply.sensing_data);
   decodeDistances(buffer, reply.ranges);
   return reply;
@@ -44,10 +35,7 @@ std::optional<AR00Worker::Reply> AR00Worker::decode(const std::string* buffer) c
 std::optional<AR00Worker::Reply> AR00Worker::decode(const Reply& raw_reply) const
 {
   Reply reply = raw_reply;
-  if (!validate(reply))
-  {
-    return std::nullopt;
-  }
+  decodeHeaderAndFooter(reply);
   WorkerBase<AR00Worker, 'A', 'R', '0', '0', protocol::AR00CommandReply>::decodeSensingData(reply.sensing_data);
   // Decode ranges
   decodeField(reply.ranges);

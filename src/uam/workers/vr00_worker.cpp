@@ -21,10 +21,7 @@ VR00Worker::VR00Worker(const uint32_t idx_offset) :
 std::optional<VR00Worker::Reply> VR00Worker::decode(const std::string* buffer) const
 {
   Reply reply;
-  if (!validate(buffer, reply))
-  {
-    return std::nullopt;
-  }
+  decodeHeaderAndFooter(buffer, reply);
   decodeVersionDetails(buffer, reply.version_details);
   return reply;
 }
@@ -32,10 +29,7 @@ std::optional<VR00Worker::Reply> VR00Worker::decode(const std::string* buffer) c
 std::optional<VR00Worker::Reply> VR00Worker::decode(const protocol::VR00CommandReply& raw_reply) const
 {
   Reply reply = raw_reply;
-  if (!validate(reply))
-  {
-    return std::nullopt;
-  }
+  decodeHeaderAndFooter(reply);
   decodeVersionDetails(reply.version_details);
   return reply;
 }

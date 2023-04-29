@@ -5,7 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
   diagnostic_updater dynamic_reconfigure laser_proc message_generation
   nodelet rosconsole roscpp sensor_msgs std_msgs std_srvs tf urg_c
 )
-set_directory_properties(PROPERTIES COMPILE_OPTIONS "-std=c++17")
+set_directory_properties(PROPERTIES COMPILE_OPTIONS "-std=c++2a")
 
 # Dynamic reconfigure support
 generate_dynamic_reconfigure_options(cfg/URG.cfg)
@@ -63,12 +63,17 @@ target_link_libraries(getID urg_c_wrapper ${catkin_LIBRARIES})
 add_executable (uam_test_node src/uam_test_node.cpp)
 target_link_libraries(uam_test_node urg_c_wrapper ${catkin_LIBRARIES})
 
-add_executable (uam_driver_node src/uam/uam_driver_node.cpp)
-target_link_libraries(uam_driver_node uam_workers ${catkin_LIBRARIES})
+add_executable (uam_driver_ros_node 
+src/uam/uam_driver_ros_params.cpp
+ src/uam/uam_driver_ros_node.cpp
+ src/uam/uam_driver.cpp 
+ src/uam/uam_driver_ros.cpp
+ )
+target_link_libraries(uam_driver_ros_node uam_workers ${catkin_LIBRARIES})
  
 
 ## Mark executables and/or libraries for installation
-install(TARGETS uam_workers urg_c_wrapper urg_node urg_node_driver getID uam_driver_node uam_test_node
+install(TARGETS uam_workers urg_c_wrapper urg_node urg_node_driver getID uam_driver_ros_node uam_test_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

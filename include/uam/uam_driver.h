@@ -26,9 +26,12 @@
 
 #include <uam/workers/scip_worker.h>
 
-namespace urg_node
+namespace uam
 {
-struct ScanDetails
+/**
+ * @brief Scan parameters structure
+ */
+struct ScanParameters
 {
   std::string frame_id { "" };
   int timeout;
@@ -42,316 +45,226 @@ struct ScanDetails
   double range_max { 0. };
 };
 
-struct AreaDataUint32_t
-{
-  union
-  {
-    struct
-    {
-      uint32_t reserved_bits : 17;
-      uint32_t value : 15;
-    } s;
-    uint32_t v;
-  };
-};
+//:
+  //    worker_(),
+  //    client_(std::bind(&UamDriver::packetCallback, this, std::placeholders::_1))
+  //  {
+  //    // Try to connect to the lidar
+  //    bool success = client_.connect(ip_address, ip_port);
+  //    if (!success)
+  //    {
+  //      std::stringstream ss;
+  //      ss << "Could not open network Hokuyo:\n";
+  //      ss << ip_address << ":" << ip_port << "\n";
+  //      throw std::runtime_error(ss.str());
+  //    }
+  //
+  //    pub_test_ = ros::NodeHandle().advertise<sensor_msgs::LaserScan>("test_scan", 10);
+  //    worker_.registerCallback<uam::AR01Worker>(std::bind(&UamDriver::publishScan, this, std::placeholders::_1));
+  //  }
 
-static_assert(sizeof(AreaDataUint32_t) == 4);
 
 /**
- * @brief
+ * @brief Hokuyo UAM-05LP Network Driver
  */
 class UamDriver
 {
-public:
-	/**
-	 *
-	 * @param ip_address
-	 * @param ip_port
-	 */
-  UamDriver(const std::string& ip_address, const int ip_port) :
-    worker_(),
-    client_(std::bind(&UamDriver::packetCallback, this, std::placeholders::_1))
+  /**
+   * @brief Subscription Mode Enum
+   */
+  enum ESubscriptionMode : uint32_t
   {
-    // Try to connect to the lidar
-    bool success = client_.connect(ip_address, ip_port);
-    if (!success)
-    {
-      std::stringstream ss;
-      ss << "Could not open network Hokuyo:\n";
-      ss << ip_address << ":" << ip_port << "\n";
-      throw std::runtime_error(ss.str());
-    }
+    AR02 = 0,/**< AR02 */
+    AR04,/**< AR04 */
+    AR07,/**< AR07 */
+    INVALID  /**< MAX */
+  };
 
-    pub_test_ = ros::NodeHandle().advertise<sensor_msgs::LaserScan>("test_scan", 10);
-    worker_.registerCallback<uam::AR01Worker>(std::bind(&UamDriver::publishScan, this, std::placeholders::_1));
+  template <typename TWorker>
+  constexpr ESubscriptionMode TypeToEnum()
+  {
+    return (
+      std::is_same<AR02Worker, TWorker>::value ?
+        ESubscriptionMode::AR02 :
+        (std::is_same<AR04Worker, TWorker>::value ?
+           ESubscriptionMode::AR04 :
+           (std::is_same<AR07Worker, TWorker>::value ? ESubscriptionMode::AR07 : ESubscriptionMode::INVALID)));
+  }
+
+public:
+  /**
+   * @brief
+   */
+  UamDriver();
+
+  /**
+   * @brief Default D'tor
+   */
+  ~UamDriver();
+
+  /**
+   * @brief Connect to a uam lidar at the specified IP address and port.
+   *
+   * @param[in] ip - The IP Address of the lidar
+   * @param[in] lidar_port - The UDP port number of the lidar
+   */
+  void connect(const std::string& ip, const uint16_t port);
+
+  /**
+   * @brief Disconnect client
+   */
+  void disconnect();
+
+  /**
+   * @brief
+   *
+   * @return
+   */
+  inline bool isTheSensorStreaming() const { return this->subscription_mode_.load() != ESubscriptionMode::INVALID; }
+
+  /**
+   * @brief Get Version Details
+   *
+   * @return The serial number + sensor model + protocol version as single string
+   * @throws std::exception - If the send operation fails, or a valid reply is not received
+   */
+  std::string getVersionDetails();
+
+  /**
+   * @brief Get Sensor status (using XR command)
+   *
+   * @return The sensor status
+   * @throws std::exception - If the send operation fails, or a valid reply is not received
+   */
+  protocol::sensing_data::SensingDataHeader getSensorStatus();
+
+  /**
+   * @brief Get Scan details
+   *
+   * @return The scan metadata required to assemble laser scan
+   * @throws std::exception - If the send operation fails, or a valid reply is not received
+   */
+  ScanParameters getScanDetails();
+
+  /**
+   * @brief Convert scan parameters
+   *
+   * @param[in] scan_params - Scan Parameters
+   * @return Scan parameters
+   */
+  ScanParameters convertScanParameters(const uam::scip_protocol::PPReply& scan_params) const;
+
+  /**
+   * @brief Register a callback method to be executed when a the specific packet
+   * is received
+   *
+   * @param[in] callback - The callback to be executed in the io_service thread
+   */
+  template <typename TWorker>
+  inline void registerCallback(typename TWorker::PacketEventCallback callback)
+  {
+    uam_packet_worker_.registerCallback<TWorker>(callback);
   }
 
   /**
+   * @brief Start streaming laser scan.
+   *
+   * @throws std::exception - If the send operation fails, or a valid reply is not received
+   */
+  void startStreaming(const bool publish_intensity, const bool publish_multiecho = false);
+
+  template <typename TAny>
+  void subscribeCallback(const typename TAny::Reply message)
+  {
+    subscription_mode_.store(TypeToEnum<TAny>());
+  }
+
+  /**
+   * @brief
+   */
+  void stopStreaming();
+
+  template <typename TAny>
+  void unsubscribeCallback(const TAny message)
+  {
+    auto last = subscription_mode_.load();
+    if (last == ESubscriptionMode::INVALID)
+    {
+      ROS_WARN_STREAM("Bug, it should not be here!");
+    }
+    else
+    {
+      ROS_INFO_STREAM(
+        "Stopping subscription, with: " << message.header[0] << message.header[1] << message.sub_header[0]
+                                        << message.sub_header[1]);
+      subscription_mode_.store(ESubscriptionMode::INVALID);
+    }
+  }
+
+  /**
+   * @brief Handle Unsubscribe
+   */
+  void handleUnsubscribe();
+
+  /**
    * @brief Packet Callback from the io handlers
+   *
    * @param Stamped packet
    */
   inline void packetCallback(const uam::protocol::ShapeShifterBuffer& packet)
   {
-    auto success = worker_.processByHandler(packet);
+    auto success = uam_packet_worker_.processByHandler(packet);
     ROS_ERROR_STREAM_COND(!success, "Failed processing packet");
   }
 
-
-  inline void processYR(const uam::protocol::YRCommandReply& message)
+  inline bool filterCallback(const uam::protocol::CommandReplyHeader& header)
   {
-    sensor_msgs::LaserScan msg;
-    msg.header.frame_id = scan_details_.frame_id;
-    msg.angle_min = scan_details_.angle_min;
-    msg.angle_max = scan_details_.angle_max;
-    msg.angle_increment = scan_details_.angle_increment;
-    msg.scan_time = scan_details_.scan_period;
-    msg.time_increment = scan_details_.time_increment;
-    msg.range_min = scan_details_.range_min;
-    msg.range_max = scan_details_.range_max;
-
-    // Grab scan
-    long time_stamp = 0;
-    unsigned long long system_time_stamp = 0;
-
-    // Fill scan
-    if (synchronize_time_)
-    {
-      msg.header.stamp = ros::Time::now();
-    }
-    else
-    {
-      msg.header.stamp.fromNSec((uint64_t)system_time_stamp);
-    }
-    // msg.header.stamp = msg.header.stamp + system_latency_ + user_latency_ + getAngularTimeOffset();
-    msg.ranges.resize(message.area_data.size());
-
-    for (size_t i = 0; i < message.area_data.size(); i++)
-    {
-      AreaDataUint32_t range;
-      range.v = message.area_data[i];
-      auto adjusted_range = range.s.value;
-      if (adjusted_range != 0)
-      {
-        msg.ranges[i] = /*range_offset_ +*/ static_cast<float>(adjusted_range) / 1000.0f;
-      }
-      else
-      {
-        msg.ranges[i] = std::numeric_limits<float>::quiet_NaN();
-        continue;
-      }
-    }
-    pub_test_.publish(msg);
+    return uam_packet_worker_.validateReplyHeader(header);
   }
 
+  /**
+   * @brief Get Safety Areas
+   *
+   * @param[in] area_type - Type of the safety area (check protocol::EYRAreaType)
+   * @param[in] area_number - Safety area [1, to 32] (this depends on fw version)
+   * @param[in] start step - 1 to 1081
+   * @param[in] end_step - 1 to 1081
+   * @return YRCommandReply if safety area was successfully decoded
+   */
+  std::optional<protocol::YRCommandReply> getSafetyArea(
+    const protocol::EYRAreaType area_type,
+    const uint16_t area_number,
+    const uint32_t start_step,
+    const uint32_t end_step);
 
-  ~UamDriver()
+  /**
+   * @brief Send Uam custom command and wait for the reply
+   *
+   * @tparam TWorker
+   * @return
+   */
+  template <typename TWorker, typename... TArgs>
+  std::optional<typename TWorker::Reply> syncSendCommandWithReply(const TArgs... args)
   {
-    if (started_continuous_mode_)
-    {
-      stop();
-    }
-    client_.disconnect();
-  }
-
-  void initialize()
-  {
-    if (started_continuous_mode_)
-    {
-      ROS_WARN_STREAM("Cannot initialize while continuous mode is on!");
-      return;
-    }
-    // todo: missing high resolution
-    // Register callback for 01
-    worker_.registerCallback<uam::AR01Worker>(std::bind(&UamDriver::publishScan, this, std::placeholders::_1));
-    // Check the sensor fw version
-    validateVersionDetails();
-    // Now that we are connected let us retrieve some information to understand what is the status
-    // of the sensor
-    manualUpdateSensorStatus();
-    // Get sensor laser scan details (min angle, max angle, angle increment)
-    getScanDetails();
-    // Get and publish safety areas
-    getSafetyAreas();
-    // We can start
-    can_start_ = true;
-  }
-
-  void getSafetyAreas()
-  {
-    auto reply = client_.syncSendAndReceive<decltype(yr_worker)::Reply>(
-      yr_worker.getCommand(0, uam::EAreaType::protectetion_1, 0, 1080));
-    if (!reply)
-    {
-      std::stringstream ss;
-      ss << "Could not retrieve scan detailsn";
-      throw std::runtime_error(ss.str());
-    }
-    processYR(*reply);
-    ROS_WARN_STREAM("Done for protection zone 1");
-    ROS_WARN_STREAM("Done for protection zone 2");
-    ROS_WARN_STREAM("Done for warning zone 1");
-    ROS_WARN_STREAM("Done for warning zone 2");
-  }
-
-  void fillScanDetails(const uam::scip_protocol::PPReply& scan_params)
-  {
-    scan_details_.range_min = scan_params.min_distance / 1000.0;
-    scan_details_.range_max = scan_params.max_distance / 1000.0;
-    auto min_step = scan_params.start_step - scan_params.front_data_index;
-    auto max_step = scan_params.end_step - scan_params.front_data_index;
-    scan_details_.angle_increment = 2.0 * M_PI / scan_params.angular_resolution;
-    scan_details_.angle_min = (2.0 * M_PI) * min_step / scan_params.angular_resolution;
-    scan_details_.angle_max = (2.0 * M_PI) * max_step / scan_params.angular_resolution;
-    scan_details_.frame_id = "scan";
-    scan_details_.scan_period = 60.0 / static_cast<double>(scan_params.rpm);
-    // Urg_c does the following for timeout
-    // (1000 * 1000 * 60 / scan_params.rpm) >> (10 - 4)  which gives 468 ("milliseconds" I believe)
-    // We should do 2x1/Scanning frequency (ignoring scan_skip mode for now).
-    scan_details_.timeout = 2 * scan_details_.scan_period * 1.e3;
-    auto circle_fraction = (scan_details_.angle_max - scan_details_.angle_min) / (2.0 * M_PI);
-    scan_details_.time_increment =
-      circle_fraction * scan_details_.scan_period / static_cast<double>(max_step - min_step);
-  }
-
-  void getScanDetails()
-  {
-    // This needs to be with scip
-    if (started_continuous_mode_)
-      return;
-
-    auto reply = sendScipCommandWithReply<uam::PPWorker>();
-
-    if (!reply)
-    {
-      std::stringstream ss;
-      ss << "Could not retrieve scan detailsn";
-      throw std::runtime_error(ss.str());
-    }
-    fillScanDetails(*reply);
-  }
-
-  void start()
-  {
-    if (started_continuous_mode_ || !can_start_)
-      return;
-    auto reply = sendCommandWithReply<uam::AR04Worker>();
-    if (!reply)
-    {
-      std::stringstream ss;
-      ss << "Failed to subscribe to pointcloud!";
-      throw std::runtime_error(ss.str());
-    }
-
-    client_.startAsyncRead();
-    ROS_INFO_STREAM("Subscription successful!");
-    started_continuous_mode_ = true;
-  }
-
-  void stop()
-  {
-    if (!started_continuous_mode_ || !can_start_)
-      return;
-
-    auto raw_reply = client_.syncSendAndReceive<uam::AR05Worker::Reply>(worker_.getCommand<uam::AR05Worker>());
-    if (!raw_reply || !worker_.process<uam::AR05Worker>(*raw_reply))
-    {
-      ROS_WARN_STREAM("Failed to unsubscribe to pointcloud!");
-      return;
-    }
-    started_continuous_mode_ = false;
-  }
-
-  void publishScan(const uam::protocol::AR01CommandReply& reply)
-  {
-    sensor_msgs::LaserScan msg;
-    msg.header.frame_id = scan_details_.frame_id;
-    msg.angle_min = scan_details_.angle_min;
-    msg.angle_max = scan_details_.angle_max;
-    msg.angle_increment = scan_details_.angle_increment;
-    msg.scan_time = scan_details_.scan_period;
-    msg.time_increment = scan_details_.time_increment;
-    msg.range_min = scan_details_.range_min;
-    msg.range_max = scan_details_.range_max;
-
-    // Grab scan
-    long time_stamp = 0;
-    unsigned long long system_time_stamp = 0;
-
-    // Fill scan
-    if (synchronize_time_)
-    {
-      msg.header.stamp = ros::Time::now();
-    }
-    else
-    {
-      msg.header.stamp.fromNSec((uint64_t)system_time_stamp);
-    }
-    // msg.header.stamp = msg.header.stamp + system_latency_ + user_latency_ + getAngularTimeOffset();
-    msg.ranges.resize(reply.ranges.size());
-    msg.intensities.resize(reply.intensities.size());
-
-    for (size_t i = 0; i < reply.ranges.size(); i++)
-    {
-      auto& range = reply.ranges[i];
-      auto& intensity = reply.intensities[i];
-
-      // According to the doc:
-      // 1. Values more than 40000 are error code (0xFFFF).
-      // 2. If object is not detected value will be 65534 (0xFFFE)
-      // 3. If object is at a very close range the value will be 65533 (0xFFFD).
-      // 4. When the device is in laser off state the value will be 65532 (0xFFFC)
-      if (range != 0 && range < 0xFFFC)
-      {
-        msg.ranges[i] = /*range_offset_ +*/ static_cast<float>(reply.ranges[i]) / 1000.0f;
-        msg.intensities[i] = reply.intensities[i];
-      }
-      else
-      {
-        msg.ranges[i] = std::numeric_limits<float>::quiet_NaN();
-        continue;
-      }
-    }
-    pub_test_.publish(msg);
-  }
-
-  void manualUpdateSensorStatus()
-  {
-    if (started_continuous_mode_)
-      return;
-
-    auto status_reply = sendCommandWithReply<uam::XR00Worker>();
-    if (!status_reply)
-    {
-      std::stringstream ss;
-      ss << "Could not retrieve sensor status for Hokuyo:\n";
-      throw std::runtime_error(ss.str());
-    }
-    last_received_status_->area_number = status_reply->data.area_number;
-    last_received_status_->error_code = status_reply->data.error_code;
-    last_received_status_->error_status = status_reply->data.error_state;
-    last_received_status_->lockout_status = status_reply->data.lockout_state;
-    last_received_status_->operating_mode = status_reply->data.operating_mode;
-    last_received_status_->optical_window_contaminated = status_reply->data.optical_window_contaminated;
-    last_received_status_->ossd1_state = status_reply->data.ossd1_state;
-    last_received_status_->ossd2_state = status_reply->data.ossd1_state;
-    last_received_status_->warning1_state = status_reply->data.warning1_state;
-    last_received_status_->warning2_state = status_reply->data.warning2_state;
-    ROS_WARN_STREAM_COND(
-      status_reply->data.lockout_state,
-      "Sensor in lockout state! Lidar pw reset might be required!");
-  }
-
-  template <typename TWorker>
-  std::optional<typename TWorker::Reply> sendCommandWithReply()
-  {
-    auto raw_reply = client_.syncSendAndReceive<typename TWorker::Reply>(worker_.getCommand<TWorker>());
+    auto raw_reply = client_.syncSendAndReceive<typename TWorker::Reply>(uam_packet_worker_.getCommand<TWorker>(args...));
     if (raw_reply)
     {
-      return worker_.process<TWorker>(*raw_reply);
+      return uam_packet_worker_.process<TWorker>(*raw_reply);
     }
     return std::nullopt;
   }
 
+  template <typename TWorker, typename... TArgs>
+  inline bool asyncSend(TArgs&&... args)
+  {
+    return client_.asyncSend(uam_packet_worker_.getCommand<TWorker>(std::forward<TArgs>(args)...));
+  }
+
+  /**
+   * @brief Send SCIP command and wait for Reply
+   *
+   * @return Reply if successful received, std::nullopt otherwise
+   */
   template <typename TWorker>
   std::optional<typename TWorker::Reply> sendScipCommandWithReply()
   {
@@ -363,53 +276,78 @@ public:
     return std::nullopt;
   }
 
-  /**
-   *
-   * @return
-   */
-  void validateVersionDetails()
-  {
-    auto reply = sendCommandWithReply<uam::VR00Worker>();
-    if (!reply.has_value())
-    {
-      std::stringstream ss;
-      ss << "Could not Request Version details for Hokuyo:\n";
-      throw std::runtime_error(ss.str());
-    }
-    // Should we check against a min version?
-    ROS_INFO_STREAM(
-      "Firmware_version is: " << std::string(
-        reply->version_details.firmware_version.data(),
-        reply->version_details.firmware_version.size()));
-    ROS_INFO_STREAM(
-      "sensor_model is: " << std::string(
-        reply->version_details.sensor_model.data(),
-        reply->version_details.sensor_model.size()));
-    ROS_INFO_STREAM(
-      "serial_number is: " << std::string(
-        reply->version_details.serial_number.data(),
-        reply->version_details.serial_number.size()));
-  }
-
 private:
-  std::optional<urg_node::Status> last_received_status_;
-  bool started_continuous_mode_ { false };
-  bool can_start_ { false };
-  ScanDetails scan_details_;
-  bool use_intensity_ { true };
-  bool use_high_resolution_ { false };
-  bool synchronize_time_ { true };
+  /**
+   * \defgroup io ASIO event loop variables for sending and receiving TCP packets
+   * @{
+   */
+
+  /**
+   * @brief The Boost IO Service object that manages the asynchronous operations
+   */
+  std::shared_ptr<boost::asio::io_service> io_service_;
+
+  /**
+   * @brief A dedicated thread for running the Boost ASIO event loop
+   */
+  std::thread io_thread_;
+
+  /**
+   * @brief A fake task to prevent the io_service from terminating until desired
+   */
+  std::unique_ptr<boost::asio::io_service::work> io_work_;
 
   /**
    * @brief connection client
    */
   uam::TcpClient client_;
 
-  uam::UamPacketWorker worker_;
-  uam::YRWorker yr_worker;
+  /**@}*/
+
+  /**
+   * @brief Last Received Scan parameters
+   */
+  std::optional<uam::scip_protocol::PPReply> last_received_scan_params_;
+
+  /**
+   * @brief Last received sensing data status
+   */
+  std::optional<protocol::sensing_data::SensingDataHeader> last_received_status_;
+
+  /**
+   * \defgroup Packet Worker member
+   * @{
+   */
+
+  /**
+   * @brief UAM custom packet Worker
+   */
+  uam::UamPacketWorker uam_packet_worker_;
+
+  /**
+   * @brief Scip PP packet worker
+   */
   uam::PPWorker scip_pp_worker_;
+
+  /**@}*/
+
+  /**
+   * @brief Flag to store message subscription mode
+   */
+  std::atomic<ESubscriptionMode> subscription_mode_;
+
+  /**
+   * @brief Scan details which are used to assemble laser scan
+   */
+  // ScanDetails scan_details_;
+
+  /**
+   * @brief Safety areas
+   */
+  std::vector<sensor_msgs::LaserScan> safety_areas_;
+
   ros::Publisher pub_test_;
 };
-}  // namespace urg_node
+}  // namespace uam
 
 #endif  // INCLUDE_URG_NODE_UAM_DRIVER

@@ -45,6 +45,14 @@ public:
    */
   std::optional<Reply> decode(const Reply& raw_reply) const;
 
+  /**
+   * @brief Validate the expected size of the reply
+   *
+   * @param[in] recv_bytes - Number of received bytes
+   * @return true if size check passes, false otherwise
+   */
+  inline const bool validateSize(const size_t recv_bytes) const { return recv_bytes == sizeof(Reply); }
+
 private:
   /**
    * @brief Decode sensing data using raw buffer

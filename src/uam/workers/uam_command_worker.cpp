@@ -9,11 +9,15 @@ Proprietary and confidential.
 
 #include <uam/workers/uam_command_worker.h>
 
+#include <tuple>
+
 namespace uam
 {
+
 bool UamPacketWorker::processByHandler(const protocol::ShapeShifterBuffer& packet)
 {
-  const auto packet_type = packet.getPacketHeader();
+  // Verify packet header
+  const auto packet_type = packet.get<protocol::CommandReplyHeader>();
   auto received_packet_size = packet_type.cmd_size;
   decodeField(received_packet_size);
   bool valid_packet = false;
@@ -31,11 +35,13 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterBuffer& packe
   bool is_ar08_packet = (!is_ar07_packet && std::get<AR08Worker>(workers_).validateReplyType(packet_type));
   bool is_vr00_packet = (!is_ar08_packet && std::get<VR00Worker>(workers_).validateReplyType(packet_type));
   bool is_xr00_packet = (!is_vr00_packet && std::get<XR00Worker>(workers_).validateReplyType(packet_type));
+  bool is_yr_packet =
+    (!is_xr00_packet &&
+     std::get<YRWorker>(workers_).validateReplyType(packet.get<protocol::YRCommandReplyHeader>()));
 
   // Subscription commands can have 2 different reply types:
   // - Empty reply flagging if subscription was successful
   // - AR00 for AR02
-  // - AR01 for AR04
   // - AR06 for AR07
   if (is_ar00_packet || (is_ar02_packet && received_packet_size == sizeof(AR00Worker::Reply)))
   {
@@ -82,11 +88,15 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterBuffer& packe
   {
     processed_successfully = std::get<XR00Worker>(workers_).processByHandler(packet.get<XR00Worker::Reply>());
   }
+  else if (is_yr_packet)
+  {
+
+	    processed_successfully = std::get<XR00Worker>(workers_).processByHandler(packet.get<XR00Worker::Reply>());
+  }
   else
   {
     ROS_ERROR_STREAM(
-      "Invalid packet type with: " << packet_type.header[0] << packet_type.header[1] << packet_type.sub_header[0]
-                                   << packet_type.sub_header[1]);
+      "Unknown packet type with: " << packet_type.header[0] << packet_type.header[1]);
   }
   return processed_successfully;
 }
