@@ -10,11 +10,14 @@ Proprietary and confidential.
 #include <ros/callback_queue.h>
 #include <uam/uam_driver_ros.h>
 
+#include <urg_node/Status.h>
+
 #include <atomic>
 #include <mutex>
 #include <string>
 namespace uam
 {
+
 UamROS::UamROS(const ros::NodeHandle& node_handle, const uam::UamROSParams& params) :
   configured_(false),
   configure_attempts_(0),
@@ -23,11 +26,12 @@ UamROS::UamROS(const ros::NodeHandle& node_handle, const uam::UamROSParams& para
   node_handle_(node_handle)
 {
   scan_publisher_ = node_handle_.advertise<sensor_msgs::LaserScan>(params.scan_topic, 1);
+  status_publisher_ = node_handle_.advertise<urg_node::Status>(params.status_topic, 1, true);
 
   configure_timer_ =
     node_handle.createTimer(params_.reconfiguration_timeout, &UamROS::configureTimerCallback, this, true, false);
 
-  scan_watchdog_timer_ = node_handle.createTimer(params_.scan_timeout, &UamROS::scanSectorWatchdogTimerCallback, this);
+  scan_watchdog_timer_ = node_handle.createTimer(params_.scan_timeout, &UamROS::scanWatchdogTimerCallback, this);
   // Configure the lidar. On failure, start a timer to try again later.
   if (!configure())
   {
@@ -35,7 +39,7 @@ UamROS::UamROS(const ros::NodeHandle& node_handle, const uam::UamROSParams& para
   }
 }
 
-void UamROS::scanSectorWatchdogTimerCallback(const ros::TimerEvent& event)
+void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
 {
   // If the timeout has expired, try to reconnect to the lidar
   std::lock_guard<std::mutex> lock(watchdog_mutex_);
@@ -53,9 +57,6 @@ void UamROS::scanSectorWatchdogTimerCallback(const ros::TimerEvent& event)
   }
 }
 
-/**
- * @brief Attempt to connect to and configure the lidar in response to a timer event
- */
 void UamROS::configureTimerCallback(const ros::TimerEvent& event)
 {
   // Stop the timer so that it may be restarted later
@@ -69,9 +70,6 @@ void UamROS::configureTimerCallback(const ros::TimerEvent& event)
   }
 }
 
-/**
- * @brief Trigger reconfigure routine
- */
 void UamROS::triggerReconfigure()
 {
   lidar_.disconnect();
@@ -85,24 +83,30 @@ bool UamROS::configure()
   {
     lidar_.connect(params_.ip_address, params_.ip_port);
     ROS_INFO_STREAM("Connected to Uam lidar.");
-    auto version_details = lidar_.getVersionDetails();
-    auto sensor_status = lidar_.getSensorStatus();
-    ROS_INFO_STREAM("Connected to Uam lidar.");
-    ROS_INFO_STREAM("Sensor details: " << version_details);
+
+    //TODO (cribeiromendes): make scip commands work seamlessly. Right now we
+    // need to ask this before starting continuous async reads
     scan_params_ = lidar_.getScanDetails();
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    auto version_details = lidar_.getVersionDetails();
+    ROS_INFO_STREAM("Sensor details: " << version_details);
+    updateStatus(lidar_.getSensorStatus(), true);
 
     lidar_.registerCallback<AR01Worker>(std::bind(
-      static_cast<void (UamROS::*)(const protocol::AR01CommandReply&)>(&UamROS::scanCallback),
+      static_cast<void (UamROS::*)(const protocol::AR01CommandReply&, const ros::Time&)>(&UamROS::scanCallback),
       this,
-      std::placeholders::_1));
+      std::placeholders::_1,
+      std::placeholders::_2));
     lidar_.registerCallback<AR06Worker>(std::bind(
-      static_cast<void (UamROS::*)(const protocol::AR06CommandReply&)>(&UamROS::scanCallback),
+      static_cast<void (UamROS::*)(const protocol::AR06CommandReply&, const ros::Time&)>(&UamROS::scanCallback),
       this,
-      std::placeholders::_1));
+      std::placeholders::_1,
+      std::placeholders::_2));
     lidar_.registerCallback<AR00Worker>(std::bind(
-      static_cast<void (UamROS::*)(const protocol::AR00CommandReply&)>(&UamROS::scanCallback),
+      static_cast<void (UamROS::*)(const protocol::AR00CommandReply&, const ros::Time&)>(&UamROS::scanCallback),
       this,
-      std::placeholders::_1));
+      std::placeholders::_1,
+      std::placeholders::_2));
 
     lidar_.startStreaming(params_.use_intensity, params_.use_multi_echo);
     {
@@ -122,32 +126,27 @@ bool UamROS::configure()
   return configured_;
 }
 
-void UamROS::scanCallback(const protocol::AR01CommandReply& reply)
+
+void UamROS::scanCallback(const protocol::AR01CommandReply& reply, const ros::Time& wall_time)
 {
+  {
+    std::lock_guard<std::mutex> lock(watchdog_mutex_);
+    scan_stamp_ = ros::Time::now();
+  }
   sensor_msgs::LaserScan msg;
-  msg.header.frame_id = scan_params_.frame_id;
-  msg.angle_min = scan_params_.angle_min;
-  msg.angle_max = scan_params_.angle_max;
-  msg.angle_increment = scan_params_.angle_increment;
-  msg.scan_time = scan_params_.scan_period;
-  msg.time_increment = scan_params_.time_increment;
-  msg.range_min = scan_params_.range_min;
-  msg.range_max = scan_params_.range_max;
+  msg.header.frame_id = params_.frame_id;
+  msg.angle_min = scan_params_.getAngleMin();
+  msg.angle_max = scan_params_.getAngleMax();
+  msg.angle_increment = scan_params_.getAngleIncrement();
+  msg.scan_time = scan_params_.getScanPeriod();
+  msg.time_increment = scan_params_.getTimeIncrement();
+  msg.range_min = scan_params_.getRangeMin();
+  msg.range_max = scan_params_.getRangeMax();
 
   // Grab scan
-  long time_stamp = 0;
-  unsigned long long system_time_stamp = 0;
+  msg.header.stamp = wall_time;
+  msg.header.stamp = msg.header.stamp + params_.time_offset + ros::Duration(scan_params_.getAngularTimeOffset());
 
-  // Fill scan
-  if (true)
-  {
-    msg.header.stamp = ros::Time::now();
-  }
-  else
-  {
-    msg.header.stamp.fromNSec((uint64_t)system_time_stamp);
-  }
-  // msg.header.stamp = msg.header.stamp + system_latency_ + user_latency_ + getAngularTimeOffset();
   msg.ranges.resize(reply.ranges.size());
   msg.intensities.resize(reply.intensities.size());
 
@@ -172,11 +171,36 @@ void UamROS::scanCallback(const protocol::AR01CommandReply& reply)
       continue;
     }
   }
+  updateStatus(reply.sensing_data);
   scan_publisher_.publish(msg);
 }
 
-void UamROS::scanCallback(const protocol::AR06CommandReply& scan_sector) {}
+void UamROS::scanCallback(const protocol::AR06CommandReply& scan_sector, const ros::Time& wall_time) {}
 
-void UamROS::scanCallback(const protocol::AR00CommandReply& scan_sector) {}
+void UamROS::scanCallback(const protocol::AR00CommandReply& scan_sector, const ros::Time& wall_time) {}
+
+void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensing_data, const bool override_check)
+{
+  // We have POD structures, not sure if we should add operator overload to them.
+  // Since we are making sure that the structure does not contain any padding bytes (pragma pack(1))
+  // we can use memcmp to compare value
+  if (override_check ||
+    (0 != std::memcmp(&last_received_status_, &sensing_data, sizeof(protocol::sensing_data::SensingDataHeader))))
+  {
+    last_received_status_ = sensing_data;
+    urg_node::Status msg;
+    msg.operating_mode = sensing_data.operating_mode;
+    msg.error_status = sensing_data.error_state;
+    msg.error_code = sensing_data.error_code;
+    msg.lockout_status = sensing_data.lockout_state;
+    msg.area_number = sensing_data.area_number;
+    msg.ossd1_state = sensing_data.ossd1_state;
+    msg.ossd2_state = sensing_data.ossd2_state;
+    msg.warning1_state = sensing_data.warning1_state;
+    msg.warning2_state = sensing_data.warning2_state;
+    msg.optical_window_contaminated = sensing_data.optical_window_contaminated;
+    status_publisher_.publish(msg);
+  }
+}
 
 }  // namespace uam

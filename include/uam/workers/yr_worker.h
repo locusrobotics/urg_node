@@ -64,9 +64,9 @@ public:
    * @param reply
    * @return
    */
-  inline bool validateReplyType(const protocol::CommandReplyHeader& packet) const
+  inline bool validateCommandHeader(const std::array<char,2>& header) const
   {
-    return packet.header[0] == 'Y' && packet.header[1] == 'R';
+    return header[0] == 'Y' && header[1] == 'R';
   }
   /**
    * @brief
@@ -84,7 +84,7 @@ public:
     const uint32_t end_step)
   {
     Request request;
-    request.header.stx = 0x02;
+    request.header.stx = protocol::STX_ID;
     request.header.header[0] = 'Y';
     request.header.header[1] = 'R';
     request.header.cmd_size = sizeof(Request);
@@ -93,7 +93,7 @@ public:
     request.header.start_step = start_step;
     request.header.end_step = end_step;
     request.header.resolution = 1;
-    request.footer.etx = 0x03;
+    request.footer.etx = protocol::ETX_ID;
     request.footer.crc = calculateCrc(request);
     return encodeCommand(request);
   }

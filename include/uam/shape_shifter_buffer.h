@@ -45,7 +45,7 @@ class ShapeShifterBuffer
   /**
    * @brief Buffer type
    *
-   * TODO(cribeiromendes): replace this with std::variant
+   * TODO(cribeiromendes): replace this with a variadic union or std::variant
    */
   union UBufferType
   {
@@ -84,13 +84,21 @@ public:
   template <typename T>
   inline const T& get() const
   {
-	// Easier to understand why compilation failed with this
+    // Easier to understand why compilation failed with this
     static_assert(isSupportedType<T>(), "Invalid expected message type!");
     return getImplementation<T>();
   }
 
+  template <typename T>
+  inline void set(T message)
+  {
+    static_assert(isSupportedType<T>(), "Invalid expected message type!");
+    getImplementationRef<T>() = message;
+  }
 
 private:
+  template <typename T>
+  inline T& getImplementationRef();
   /**
    * @brief Retrieve const reference for the message entry in the buffer
    *
@@ -149,6 +157,59 @@ inline const YRCommandReplyHeader& ShapeShifterBuffer::getImplementation() const
 }
 template <>
 inline const CommandReplyHeader& ShapeShifterBuffer::getImplementation() const
+{
+  return buffer.header;
+}
+
+template <>
+inline AR00CommandReply& ShapeShifterBuffer::getImplementationRef()
+{
+  return buffer.ar00_reply;
+}
+
+template <>
+inline AR01CommandReply& ShapeShifterBuffer::getImplementationRef()
+{
+  return buffer.ar01_reply;
+}
+
+template <>
+inline EmptyCommandReply& ShapeShifterBuffer::getImplementationRef()
+{
+  return buffer.empty_reply;
+}
+
+template <>
+inline AR06CommandReply& ShapeShifterBuffer::getImplementationRef()
+{
+  return buffer.ar06_reply;
+}
+
+template <>
+inline VR00CommandReply& ShapeShifterBuffer::getImplementationRef()
+{
+  return buffer.vr00_reply;
+}
+
+template <>
+inline XR00CommandReply& ShapeShifterBuffer::getImplementationRef()
+{
+  return buffer.xr00_reply;
+}
+
+template <>
+inline YRCommandReply& ShapeShifterBuffer::getImplementationRef()
+{
+  return buffer.yr_reply;
+}
+
+template <>
+inline YRCommandReplyHeader& ShapeShifterBuffer::getImplementationRef()
+{
+  return buffer.yr_reply_header;
+}
+template <>
+inline CommandReplyHeader& ShapeShifterBuffer::getImplementationRef()
 {
   return buffer.header;
 }

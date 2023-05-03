@@ -53,9 +53,14 @@ public:
     return std::get<TWorkerType>(workers_).getCommand(args...);
   }
 
-  bool validateReplyHeader(const protocol::CommandReplyHeader& header) const
+  /**
+   * @brief
+   * @param header
+   * @return
+   */
+  inline bool validateCommandHeader(const std::array<char,2>& header) const
   {
-    return validateReplyImplementation(header, workers_);
+    return validateCommandHeaderImplementation(header, workers_);
   }
 
   /**
@@ -77,7 +82,7 @@ public:
    * @param[in] packet - Packet
    * @return
    */
-  bool processByHandler(const protocol::ShapeShifterBuffer& packet);
+  bool processByHandler(const protocol::ShapeShifterBuffer& packet, const ros::Time& wall_time);
 
   /**
    * @brief Call specific worker and result will be processed by the registered handler
@@ -110,11 +115,11 @@ private:
    * @return
    */
   template <typename... TWorkers>
-  static bool validateReplyImplementation(const protocol::CommandReplyHeader& header, std::tuple<TWorkers...> const& workers)
+  static inline bool validateCommandHeaderImplementation(const std::array<char,2>& header, std::tuple<TWorkers...> const& workers)
   {
     // Verify packet header
     return std::apply(
-      [&header](TWorkers const&... worker) -> bool { return ((worker.validateReplyType(header)) || ...); },
+      [&header](TWorkers const&... worker) -> bool { return ((worker.validateCommandHeader(header)) || ...); },
       workers);
   }
 

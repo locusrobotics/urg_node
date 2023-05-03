@@ -30,12 +30,12 @@ public:
   /**
    * @brief type of the Callback that receives the packet
    */
-  using OnNewDataCallback = std::function<void(const protocol::ShapeShifterBuffer& packet)>;
+  using OnNewDataCallback = std::function<void(const protocol::ShapeShifterBuffer& packet, const ros::Time&)>;
 
   /**
    * @brief This
    */
-  using FilterCallback = std::function<bool(const protocol::CommandReplyHeader& packet)>;
+  using FilterCallback = std::function<bool(const decltype(protocol::CommandReplyHeader::header)& packet)>;
 
   /**
    * @brief Default C'tor
@@ -57,11 +57,6 @@ public:
   ~TcpClient();
 
   /**
-   * @brief Disconnect client
-   */
-  void disconnect();
-
-  /**
    * @brief Connect to tcp server
    *
    * @param[in] remote_ip - Server ip address
@@ -70,6 +65,25 @@ public:
    * @return true if connect successful, false otherwise
    */
   bool connect(const std::string& remote_ip = "", uint16_t remote_port = 0u);
+
+  /**
+   * @brief Returns the state of the socket
+   *
+   * @return true if connected, false otherwise
+   */
+  inline bool isConnected() const { return connected_; }
+
+  /**
+   * @brief Returns if async read is queued or not
+   *
+   * @return true if async read is in progress, alse otherwise
+   */
+  inline bool isStopped() const { return stopped_; }
+
+  /**
+   * @brief Disconnect client
+   */
+  void disconnect();
 
   /**
    * @brief Place and send order and wait for it to be sent
@@ -86,8 +100,9 @@ public:
   }
 
   /**
-   * @brief
-   * @return
+   * @brief Start Async Read Task (to read UAM commands)
+   *
+   * @return true if async task was created false otherwise
    */
   inline bool startAsyncReadTask()
   {
@@ -99,7 +114,6 @@ public:
 
     if (!stopped_)
     {
-      ROS_WARN_STREAM("Async read in progress");
       return true;
     }
 
@@ -109,151 +123,60 @@ public:
     return true;
   }
 
-  inline bool stopAsyncReadTask()
-  {
-    if (!connected_)
-    {
-      ROS_WARN_STREAM("Not connected");
-      return false;
-    }
-    if (stopped_)
-    {
-      ROS_WARN_STREAM("Async read already stopped");
-      return true;
-    }
-    // Request stop
-    stop_requested_ = true;
-    while (ros::ok() && !stopped_)
-    {
-      ROS_INFO_STREAM_THROTTLE(1, "Waiting for the async job to finish...");
-      std::this_thread::sleep_for(std::chrono::milliseconds(30));
-    }
-    return stopped_.load();
-  }
-
   /**
-   * @brief Send and receive messages
+   * @brief Create an async read line operation
    *
-   * @param[in] worker - Worker of the requested command
-   * @param[out] reply - Reply message
-   * @return true if success, false otherwise
+   * @param[in] handler - Async read handler
    */
-  template <typename TReply>
-  std::optional<TReply> syncSendAndReceive(const std::string& command)
+  template <typename TReply, typename Handler>
+  void asyncReadLine(Handler handler)
   {
-    if (!connected_)
-    {
-      ROS_WARN_STREAM("Not connected");
-      return std::nullopt;
-    }
-
     if (!stopped_)
     {
-      ROS_ERROR_STREAM("Sync operation not possible as async read is in progress.");
-      return std::nullopt;
+      ROS_ERROR_STREAM("Cannot send async readline with async receive in progress.");
+      return;
     }
-
-    boost::system::error_code error_code;
-    socket_.send(boost::asio::buffer(command), command.size(), error_code);
-    if (error_code)
-    {
-      ROS_ERROR_STREAM("Failed to send command: " << error_code.message());
-      return std::nullopt;
-    }
-
-    // We should now understand if the reply is going to be successful or not.
-    // If the device fails to correctly respond, we could get stuck here forever
-    // while expecting for the complete packet
-
-    const decltype(uam::protocol::CommandReplyHeader::cmd_size) expected_size = sizeof(TReply);
-    auto recv_bytes = boost::asio::read(
+    
+    // Start the asynchronous operation.
+    boost::asio::async_read_until(
       socket_,
-      boost::asio::buffer(receive_buffer_.getRawPacket()),
-      boost::asio::transfer_exactly(expected_size),
-      error_code);
-    if (error_code || expected_size != recv_bytes)
-    {
-      ROS_WARN_STREAM(
-        "Failed to read: " << error_code.message() << " Received " << recv_bytes << "bytes\n"
-                           << "Expected " << expected_size << " bytes");
-      return std::nullopt;
-    }
-    TReply reply = receive_buffer_.get<TReply>();
-    return reply;
+      readline_buffer_,
+      '\n',
+      [&](const boost::system::error_code& result_error, std::size_t result_n)
+      {
+        if (result_error || result_n == 0)
+        {
+          return;
+        }
+
+        TReply reply;
+        const auto nr_lines_to_read = reply.size();
+        size_t nr_lines_read = 0;
+        std::istream is(&readline_buffer_);
+        std::string line;
+        while (std::getline(is, line) && nr_lines_read < nr_lines_to_read)
+        {
+          reply.at(nr_lines_read) = line;
+          nr_lines_read++;
+          line.clear();
+        }
+        handler(reply);
+      });
+
+    return;
   }
 
   /**
-   * @brief Send and wait for reply which will consist in reading N lines
-   *
-   * @param[in] command - Command to send
-   * @return TReply if successful or std::nullopt if it fails.
+   * @brief Register Callback to filter if a packet is valid or not
+   * @param[in] f_ - Filter callback
    */
-  template <typename TReply>
-  std::optional<TReply> syncSendAndReadLine(const std::string& command)
-  {
-    if (!stopped_)
-    {
-      ROS_ERROR_STREAM("Sync operation not possible as async read is in progress.");
-      return std::nullopt;
-    }
-    boost::system::error_code error_code;
-    socket_.send(boost::asio::buffer(command), command.size(), error_code);
-    if (error_code)
-    {
-      ROS_ERROR_STREAM("Failed to send command: " << error_code.message());
-      ROS_DEBUG_STREAM("Failed to send command: " << command);
-      return std::nullopt;
-    }
-
-    TReply reply;
-    const auto nr_lines_to_read = reply.size();
-    size_t nr_lines_read = 0;
-    {
-      boost::asio::streambuf b;
-      auto n_bytes = boost::asio::read_until(socket_, b, '\n', error_code);
-      if (error_code || n_bytes == 0)
-      {
-        throw std::runtime_error(error_code.message());
-      }
-      std::istream is(&b);
-      std::string line;
-      while (std::getline(is, line) && nr_lines_read < nr_lines_to_read)
-      {
-        reply.at(nr_lines_read) = line;
-        nr_lines_read++;
-        line.clear();
-      }
-    }
-
-    if (nr_lines_read != (nr_lines_to_read))
-    {
-      ROS_ERROR_STREAM("Failed to read requested number of lines!");
-      return std::nullopt;
-    }
-    return reply;
-  }
-
   void registerFilterCallback(FilterCallback f_) { filter_callback_ = f_; }
 
 private:
   /**
-   * @brief Check deadline timer.
-   *
-   * This is the handler for the deadline and to close socket if deadline
-   * has expired. This will be run by the thread which takes care of the io_service_
-   *
-   */
-  void checkDeadline();
-
-  /**
-   * @brief
-   */
-  void handleConnect();
-
-  /**
    * @brief Start Async Read in the worker thread
    */
-  void asyncReadData();
+  void asyncReadData(const size_t packet_offset = 0);
 
   /**
    * @brief Receive handler for Async read
@@ -268,6 +191,11 @@ private:
    * @brief Shape shifter buffer
    */
   protocol::ShapeShifterBuffer receive_buffer_;
+  
+  /**
+   * @brief Read line buffer
+   */
+  boost::asio::streambuf readline_buffer_;
 
   /**
    * @brief The Boost IO Service object that manages the asynchronous operations
@@ -320,6 +248,11 @@ private:
   /**
    * @brief
    */
+  OnNewDataCallback scip_callback_;
+
+  /**
+   * @brief
+   */
   FilterCallback filter_callback_;
 
   /**
@@ -336,8 +269,6 @@ private:
    * @brief Filter
    */
   protocol::CommandReplyHeader command_header_buffer_;
-  //boost::asio::deadline_timer deadline_connect_;
-  //boost::asio::deadline_timer deadline_receive_;
 };
 
 }  // namespace uam

@@ -34,9 +34,9 @@ public:
 
 private:
   /**
-   * @brief Attempt to reconnect to the lidar if no scan sectors are received
+   * @brief Attempt to reconnect to the lidar if no scan are received
    */
-  void scanSectorWatchdogTimerCallback(const ros::TimerEvent& event);
+  void scanWatchdogTimerCallback(const ros::TimerEvent& event);
 
   /**
    * @brief Attempt to connect to and configure the lidar in response to a timer event
@@ -49,9 +49,9 @@ private:
   void triggerReconfigure();
 
   /**
-   * @brief
+   * @brief Connect and configure
    *
-   * @return
+   * @return true if successfully connected
    */
   bool configure();
 
@@ -60,23 +60,31 @@ private:
    *
    * @param scan_sector
    */
-  void scanCallback(const protocol::AR00CommandReply& scan_sector);
+  void scanCallback(const protocol::AR00CommandReply& scan_sector, const ros::Time& wall_time);
   /**
    * @brief
    *
    * @param scan_sector
    */
-  void scanCallback(const protocol::AR01CommandReply& scan_sector);
+  void scanCallback(const protocol::AR01CommandReply& scan_sector, const ros::Time& wall_time);
 
   /**
    * @brief
    *
    * @param scan_sector
    */
-  void scanCallback(const protocol::AR06CommandReply& scan_sector);
+  void scanCallback(const protocol::AR06CommandReply& scan_sector, const ros::Time& wall_time);
 
+  /**
+   * @brief Update status
+   *
+   * @param[in] sensing_data - Last received sensing data
+   * @param[in] override_check - Boolean to override comparison between last status and sensing_data
+   */
+  void updateStatus(const protocol::sensing_data::SensingDataHeader& sensing_data, const bool override_check = false);
 
 private:
+
   /**
    * \defgroup
    * @{
@@ -153,6 +161,11 @@ private:
    * @brief The last time the lidar was configured
    */
   ros::Time configured_stamp_;
+
+  /**
+   * @brief Last received sensing data status
+   */
+  protocol::sensing_data::SensingDataHeader last_received_status_;
 
   /**@}*/
 };

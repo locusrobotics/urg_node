@@ -25,9 +25,6 @@ TcpClient::TcpClient(OnNewDataCallback callback) :
   callback_(callback),
   stopped_(true),
   stop_requested_(false)
-  /*,
-  deadline_connect_(*io_service_),
-  deadline_receive_(*io_service_)*/
 {
   // Add a fake task to the io_service to prevent it from exiting until desired
   io_work_ = std::make_unique<boost::asio::io_service::work>(*io_service_);
@@ -72,9 +69,7 @@ void TcpClient::disconnect()
   }
 }
 
-bool TcpClient::connect(
-  const std::string& remote_ip,
-  uint16_t remote_port)
+bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
 {
   if (connected_)
   {
@@ -106,43 +101,22 @@ bool TcpClient::connect(
     ROS_ERROR_STREAM("Failed to connect: " << error_code.message());
     return false;
   }
+  connected_ = true;
   // Set tcp no delay
   boost::asio::ip::tcp::no_delay option(true);
   socket_.set_option(option, error_code);
   if (error_code)
   {
     ROS_ERROR_STREAM("Failed to set option: " << error_code.message());
+    disconnect();
     return false;
   }
+
   ROS_INFO_STREAM("Connected to: " << remote_ip << ":" << remote_port);
-  connected_ = true;
   return true;
 }
 
-void TcpClient::checkDeadline()
-{
-  if (stopped_)
-    return;
-
-  // Check whether the deadline has passed. We compare the deadline against
-  // the current time since a new asynchronous operation may have moved the
-  // deadline before this actor had a chance to run.
-//  if (deadline_connect_.expires_at() <= boost::asio::deadline_timer::traits_type::now())
-//  {
-//    // The deadline has passed. The socket is closed so that any outstanding
-//    // asynchronous operations are cancelled.
-//    socket_.close();
-//
-//    // There is no longer an active deadline. The expiry is set to positive
-//    // infinity so that the actor takes no action until a new deadline is set.
-//    deadline_connect_.expires_at(boost::posix_time::pos_infin);
-//  }
-//
-//  // Put the actor back to sleep.
-//  deadline_connect_.async_wait(boost::bind(&TcpClient::checkDeadline, this));
-}
-
-void TcpClient::asyncReadData()
+void TcpClient::asyncReadData(const size_t packet_offset)
 {
   if (!connected_ || stop_requested_)
   {
@@ -153,7 +127,9 @@ void TcpClient::asyncReadData()
   // Try read  with the minimum reply size
   boost::asio::async_read(
     socket_,
-    boost::asio::buffer(receive_buffer_.getRawPacket()),
+    boost::asio::buffer(
+      receive_buffer_.getRawPacket().data() + packet_offset,
+      sizeof(protocol::CommandReplyHeader) - packet_offset),
     boost::asio::transfer_exactly(sizeof(protocol::CommandReplyHeader)),
     boost::bind(
       &TcpClient::handleReceive,
@@ -166,6 +142,7 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
 {
   // Grab a packet received time as soon as possible
   auto received_stamp = ros::Time::now();
+  size_t packet_offset = 0;
 
   if (error_code)
   {
@@ -186,10 +163,13 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
   {
     // All the packets are expected to contain a header. We read those bytes
     // and then we call the read to read the rest
-    auto expected_total_size = receive_buffer_.get<protocol::CommandReplyHeader>().cmd_size;
-    bool should_try_complete_read = filter_callback_ ? filter_callback_(receive_buffer_.get<protocol::CommandReplyHeader>()) : true;
+    bool should_try_complete_read =
+      filter_callback_ ? filter_callback_(receive_buffer_.get<protocol::CommandReplyHeader>().header) : true;
+
     if (should_try_complete_read)
     {
+      auto stamp = ros::Time::now();
+      auto expected_total_size = receive_buffer_.get<protocol::CommandReplyHeader>().cmd_size;
       decodeField(expected_total_size);
       if (expected_total_size > sizeof(protocol::AR01CommandReply))
       {
@@ -197,9 +177,6 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
       }
       else
       {
-        if (should_try_complete_read)
-        {
-        }
         boost::system::error_code new_error_code;
         auto missing_read = expected_total_size - bytes_transferred;
         auto recv_bytes = boost::asio::read(
@@ -207,19 +184,24 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
           boost::asio::buffer(receive_buffer_.getRawPacket().data() + bytes_transferred, missing_read),
           boost::asio::transfer_exactly(missing_read),
           new_error_code);
-
         if (new_error_code || recv_bytes != missing_read)
         {
           ROS_WARN_STREAM(
             "Failed to read: " << new_error_code.message() << " Received " << recv_bytes << "bytes\n"
                                << "Expected " << expected_total_size << " bytes");
-          return;
         }
-        callback_(receive_buffer_);
+        else
+        {
+          callback_(receive_buffer_, stamp);
+        }
       }
     }
+    else
+    {
+      ROS_WARN_STREAM("Packet was received but could not make sense of them, skipping it.");
+    }
   }
-  asyncReadData();
+  asyncReadData(packet_offset);
 }
 
 }  // namespace uam

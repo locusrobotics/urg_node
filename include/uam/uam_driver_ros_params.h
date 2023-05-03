@@ -122,6 +122,11 @@ public:
    * @brief The topic name where LaserScan messages will be published
    */
   std::string scan_topic { "scan" };
+
+  /**
+   * @brief The topic name where LaserScan messages will be published
+   */
+  std::string status_topic { "status" };
 };
 }
 

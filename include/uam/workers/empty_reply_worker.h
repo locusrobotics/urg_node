@@ -56,10 +56,6 @@ public:
   {
     protocol::EmptyCommandReply reply = raw_reply;
     this->decodeHeaderAndFooter(reply);
-    if (!this->validateCrc(reply))
-    {
-      return std::nullopt;
-    }
     return reply;
   }
 

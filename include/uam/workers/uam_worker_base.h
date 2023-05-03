@@ -64,8 +64,6 @@ namespace uam
 template <typename TDerived, char HeaderMSB, char HeaderLSB, char SubHeaderMSB, char SubHeaderLSB, typename TReply>
 class WorkerBase
 {
-  static constexpr uint8_t STX_ID = 0x02;
-  static constexpr uint8_t ETX_ID = 0x03;
 
 public:
   /**
@@ -91,7 +89,7 @@ public:
   /**
    * @brief Packet callback type
    */
-  using PacketEventCallback = std::function<void(const Reply)>;
+  using PacketEventCallback = std::function<void(const Reply, const ros::Time&)>;
 
   /**
    * @brief Return encoded request
@@ -99,6 +97,17 @@ public:
    * @return request message
    */
   inline const std::string& getCommand() const { return encoded_request_; }
+
+  /**
+   * @brief Validate if the reply is of the type TDerived
+   *
+   * @param[in] header - Command reply header
+   * @return true if the reply is of the type TDerived::Reply, false otherwise
+   */
+  inline bool validateCommandHeader(const std::array<char,2>& header) const
+  {
+    return header[0] == HeaderMSB && header[1] == HeaderLSB;
+  }
 
   /**
    * @brief Validate if the reply is of the type TDerived
@@ -196,7 +205,7 @@ public:
    *
    * @return true if message was successfully process, false otherwise
    */
-  bool processByHandler(const std::string* buffer) const
+  bool processByHandler(const std::string* buffer, const ros::Time& wall_time) const
   {
     auto reply = process(buffer);
     if (!reply.has_value())
@@ -205,7 +214,7 @@ public:
       return false;
     }
     if (callback_)
-      callback_(*reply);
+      callback_(*reply, wall_time);
     return true;
   }
 
@@ -215,7 +224,7 @@ public:
    * @param[in] buffer - Raw buffer
    * @return Reply decoded message if successful, std::nullopt otherwise
    */
-  bool processByHandler(const Reply& raw_reply) const
+  bool processByHandler(const Reply& raw_reply, const ros::Time& wall_time) const
   {
     auto reply = process(raw_reply);
     if (!reply.has_value())
@@ -224,7 +233,7 @@ public:
       return false;
     }
     if (callback_)
-      callback_(*reply);
+      callback_(*reply, wall_time);
     else
       ROS_WARN_STREAM(
         "No handler for " << HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB << " and it is "
@@ -241,11 +250,11 @@ protected:
    *
    */
   WorkerBase(const uint32_t header_offset = 0, const uint32_t footer_offset = sizeof(protocol::CommandReplyHeader)) :
-    request_(Request { protocol::CommandRequestHeader { STX_ID,
+    request_(Request { protocol::CommandRequestHeader { protocol::STX_ID,
                                                         sizeof(Request),
                                                         { HeaderMSB, HeaderLSB },
                                                         { SubHeaderMSB, SubHeaderLSB } },
-                       protocol::CommandFooter { 0, ETX_ID } }),
+                       protocol::CommandFooter { 0, protocol::ETX_ID } }),
     header_visitor_(header_offset),
     footer_visitor_(footer_offset)
   {

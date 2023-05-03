@@ -45,6 +45,10 @@ namespace uam
 {
 namespace protocol
 {
+
+constexpr uint8_t STX_ID = 0x02;
+constexpr uint8_t ETX_ID = 0x03;
+
 #pragma pack(1)
 struct CommandRequestHeader
 {
@@ -61,12 +65,12 @@ struct CommandRequestHeader
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  char header[2];
+  std::array<char,2> header;
 
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  char sub_header[2];
+  std::array<char,2> sub_header;
 };
 #pragma pack()
 
@@ -86,12 +90,12 @@ struct CommandReplyHeader
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  char header[2];
+  std::array<char,2> header;
 
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  char sub_header[2];
+  std::array<char,2> sub_header;
 
   /**
    * @brief code to inform the success or failure of the command execution.
@@ -143,7 +147,7 @@ struct VersionDetails
   /**
    * @brief reserved
    */
-  char reserved0[37];
+  std::array<char,37> reserved0;
   /**
    * @brief Reserved byte
    */
@@ -259,7 +263,7 @@ struct SensingDataHeader
   /**
    * @brief reserved
    */
-  char reserved0[2];
+  std::array<char,2> reserved0;
   /**
    * @brief
    * 0 - not active
@@ -307,7 +311,7 @@ struct SensingDataHeader
   /**
    * @brief reserved
    */
-  char reserved1[6];
+  std::array<char,6> reserved1;
 };
 #pragma pack()
 
@@ -383,7 +387,7 @@ struct StatusData
   /**
    * @brief reserved
    */
-  char reserved0[2];
+  std::array<char,2> reserved0;
   /**
    * @brief
    * 0 - not active
@@ -505,7 +509,7 @@ struct StatusData
   /**
    * @brief Reserved bytes
    */
-  char reserved1[39];
+  std::array<char,39> reserved1;
 };
 #pragma pack()
 
@@ -627,7 +631,7 @@ struct YRCommandHeader
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  char header[2];
+  std::array<char,2> header;
   /**
    * @brief
    * 00: Protection Zone 1
