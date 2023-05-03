@@ -30,8 +30,6 @@ catkin_package(
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-
-
 ## Declare a cpp library
 add_library(uam_workers 
   src/uam/workers/sensing_data/ar00_worker.cpp

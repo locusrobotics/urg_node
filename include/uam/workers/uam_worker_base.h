@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef INCLUDE_URG_NODE_UAM_UAM_WORKER_BASE_H_
-#define INCLUDE_URG_NODE_UAM_UAM_WORKER_BASE_H_
+#ifndef URG_NODE_UAM_UAM_WORKER_BASE_H
+#define URG_NODE_UAM_UAM_WORKER_BASE_H
 
 #include <ros/ros.h>
 #include <uam/protocol_types/uam_protocol_types.h>

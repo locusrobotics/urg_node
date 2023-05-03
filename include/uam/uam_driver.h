@@ -1,9 +1,36 @@
-/*
- * scan_worker.cpp
+/*********************************************************************
+ * Software License Agreement (BSD License)
  *
- *  Created on: 03/04/2023
- *      Author: cribeiromendes
- */
+ *  Copyright (c) 2023, Locus Robotics
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
 #ifndef INCLUDE_URG_NODE_UAM_DRIVER
 #define INCLUDE_URG_NODE_UAM_DRIVER
@@ -62,7 +89,8 @@ struct ScanParameters
 
     scan_details.scan_period = 60.0 / static_cast<double>(reply.rpm);
     auto circle_fraction = (scan_details.angle_max_limit - scan_details.angle_min_limit) / (2.0 * M_PI);
-    scan_details.time_increment = circle_fraction * scan_details.scan_period / static_cast<double>(scan_details.max_step - scan_details.min_step);
+    scan_details.time_increment =
+      circle_fraction * scan_details.scan_period / static_cast<double>(scan_details.max_step - scan_details.min_step);
     scan_details.setAngleLimits(scan_details.angle_min_limit, scan_details.angle_max_limit);
     return scan_details;
   }
@@ -107,17 +135,16 @@ struct ScanParameters
     angular_time_offset = calculateTimeOffset();
   }
 
-  inline auto getAngleMin() const {return angle_min;}
-  inline auto getAngleMax() const {return angle_max;}
-  inline auto getAngleIncrement() const {return angle_increment;}
-  inline auto getScanPeriod() const {return scan_period;}
-  inline auto getTimeIncrement() const {return time_increment;}
-  inline auto getRangeMin() const {return range_min;}
-  inline auto getRangeMax() const {return range_max;}
-  inline auto getAngularTimeOffset() const {return angular_time_offset;}
+  inline auto getAngleMin() const { return angle_min; }
+  inline auto getAngleMax() const { return angle_max; }
+  inline auto getAngleIncrement() const { return angle_increment; }
+  inline auto getScanPeriod() const { return scan_period; }
+  inline auto getTimeIncrement() const { return time_increment; }
+  inline auto getRangeMin() const { return range_min; }
+  inline auto getRangeMax() const { return range_max; }
+  inline auto getAngularTimeOffset() const { return angular_time_offset; }
 
 private:
-
   double calculateTimeOffset() const
   {
     // Adjust value for Hokuyo's timestamps
@@ -151,14 +178,13 @@ private:
     return std::min(std::max(0, index), min_step);
   }
 
-  int index2step(const int step) const {return step - front_data_index;}
+  int index2step(const int step) const { return step - front_data_index; }
 
-
-  double angle_min {0.};
-  double angle_max {0.};
-  int first_step {0};
-  int last_step {0};
-  double angular_time_offset {0.}; // s
+  double angle_min { 0. };
+  double angle_max { 0. };
+  int first_step { 0 };
+  int last_step { 0 };
+  double angular_time_offset { 0. };  // s
 
   double angle_min_limit { 0. };  // start angle of the scan [rad]
   double angle_max_limit { 0. };  // end angle of the scan [rad]
@@ -170,16 +196,16 @@ private:
   double range_min { 0. };  // minimum range value [m]
   double range_max { 0. };  // maximum range value [m]
 
-  double scan_period {0.};
+  double scan_period { 0. };
 
-  int first_data_index {0};
-  int last_data_index {0};
+  int first_data_index { 0 };
+  int last_data_index { 0 };
 
-  int min_step {0};
-  int max_step {0};
+  int min_step { 0 };
+  int max_step { 0 };
 
-  int front_data_index {0};
-  int angular_resolution {0};
+  int front_data_index { 0 };
+  int angular_resolution { 0 };
   int rpm;
 };
 
@@ -289,8 +315,7 @@ public:
    *
    * @return Reply if successful received, std::nullopt otherwise
    */
-  scip_protocol::PPReply sendPPCommandWithReply(
-    const std::chrono::duration<double>& timeout = std::chrono::seconds(2))
+  scip_protocol::PPReply sendPPCommandWithReply(const std::chrono::duration<double>& timeout = std::chrono::seconds(2))
   {
     if (!client_.isConnected())
     {
@@ -326,7 +351,6 @@ public:
     std::unique_lock<std::mutex> lock(pending_command_mutex_);
     if (pending_command_signal_.wait_for(lock, timeout, [this] { return pending_command_reply_ready_; }))
     {
-        ROS_WARN_STREAM("DOne now");
       return pending_scip_reply_;
     }
     else
@@ -450,7 +474,7 @@ public:
    *
    * @param Stamped packet
    */
-  inline void packetCallback(const uam::protocol::ShapeShifterBuffer& packet, const ros::Time& wall_time)
+  inline void packetCallback(const uam::protocol::ShapeShifterPacket& packet, const ros::Time& wall_time)
   {
     auto success = uam_packet_worker_.processByHandler(packet, wall_time);
     ROS_ERROR_STREAM_COND(!success, "Failed processing packet");
@@ -562,7 +586,7 @@ private:
    *
    * This is populated by the receive event sequence after the pending command has been sent.
    */
-  protocol::ShapeShifterBuffer pending_command_reply_;
+  protocol::ShapeShifterPacket pending_command_reply_;
 
   /**
    * @brief The reply message associated with the pending scip command

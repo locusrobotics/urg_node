@@ -1,11 +1,36 @@
-/**
-Software License Agreement (proprietary)
-\file      tcp_client.h
-\authors   Carlos Mendes <cribeiromendes@locusrobotics.com>
-\copyright Copyright (c) (2023,), Locus Robotics Corp., All rights reserved.
-Unauthorized copying of this file, via any medium, is strictly prohibited.
-Proprietary and confidential.
-**/
+/*********************************************************************
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2023, Locus Robotics
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -63,7 +88,7 @@ void TcpClient::disconnect()
       socket_.close(error_code);
       if (error_code)
       {
-        ROS_WARN_STREAM_NAMED(name_, "Failed to close socket. " << error_code.message());
+        ROS_WARN_STREAM("Failed to close socket. " << error_code.message());
       }
     }
   }
@@ -150,7 +175,7 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
     // error conditions.
     if (connected_ || error_code != boost::asio::error::operation_aborted)
     {
-      ROS_ERROR_STREAM_NAMED(name_, "Error receiving lidar message. " << error_code.message());
+      ROS_ERROR_STREAM("Error receiving lidar message. " << error_code.message());
     }
   }
   else if (sizeof(protocol::CommandReplyHeader) != bytes_transferred)

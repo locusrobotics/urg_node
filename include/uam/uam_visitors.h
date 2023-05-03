@@ -1,14 +1,39 @@
-/**
-Software License Agreement (proprietary)
-\file      uam_visitors.h
-\authors   Carlos Mendes <cribeiromendes@locusrobotics.com>
-\copyright Copyright (c) (2023,), Locus Robotics Corp., All rights reserved.
-Unauthorized copying of this file, via any medium, is strictly prohibited.
-Proprietary and confidential.
-**/
+/*********************************************************************
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2023, Locus Robotics
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
-#ifndef INCLUDE_URG_NODE_UAM_UAM_VISITORS_H_
-#define INCLUDE_URG_NODE_UAM_UAM_VISITORS_H_
+#ifndef URG_NODE_UAM_UAM_VISITORS_H
+#define URG_NODE_UAM_UAM_VISITORS_H
 
 #include <uam/protocol_types/uam_protocol_types.h>
 #include <urg_node/visitor.h>
@@ -239,10 +264,6 @@ static_assert(
   protocol::c_sensing_data_start_idx + offsetof(protocol::sensing_data::SensingDataHeader, error_code) == 15);
 static_assert(
   protocol::c_sensing_data_start_idx + offsetof(protocol::sensing_data::SensingDataHeader, lockout_state) == 17);
-// static_assert(
-//  protocol::c_sensing_data_start_idx +
-//    offsetof(protocol::sensing_data::SensingDataHeader, optical_window_contaminated) ==
-//  43);
 
 static_assert(offsetof(protocol::AR00CommandReply, ranges) == protocol::c_distance_start_idx);
 static_assert(offsetof(protocol::AR00CommandReply, ranges) == 50);

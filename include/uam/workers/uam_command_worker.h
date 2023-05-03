@@ -1,17 +1,42 @@
-/**
-Software License Agreement (proprietary)
-\file      uam_command_workers.h
-\authors   Carlos Mendes <cribeiromendes@locusrobotics.com>
-\copyright Copyright (c) (2023,), Locus Robotics Corp., All rights reserved.
-Unauthorized copying of this file, via any medium, is strictly prohibited.
-Proprietary and confidential.
-**/
+/*********************************************************************
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2023, Locus Robotics
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
-#ifndef INCLUDE_URG_NODE_UAM_UAM_COMMAND_WORKERS_H_
-#define INCLUDE_URG_NODE_UAM_UAM_COMMAND_WORKERS_H_
+#ifndef URG_NODE_UAM_UAM_COMMAND_WORKER_H
+#define URG_NODE_UAM_UAM_COMMAND_WORKER_H
 
 // sensing data workers
-#include <uam/shape_shifter_buffer.h>
+#include <uam/shape_shifter_packet.h>
 #include <uam/workers/empty_reply_worker.h>
 #include <uam/workers/sensing_data/ar00_worker.h>
 #include <uam/workers/sensing_data/ar01_worker.h>
@@ -54,11 +79,12 @@ public:
   }
 
   /**
-   * @brief
-   * @param header
-   * @return
+   * @brief Validate if the command header against known packets
+   *
+   * @param[in] header - Incoming header
+   * @return true if the command is recognised by a packet worker, false otherwise
    */
-  inline bool validateCommandHeader(const std::array<char,2>& header) const
+  inline bool validateCommandHeader(const std::array<char, 2>& header) const
   {
     return validateCommandHeaderImplementation(header, workers_);
   }
@@ -79,10 +105,11 @@ public:
    * @brief This method is used to process a message which can assume different
    * types
    *
-   * @param[in] packet - Packet
-   * @return
+   * @param[in] packet - The shape shifter packet
+   * @param[in] wall_time - Wall time (the moment when the packet header was captured)
+   * @return true if packet was successfully processed, false otherwise
    */
-  bool processByHandler(const protocol::ShapeShifterBuffer& packet, const ros::Time& wall_time);
+  bool processByHandler(const protocol::ShapeShifterPacket& packet, const ros::Time& wall_time);
 
   /**
    * @brief Call specific worker and result will be processed by the registered handler
@@ -110,12 +137,14 @@ public:
 private:
   /**
    * @brief Filter function to validate if we have a valid packet based on header
-   * @param header
-   * @param f_tuple
-   * @return
+   * @param[in] header - Incoming packet header
+   * @param[in] f_tuple - Tuple of workers
+   * @return true if a worker validated the header, false otherwise
    */
   template <typename... TWorkers>
-  static inline bool validateCommandHeaderImplementation(const std::array<char,2>& header, std::tuple<TWorkers...> const& workers)
+  static inline bool validateCommandHeaderImplementation(
+    const std::array<char, 2>& header,
+    std::tuple<TWorkers...> const& workers)
   {
     // Verify packet header
     return std::apply(
@@ -124,7 +153,7 @@ private:
   }
 
   /**
-   * @brief UAM tupple of packet workers
+   * @brief UAM tuple of packet workers
    */
   std::tuple<
     uam::AR00Worker,
@@ -138,9 +167,9 @@ private:
     uam::AR08Worker,
     uam::VR00Worker,
     uam::XR00Worker,
-	uam::YRWorker>
+    uam::YRWorker>
     workers_;
 };
 }  // namespace uam
 
-#endif  // INCLUDE_URG_NODE_UAM_UAM_COMMAND_WORKERS_H_
+#endif  // URG_NODE_UAM_UAM_COMMAND_WORKER_H

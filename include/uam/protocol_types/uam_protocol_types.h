@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2022, Locus Robotics
+ *  Copyright (c) 2023, Locus Robotics
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef INCLUDE_URG_NODE_UAM_PROTOCOL_TYPES_H_
-#define INCLUDE_URG_NODE_UAM_PROTOCOL_TYPES_H_
+#ifndef URG_NODE_UAM_PROTOCOL_TYPES_UAM_PROTOCOL_TYPES_H_
+#define URG_NODE_UAM_PROTOCOL_TYPES_UAM_PROTOCOL_TYPES_H_
 
 #include <cstddef>
 #include <cstdint>
@@ -45,7 +45,6 @@ namespace uam
 {
 namespace protocol
 {
-
 constexpr uint8_t STX_ID = 0x02;
 constexpr uint8_t ETX_ID = 0x03;
 
@@ -65,12 +64,12 @@ struct CommandRequestHeader
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  std::array<char,2> header;
+  std::array<char, 2> header;
 
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  std::array<char,2> sub_header;
+  std::array<char, 2> sub_header;
 };
 #pragma pack()
 
@@ -90,12 +89,12 @@ struct CommandReplyHeader
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  std::array<char,2> header;
+  std::array<char, 2> header;
 
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  std::array<char,2> sub_header;
+  std::array<char, 2> sub_header;
 
   /**
    * @brief code to inform the success or failure of the command execution.
@@ -147,7 +146,7 @@ struct VersionDetails
   /**
    * @brief reserved
    */
-  std::array<char,37> reserved0;
+  std::array<char, 37> reserved0;
   /**
    * @brief Reserved byte
    */
@@ -263,7 +262,7 @@ struct SensingDataHeader
   /**
    * @brief reserved
    */
-  std::array<char,2> reserved0;
+  std::array<char, 2> reserved0;
   /**
    * @brief
    * 0 - not active
@@ -311,7 +310,7 @@ struct SensingDataHeader
   /**
    * @brief reserved
    */
-  std::array<char,6> reserved1;
+  std::array<char, 6> reserved1;
 };
 #pragma pack()
 
@@ -387,7 +386,7 @@ struct StatusData
   /**
    * @brief reserved
    */
-  std::array<char,2> reserved0;
+  std::array<char, 2> reserved0;
   /**
    * @brief
    * 0 - not active
@@ -509,7 +508,7 @@ struct StatusData
   /**
    * @brief Reserved bytes
    */
-  std::array<char,39> reserved1;
+  std::array<char, 39> reserved1;
 };
 #pragma pack()
 
@@ -631,7 +630,7 @@ struct YRCommandHeader
   /**
    * @brief It is a unique code to differentiate the type of command.
    */
-  std::array<char,2> header;
+  std::array<char, 2> header;
   /**
    * @brief
    * 00: Protection Zone 1
@@ -706,27 +705,26 @@ struct YRCommandRequest
 struct YRCommandReply
 {
   YRCommandReplyHeader header;
-  std::array<uint32_t,1080> area_data;
+  std::array<uint32_t, 1080> area_data;
   CommandFooter footer;
 };
 #pragma pack()
-
 
 /**
  * @brief Area Types
  */
 enum EYRAreaType : uint16_t
 {
-  protection_1 = 0,/**< protection_1 */
-  protection_2,    /**< protection_2 */
-  warning_1,       /**< warning_1 */
-  warning_2,       /**< warning_2 */
-  muting_1,        /**< muting_1 */
-  muting_2,        /**< muting_2 */
-  reference_center,/**< reference_center */
-  reference_max,   /**< reference_max */
-  reference_min,   /**< reference_min */
-  MAX              /**< MAX */
+  protection_1 = 0, /**< protection_1 */
+  protection_2, /**< protection_2 */
+  warning_1, /**< warning_1 */
+  warning_2, /**< warning_2 */
+  muting_1, /**< muting_1 */
+  muting_2, /**< muting_2 */
+  reference_center, /**< reference_center */
+  reference_max, /**< reference_max */
+  reference_min, /**< reference_min */
+  MAX /**< MAX */
 };
 
 /**
@@ -742,4 +740,4 @@ constexpr size_t c_intensity_start_idx { c_distance_start_idx + sizeof(protocol:
 }  // namespace protocol
 }  // namespace uam
 
-#endif /* INCLUDE_URG_NODE_UAM_PROTOCOL_TYPES_H_ */
+#endif  //  URG_NODE_UAM_PROTOCOL_TYPES_UAM_PROTOCOL_TYPES_H_

@@ -1,14 +1,39 @@
-/**
-Software License Agreement (proprietary)
-\file      vr_00_decoder.h
-\authors   Carlos Mendes <cribeiromendes@locusrobotics.com>
-\copyright Copyright (c) (2023,), Locus Robotics Corp., All rights reserved.
-Unauthorized copying of this file, via any medium, is strictly prohibited.
-Proprietary and confidential.
-**/
+/*********************************************************************
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2023, Locus Robotics
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
-#ifndef INCLUDE_URG_NODE_UAM_DECODER_PP_WORKER_H_
-#define INCLUDE_URG_NODE_UAM_DECODER_PP_WORKER_H_
+#ifndef URG_NODE_UAM_WORKERS_SCIP_WORKER_H
+#define URG_NODE_UAM_WORKERS_SCIP_WORKER_H
 
 #include <uam/protocol_types/scip_protocol_types.h>
 #include <uam/workers/uam_worker_base.h>
@@ -17,6 +42,16 @@ Proprietary and confidential.
 
 namespace uam
 {
+/**
+ * @brief This template class for SCIP workers. To decode each individual reply, each
+ * child will have to implement custom decode methods. To decode each packet there
+ * are two options, or sending a byte array in the for of a std::string or sending
+ * already the raw_reply. This last approach does not require visitor members.
+ *
+ * @tparam TDerived - CRTP Pattern to allow for static dispatch whenever possible.
+ * @tparam NR_LINES - Number of lines of the reply
+ * @tparam TReply - The reply type for the child worker
+ */
 template <typename TDerived, size_t NR_LINES, typename TReply>
 class SCIPWorker
 {
@@ -74,6 +109,14 @@ public:
   }
 
 protected:
+  /**
+   * @brief Find a substring in between two delimiters
+   *
+   * @param[in] input - Complete string
+   * @param[in] first - First delimiter
+   * @param[in] last - Last delimiter
+   * @return
+   */
   static std::string findSubstring(
     const std::string& input,
     const std::string& first = ":",
@@ -96,17 +139,28 @@ protected:
   }
 
 private:
+  /**
+   * @brief The packet callback
+   */
   PacketEventCallback callback_;
 };
 
 /**
- * @brief VR00 command worker
+ * @brief PP command worker
  */
 class PPWorker : public SCIPWorker<PPWorker, scip_protocol::PPReplyLineIndex::NR_LINES, scip_protocol::PPReply>
 {
 public:
+  /**
+   * @brief Default C'tor
+   */
   PPWorker() : SCIPWorker<PPWorker, scip_protocol::PPReplyLineIndex::NR_LINES, scip_protocol::PPReply>() {}
 
+  /**
+   * @brief Decode raw reply into Reply
+   * @param[in] raw_reply - Raw reply (array of strings)
+   * @return[out] Decoded reply if success, std::nullopt otherwise
+   */
   std::optional<Reply> decode(const RawReply& raw_reply) const
   {
     if (raw_reply.size() != scip_protocol::PPReplyLineIndex::NR_LINES)
@@ -116,13 +170,8 @@ public:
                                           << " line. Expected: " << scip_protocol::PPReplyLineIndex::NR_LINES);
       return std::nullopt;
     }
+
     Reply reply;
-
-    for (auto& i : raw_reply)
-    {
-      std::cout << i << std::endl;
-    }
-
     bool failed = !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::MIN_DISTANCE), reply.min_distance);
     failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::MAX_DISTANCE), reply.max_distance);
     failed = failed ||
@@ -140,9 +189,21 @@ public:
     return reply;
   }
 
+  /**
+   * @brief Retrieve the command
+   *
+   * @return The scip PP command
+   */
   inline const std::string getCommand() const { return "PP\n"; }
 
 private:
+  /**
+   * @brief Transform string into an integer value
+   *
+   * @param[in] field - Input string
+   * @param[out] value - Output value
+   * @return true if transformation was successful, false otherwise
+   */
   bool decodeField(const std::string& field, int& value) const
   {
     auto sub_str = findSubstring(field);
@@ -153,6 +214,14 @@ private:
     }
     return false;
   }
+
+  /**
+   * @brief Transform string into a long value
+   *
+   * @param[in] field - Input string
+   * @param[out] value - Output value
+   * @return true if transformation was successful, false otherwise
+   */
   bool decodeField(const std::string& field, long& value)
   {
     auto sub_str = findSubstring(field);
@@ -167,4 +236,4 @@ private:
 
 }  // namespace uam
 
-#endif  // INCLUDE_URG_NODE_UAM_DECODER_PP_WORKER_H_
+#endif  // URG_NODE_UAM_WORKERS_SCIP_WORKER_H
