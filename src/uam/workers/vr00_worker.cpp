@@ -34,10 +34,12 @@
 
 #include <uam/workers/vr00_worker.h>
 
+#include <string>
+
 namespace uam
 {
 VR00Worker::VR00Worker(const uint32_t idx_offset) :
-  WorkerBase<VR00Worker,'V', 'R', '0', '0', protocol::VR00CommandReply>(
+  WorkerBase<VR00Worker, 'V', 'R', '0', '0', protocol::VR00CommandReply>(
     idx_offset,
     idx_offset + offsetof(Reply, footer)),
   version_detail_visitor_(idx_offset + offsetof(Reply, version_details))

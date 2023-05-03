@@ -37,9 +37,12 @@
 
 #include <urg_node/Status.h>
 
+#include <algorithm>
 #include <atomic>
+#include <limits>
 #include <mutex>
 #include <string>
+
 namespace uam
 {
 
@@ -109,7 +112,7 @@ bool UamROS::configure()
     lidar_.connect(params_.ip_address, params_.ip_port);
     ROS_INFO_STREAM("Connected to Uam lidar.");
 
-    //TODO (cribeiromendes): make scip commands work seamlessly. Right now we
+    // TODO(cribeiromendes): make scip commands work seamlessly. Right now we
     // need to ask this before starting continuous async reads
     scan_params_ = lidar_.getScanDetails();
     std::this_thread::sleep_for(std::chrono::seconds(1));

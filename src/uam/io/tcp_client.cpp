@@ -32,13 +32,17 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
+#include <uam/io/tcp_client.h>
+
+#include <ros/console.h>
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <ros/console.h>
-#include <uam/io/tcp_client.h>
+#include <string>
+#include <memory>
 
 namespace uam
 {

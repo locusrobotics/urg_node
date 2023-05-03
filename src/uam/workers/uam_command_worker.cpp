@@ -38,7 +38,6 @@
 
 namespace uam
 {
-
 bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packet, const ros::Time& wall_time)
 {
   // Verify packet header
@@ -61,8 +60,7 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
   bool is_vr00_packet = (!is_ar08_packet && std::get<VR00Worker>(workers_).validateReplyType(packet_type));
   bool is_xr00_packet = (!is_vr00_packet && std::get<XR00Worker>(workers_).validateReplyType(packet_type));
   bool is_yr_packet =
-    (!is_xr00_packet &&
-     std::get<YRWorker>(workers_).validateReplyType(packet.get<protocol::YRCommandReplyHeader>()));
+    (!is_xr00_packet && std::get<YRWorker>(workers_).validateReplyType(packet.get<protocol::YRCommandReplyHeader>()));
 
   // Subscription commands can have 2 different reply types:
   // - Empty reply flagging if subscription was successful
@@ -71,47 +69,58 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
   if (is_ar00_packet || (is_ar02_packet && received_packet_size == sizeof(AR00Worker::Reply)))
   {
     valid_packet = true;
-    processed_successfully = std::get<AR00Worker>(workers_).processByHandler(packet.get<AR00Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<AR00Worker>(workers_).processByHandler(packet.get<AR00Worker::Reply>(), wall_time);
   }
   else if (is_ar01_packet || (is_ar04_packet && received_packet_size == sizeof(AR01Worker::Reply)))
   {
-    processed_successfully = std::get<AR01Worker>(workers_).processByHandler(packet.get<AR01Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<AR01Worker>(workers_).processByHandler(packet.get<AR01Worker::Reply>(), wall_time);
   }
   else if (is_ar06_packet || (is_ar07_packet && received_packet_size == sizeof(AR06Worker::Reply)))
   {
-    processed_successfully = std::get<AR06Worker>(workers_).processByHandler(packet.get<AR06Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<AR06Worker>(workers_).processByHandler(packet.get<AR06Worker::Reply>(), wall_time);
   }
   else if (is_ar02_packet)
   {
-    processed_successfully = std::get<AR02Worker>(workers_).processByHandler(packet.get<AR02Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<AR02Worker>(workers_).processByHandler(packet.get<AR02Worker::Reply>(), wall_time);
   }
   else if (is_ar03_packet)
   {
-    processed_successfully = std::get<AR03Worker>(workers_).processByHandler(packet.get<AR03Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<AR03Worker>(workers_).processByHandler(packet.get<AR03Worker::Reply>(), wall_time);
   }
   else if (is_ar04_packet)
   {
-    processed_successfully = std::get<AR04Worker>(workers_).processByHandler(packet.get<AR04Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<AR04Worker>(workers_).processByHandler(packet.get<AR04Worker::Reply>(), wall_time);
   }
   else if (is_ar05_packet)
   {
-    processed_successfully = std::get<AR05Worker>(workers_).processByHandler(packet.get<AR05Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<AR05Worker>(workers_).processByHandler(packet.get<AR05Worker::Reply>(), wall_time);
   }
   else if (is_ar07_packet)
   {
-    processed_successfully = std::get<AR07Worker>(workers_).processByHandler(packet.get<AR07Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<AR07Worker>(workers_).processByHandler(packet.get<AR07Worker::Reply>(), wall_time);
   }
   else if (is_ar08_packet)
   {
-    processed_successfully = std::get<AR08Worker>(workers_).processByHandler(packet.get<AR08Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<AR08Worker>(workers_).processByHandler(packet.get<AR08Worker::Reply>(), wall_time);
   }
   else if (is_vr00_packet)
   {
-    processed_successfully = std::get<VR00Worker>(workers_).processByHandler(packet.get<VR00Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<VR00Worker>(workers_).processByHandler(packet.get<VR00Worker::Reply>(), wall_time);
   }
   else if (is_xr00_packet)
   {
-    processed_successfully = std::get<XR00Worker>(workers_).processByHandler(packet.get<XR00Worker::Reply>(), wall_time);
+    processed_successfully =
+      std::get<XR00Worker>(workers_).processByHandler(packet.get<XR00Worker::Reply>(), wall_time);
   }
   else if (is_yr_packet)
   {
@@ -120,8 +129,7 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
   }
   else
   {
-    ROS_ERROR_STREAM(
-      "Unknown packet type with: " << packet_type.header[0] << packet_type.header[1]);
+    ROS_ERROR_STREAM("Unknown packet type with: " << packet_type.header[0] << packet_type.header[1]);
   }
   return processed_successfully;
 }

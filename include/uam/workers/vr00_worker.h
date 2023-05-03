@@ -32,11 +32,13 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef URG_NODE_UAM_WORKERS_VR_00_WORKER_H
-#define URG_NODE_UAM_WORKERS_VR_00_WORKER_H
+#ifndef UAM_WORKERS_VR00_WORKER_H
+#define UAM_WORKERS_VR00_WORKER_H
 
 #include <uam/protocol_types/uam_protocol_types.h>
 #include <uam/workers/uam_worker_base.h>
+
+#include <string>
 
 namespace uam
 {
@@ -103,4 +105,4 @@ private:
 
 }  // namespace uam
 
-#endif  // URG_NODE_UAM_WORKERS_VR_00_WORKER_H
+#endif  // UAM_WORKERS_VR00_WORKER_H

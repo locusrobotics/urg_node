@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef URG_NODE_UAM_UAM_VISITORS_H
-#define URG_NODE_UAM_UAM_VISITORS_H
+#ifndef UAM_UAM_VISITORS_H
+#define UAM_UAM_VISITORS_H
 
 #include <uam/protocol_types/uam_protocol_types.h>
 #include <urg_node/visitor.h>
@@ -46,7 +46,7 @@ namespace uam
 class CommandHeaderVisitor
 {
 public:
-  CommandHeaderVisitor(const size_t initial_offset) :
+  explicit CommandHeaderVisitor(const size_t initial_offset) :
     stx(initial_offset),
     cmd_size(initial_offset),
     header(initial_offset),
@@ -66,7 +66,7 @@ public:
 class CommandFooterVisitor
 {
 public:
-  CommandFooterVisitor(const size_t initial_offset) : crc(initial_offset), etx(initial_offset) {}
+  explicit CommandFooterVisitor(const size_t initial_offset) : crc(initial_offset), etx(initial_offset) {}
 
 #define VISITOR_MEMBER_IMPL_CMD_FOOTER(field) VISITOR_MEMBER(protocol::CommandFooter, field)
   VISITOR_MEMBER_IMPL_CMD_FOOTER(crc);
@@ -79,7 +79,7 @@ public:
 class SensingDataVisitor
 {
 public:
-  SensingDataVisitor(const size_t initial_offset) :
+  explicit SensingDataVisitor(const size_t initial_offset) :
     operating_mode(initial_offset),
     area_number(initial_offset, 1),
     error_state(initial_offset),
@@ -129,7 +129,7 @@ public:
 class StatusDataVisitor
 {
 public:
-  StatusDataVisitor(const size_t initial_offset) :
+  explicit StatusDataVisitor(const size_t initial_offset) :
     operating_mode(initial_offset),
     area_number(initial_offset),
     error_state(initial_offset),
@@ -218,7 +218,7 @@ template <size_t Steps>
 class DistanceDataVisitor
 {
 public:
-  DistanceDataVisitor(const size_t initial_offset) : distances(initial_offset) {}
+  explicit DistanceDataVisitor(const size_t initial_offset) : distances(initial_offset) {}
 
   Visitor<protocol::sensing_data::DistanceDataArray<Steps>, 0> distances;
 };
@@ -226,7 +226,7 @@ template <size_t Steps>
 class IntensityDataArrayVisitor
 {
 public:
-  IntensityDataArrayVisitor(const size_t initial_offset) : intensities(initial_offset) {}
+  explicit IntensityDataArrayVisitor(const size_t initial_offset) : intensities(initial_offset) {}
   Visitor<protocol::sensing_data::IntensityDataArray<Steps>, 0> intensities;
 };
 
@@ -237,7 +237,7 @@ public:
    * @brief Constructor if visitors receive raw buffer
    * @param initial_offset
    */
-  VersionDetailsVisitor(const size_t initial_offset) :
+  explicit VersionDetailsVisitor(const size_t initial_offset) :
     sensor_model(initial_offset),
     firmware_version(initial_offset),
     serial_number(initial_offset)
@@ -273,4 +273,4 @@ static_assert(sizeof(protocol::XR00CommandReply) == 106);
 
 }  // namespace uam
 
-#endif  // INCLUDE_URG_NODE_UAM_UAM_VISITORS_H_
+#endif  // UAM_UAM_VISITORS_H

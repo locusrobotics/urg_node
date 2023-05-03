@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef INCLUDE_URG_NODE_UAM_DRIVER
-#define INCLUDE_URG_NODE_UAM_DRIVER
+#ifndef UAM_UAM_DRIVER_H
+#define UAM_UAM_DRIVER_H
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -44,7 +44,6 @@
 #include <urg_node/Status.h>
 
 #include <sensor_msgs/LaserScan.h>
-#include <string>
 #include <uam/workers/uam_command_worker.h>
 #include <uam/workers/yr_worker.h>
 
@@ -52,6 +51,12 @@
 #include <boost/algorithm/string/iter_find.hpp>
 
 #include <uam/workers/scip_worker.h>
+
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
 namespace uam
 {
@@ -346,7 +351,7 @@ public:
           pending_command_reply_ready_ = true;
           pending_command_signal_.notify_one();
         }
-      });
+      }); //NOLINT
 
     std::unique_lock<std::mutex> lock(pending_command_mutex_);
     if (pending_command_signal_.wait_for(lock, timeout, [this] { return pending_command_reply_ready_; }))
@@ -597,4 +602,4 @@ private:
 };
 }  // namespace uam
 
-#endif  // INCLUDE_URG_NODE_UAM_DRIVER
+#endif  // UAM_UAM_DRIVER_H

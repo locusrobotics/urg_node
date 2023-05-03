@@ -34,6 +34,8 @@
 
 #include <uam/workers/xr00_worker.h>
 
+#include <string>
+
 namespace uam
 {
 XR00Worker::XR00Worker(const uint32_t idx_offset) :

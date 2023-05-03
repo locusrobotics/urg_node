@@ -72,7 +72,7 @@ public:
 
 class URGCWrapper
 {
-public:  
+public:
   using UAMStatus = uam::protocol::AR00CommandReply;
   URGCWrapper(const std::string& ip_address, const int ip_port,
       bool& using_intensity, bool& using_multiecho, bool synchronize_time);

@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef URG_NODE_UAM_PROTOCOL_TYPES_UAM_PROTOCOL_TYPES_H_
-#define URG_NODE_UAM_PROTOCOL_TYPES_UAM_PROTOCOL_TYPES_H_
+#ifndef UAM_PROTOCOL_TYPES_UAM_PROTOCOL_TYPES_H
+#define UAM_PROTOCOL_TYPES_UAM_PROTOCOL_TYPES_H
 
 #include <cstddef>
 #include <cstdint>
@@ -733,11 +733,11 @@ enum EYRAreaType : uint16_t
 constexpr uint16_t c_max_safety_area_index = 32;
 
 constexpr size_t c_sensing_data_start_idx { sizeof(protocol::CommandReplyHeader) };
-constexpr size_t c_distance_start_idx { sizeof(protocol::CommandReplyHeader) +
+constexpr size_t c_distance_start_idx { sizeof(protocol::CommandReplyHeader) +  //NOLINT
                                         sizeof(protocol::sensing_data::SensingDataHeader) };
 constexpr size_t c_intensity_start_idx { c_distance_start_idx + sizeof(protocol::AR01CommandReply::ranges) };
 
 }  // namespace protocol
 }  // namespace uam
 
-#endif  //  URG_NODE_UAM_PROTOCOL_TYPES_UAM_PROTOCOL_TYPES_H_
+#endif  //  UAM_PROTOCOL_TYPES_UAM_PROTOCOL_TYPES_H

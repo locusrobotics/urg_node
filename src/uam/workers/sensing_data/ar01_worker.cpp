@@ -36,6 +36,7 @@
 #include <uam/workers/sensing_data/ar01_worker.h>
 
 #include <optional>
+#include <string>
 
 namespace uam
 {
@@ -52,7 +53,7 @@ AR01Worker::AR01Worker(const uint32_t idx_offset) :
 std::optional<AR01Worker::Reply> AR01Worker::decode(const std::string* buffer) const
 {
   Reply reply;
-  decodeHeaderAndFooter(buffer,reply);
+  decodeHeaderAndFooter(buffer, reply);
   decodeSensingData(buffer, reply.sensing_data);
   decodeDistances(buffer, reply.ranges);
   decodeIntensities(buffer, reply.intensities);

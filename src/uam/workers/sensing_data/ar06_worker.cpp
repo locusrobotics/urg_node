@@ -35,6 +35,9 @@
 #include <uam/protocol_types/uam_protocol_types.h>
 #include <uam/workers/sensing_data/ar06_worker.h>
 
+#include <optional>
+#include <string>
+
 namespace uam
 {
 AR06Worker::AR06Worker(const uint32_t idx_offset) :
@@ -49,7 +52,7 @@ AR06Worker::AR06Worker(const uint32_t idx_offset) :
 std::optional<AR06Worker::Reply> AR06Worker::decode(const std::string* buffer) const
 {
   Reply reply;
-  decodeHeaderAndFooter(buffer,reply);
+  decodeHeaderAndFooter(buffer, reply);
   decodeSensingData(buffer, reply.sensing_data);
   decodeDistances(buffer, reply.ranges);
   return reply;

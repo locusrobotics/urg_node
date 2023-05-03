@@ -32,13 +32,14 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef URG_NODE_UAM_WORKERS_SCIP_WORKER_H
-#define URG_NODE_UAM_WORKERS_SCIP_WORKER_H
+#ifndef UAM_WORKERS_SCIP_WORKER_H
+#define UAM_WORKERS_SCIP_WORKER_H
 
 #include <uam/protocol_types/scip_protocol_types.h>
 #include <uam/workers/uam_worker_base.h>
 
 #include <optional>
+#include <string>
 
 namespace uam
 {
@@ -214,26 +215,8 @@ private:
     }
     return false;
   }
-
-  /**
-   * @brief Transform string into a long value
-   *
-   * @param[in] field - Input string
-   * @param[out] value - Output value
-   * @return true if transformation was successful, false otherwise
-   */
-  bool decodeField(const std::string& field, long& value)
-  {
-    auto sub_str = findSubstring(field);
-    if (!sub_str.empty())
-    {
-      value = std::stol(sub_str, nullptr, 10);
-      return true;
-    }
-    return false;
-  }
 };
 
 }  // namespace uam
 
-#endif  // URG_NODE_UAM_WORKERS_SCIP_WORKER_H
+#endif  // UAM_WORKERS_SCIP_WORKER_H

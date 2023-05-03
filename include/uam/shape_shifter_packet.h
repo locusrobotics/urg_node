@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef URG_NODE_UAM_SHAPE_SHIFTER_PACKET_H
-#define URG_NODE_UAM_SHAPE_SHIFTER_PACKET_H
+#ifndef UAM_SHAPE_SHIFTER_PACKET_H
+#define UAM_SHAPE_SHIFTER_PACKET_H
 
 #include <ros/console.h>
 #include <uam/protocol_types/uam_protocol_types.h>
@@ -84,7 +84,7 @@ class ShapeShifterPacket
     YRCommandReply yr_reply;
     YRCommandReplyHeader yr_reply_header;
     std::array<char, sizeof(AR01CommandReply)> raw_buffer;
-  } buffer;
+  } buffer;  //NOLINT
 
   /**
    * @brief Validate union size agains expected size
@@ -251,4 +251,4 @@ inline CommandReplyHeader& ShapeShifterPacket::getImplementationRef()
 }  // namespace protocol
 }  // namespace uam
 
-#endif  // URG_NODE_UAM_SHAPE_SHIFTER_PACKET_H
+#endif  // UAM_SHAPE_SHIFTER_PACKET_H

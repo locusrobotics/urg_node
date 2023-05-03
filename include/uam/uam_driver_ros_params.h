@@ -35,8 +35,9 @@
 #ifndef UAM_UAM_DRIVER_ROS_PARAMS_H
 #define UAM_UAM_DRIVER_ROS_PARAMS_H
 
-
 #include <ros/node_handle.h>
+
+#include <string>
 
 namespace uam
 {
@@ -53,12 +54,12 @@ public:
   /**
    * @brief Controls (filters) the angle of the first range measurement in radians.
    */
-  float angle_min { -2.36 } ;
+  float angle_min { -2.36 };
 
   /**
    * @brief Controls (filters) the angle of the last range measurement in radians
    */
-  float angle_max {2.36};
+  float angle_max { 2.36 };
 
   /**
    * @brief Period between lidar reconnect attempts
@@ -80,8 +81,7 @@ public:
    *
    * This setting cannot be set to true if intensity is to be used
    */
-  bool use_multi_echo {false};
-
+  bool use_multi_echo { false };
 
   /**
    * @brief The frame id attached to the LaserScan message header
@@ -147,6 +147,6 @@ public:
    */
   std::string status_topic { "status" };
 };
-}
+}  // namespace uam
 
 #endif  // UAM_UAM_DRIVER_ROS_PARAMS_H

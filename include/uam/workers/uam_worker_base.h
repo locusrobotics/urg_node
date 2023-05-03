@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef URG_NODE_UAM_UAM_WORKER_BASE_H
-#define URG_NODE_UAM_UAM_WORKER_BASE_H
+#ifndef UAM_WORKERS_UAM_WORKER_BASE_H
+#define UAM_WORKERS_UAM_WORKER_BASE_H
 
 #include <ros/ros.h>
 #include <uam/protocol_types/uam_protocol_types.h>
@@ -64,7 +64,6 @@ namespace uam
 template <typename TDerived, char HeaderMSB, char HeaderLSB, char SubHeaderMSB, char SubHeaderLSB, typename TReply>
 class WorkerBase
 {
-
 public:
   /**
    * @brief provide access to the request type
@@ -104,7 +103,7 @@ public:
    * @param[in] header - Command reply header
    * @return true if the reply is of the type TDerived::Reply, false otherwise
    */
-  inline bool validateCommandHeader(const std::array<char,2>& header) const
+  inline bool validateCommandHeader(const std::array<char, 2>& header) const
   {
     return header[0] == HeaderMSB && header[1] == HeaderLSB;
   }
@@ -138,12 +137,12 @@ public:
   {
     // Before decoding the message we need to double check if we got the expected
     // message size
-//    auto reply = static_cast<const TDerived*>(this)->decode(buffer);
-//    if (!reply.has_value())
-//    {
-//      ROS_ERROR_STREAM("Failed to decode message");
-//      return std::nullopt;
-//    }
+    //    auto reply = static_cast<const TDerived*>(this)->decode(buffer);
+    //    if (!reply.has_value())
+    //    {
+    //      ROS_ERROR_STREAM("Failed to decode message");
+    //      return std::nullopt;
+    //    }
     ROS_ERROR_STREAM("Failed to decode message");
     return std::nullopt;
   }
@@ -249,8 +248,10 @@ protected:
    * This initialize
    *
    */
-  WorkerBase(const uint32_t header_offset = 0, const uint32_t footer_offset = sizeof(protocol::CommandReplyHeader)) :
-    request_(Request { protocol::CommandRequestHeader { protocol::STX_ID,
+  explicit WorkerBase(
+    const uint32_t header_offset = 0,
+    const uint32_t footer_offset = sizeof(protocol::CommandReplyHeader)) :
+    request_(Request { protocol::CommandRequestHeader { protocol::STX_ID,  // NOLINT
                                                         sizeof(Request),
                                                         { HeaderMSB, HeaderLSB },
                                                         { SubHeaderMSB, SubHeaderLSB } },
@@ -533,4 +534,4 @@ protected:
 
 }  // namespace uam
 
-#endif  // INCLUDE_URG_NODE_UAM_UAM_WORKER_BASE_H_
+#endif  // UAM_WORKERS_UAM_WORKER_BASE_H

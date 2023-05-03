@@ -34,6 +34,9 @@
 
 #include <uam/uam_driver.h>
 
+#include <memory>
+#include <string>
+
 namespace uam
 {
 UamDriver::UamDriver() :

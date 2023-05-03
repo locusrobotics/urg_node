@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef URG_NODE_UAM_UAM_COMMAND_WORKER_H
-#define URG_NODE_UAM_UAM_COMMAND_WORKER_H
+#ifndef UAM_WORKERS_UAM_COMMAND_WORKER_H
+#define UAM_WORKERS_UAM_COMMAND_WORKER_H
 
 // sensing data workers
 #include <uam/shape_shifter_packet.h>
@@ -45,6 +45,7 @@
 #include <uam/workers/xr00_worker.h>
 #include <uam/workers/yr_worker.h>
 
+#include <string>
 #include <tuple>
 #include <type_traits>
 
@@ -172,4 +173,4 @@ private:
 };
 }  // namespace uam
 
-#endif  // URG_NODE_UAM_UAM_COMMAND_WORKER_H
+#endif  // UAM_WORKERS_UAM_COMMAND_WORKER_H

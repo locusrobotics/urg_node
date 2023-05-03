@@ -33,12 +33,14 @@
  *********************************************************************/
 
 
-#ifndef URG_NODE_UAM_WORKERS_YR_WORKER_H
-#define URG_NODE_UAM_WORKERS_YR_WORKER_H
+#ifndef UAM_WORKERS_YR_WORKER_H
+#define UAM_WORKERS_YR_WORKER_H
 
 #include <uam/protocol_types/uam_protocol_types.h>
 #include <uam/uam_error_codes.h>
 #include <uam/workers/uam_worker_base.h>
+
+#include <string>
 
 namespace uam
 {
@@ -90,7 +92,7 @@ public:
    * @param reply
    * @return
    */
-  inline bool validateCommandHeader(const std::array<char,2>& header) const
+  inline bool validateCommandHeader(const std::array<char, 2>& header) const
   {
     return header[0] == 'Y' && header[1] == 'R';
   }
@@ -287,4 +289,4 @@ protected:
 
 }  // namespace uam
 
-#endif  // URG_NODE_UAM_WORKERS_YR_WORKER_H
+#endif  // UAM_WORKERS_YR_WORKER_H

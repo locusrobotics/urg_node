@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef URG_NODE_UAM_IO_TCP_CLIENT_H
-#define URG_NODE_UAM_IO_TCP_CLIENT_H
+#ifndef UAM_IO_TCP_CLIENT_H
+#define UAM_IO_TCP_CLIENT_H
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -43,6 +43,9 @@
 #include <ros/init.h>
 #include <uam/shape_shifter_packet.h>
 #include <uam/uam_visitors.h>
+
+#include <memory>
+#include <string>
 
 namespace uam
 {
@@ -65,7 +68,7 @@ public:
   /**
    * @brief Default C'tor
    */
-  TcpClient(OnNewDataCallback callback);
+  explicit TcpClient(OnNewDataCallback callback);
 
   /**
    * @brief
@@ -186,7 +189,7 @@ public:
           line.clear();
         }
         handler(reply);
-      });
+      });  //NOLINT
 
     return;
   }
@@ -288,4 +291,4 @@ private:
 
 }  // namespace uam
 
-#endif  // URG_NODE_UAM_IO_TCP_CLIENT_H
+#endif  // UAM_IO_TCP_CLIENT_H
