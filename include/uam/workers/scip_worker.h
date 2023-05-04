@@ -177,10 +177,10 @@ public:
     failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::MAX_DISTANCE), reply.max_distance);
     failed = failed ||
              !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::ANGULAR_RESOLUTION), reply.angular_resolution);
-    failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::STARTING_STEP), reply.start_step);
-    failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::END_STEP), reply.end_step);
+    failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::STARTING_STEP), reply.first_step);
+    failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::END_STEP), reply.last_step);
     failed = failed ||
-             !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::STEP_FRONT_DIRECTION), reply.front_data_index);
+             !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::STEP_FRONT_DIRECTION), reply.front_data_step);
     failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::RPM), reply.rpm);
     if (failed)
     {

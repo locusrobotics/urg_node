@@ -41,6 +41,9 @@
 
 namespace uam
 {
+/**
+ * @brief UAM driver ros parameters
+ */
 struct UamROSParams
 {
 public:
@@ -54,12 +57,12 @@ public:
   /**
    * @brief Controls (filters) the angle of the first range measurement in radians.
    */
-  float angle_min { -2.36 };
+  double angle_min { -2.36 };
 
   /**
    * @brief Controls (filters) the angle of the last range measurement in radians
    */
-  float angle_max { 2.36 };
+  double angle_max { 2.36 };
 
   /**
    * @brief Period between lidar reconnect attempts
@@ -89,20 +92,6 @@ public:
   std::string frame_id { "laser" };
 
   /**
-   * @brief Enable or disable hardware timestamping of received UDP packets by the ethernet adapter
-   *
-   * The hardwaree timestamp is captured by the ethernet adapter itself, either at the MAC or PHY layer. Support for
-   * hardware timestamping is dependent on the ethernet adapter hardware and kernel driver implementation; not all
-   * ethernet adapters support hardware timestamping. Additionally, hardware timestamping must be enabled for each
-   * ethernet adapter at the kernel level. The easiest way to accomplish this is by running
-   * `sudo hwstamp_ctl -i eth0 -r 1` from the `linuxptp` debian package before connecting to the lidar. Further, the
-   * hardware timestamps will use the clock in the ethernet adapter. The ethernet clock and main system clock should
-   * be synchronized before enabling hardware timestamps. The easiest method of synchronizing the clocks is running
-   * `sudo phc2sys -r -r -s CLOCK_REALTIME -c eth0 -O 0`, also from the `linuxptp` debian package.
-   */
-  bool hardware_timestamps { false };
-
-  /**
    * @brief The tcp client port number the client/robot/NUC is using to communicate with laser
    */
   unsigned int ip_port { 10940 };
@@ -110,7 +99,7 @@ public:
   /**
    * @brief The amount of seconds the client waits for a reply to the requested command
    */
-  ros::Duration command_reply_timeout { 5.0 };
+  ros::Duration command_reply_timeout { 60.0 };
 
   /**
    * @brief The IP Address of the lidar server
@@ -145,7 +134,17 @@ public:
   /**
    * @brief The topic name where LaserScan messages will be published
    */
-  std::string status_topic { "status" };
+  std::string status_topic { "laser_status" };
+
+  /**
+   * @brief If the update_laser_status service is to be provided
+   */
+  bool provide_laser_status_service { false };
+
+  /**
+   * @brief Update Laser Status service name
+   */
+  std::string request_status_service { "update_laser_status" };
 };
 }  // namespace uam
 

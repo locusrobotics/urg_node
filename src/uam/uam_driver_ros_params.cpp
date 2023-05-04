@@ -49,7 +49,6 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
     params.use_multi_echo = false;
   }
   nh.getParam("frame_id", params.frame_id);
-  nh.getParam("hardware_timestamps", params.hardware_timestamps);
   nh.getParam("ip_address", params.ip_address);
   auto port = nh.param("ip_port", static_cast<int>(params.ip_port));
   if (params.ip_port < 0)
@@ -69,6 +68,10 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
     params.reconfiguration_timeout = ros::Duration(reconfig_timeout);
   }
   nh.getParam("topic", params.scan_topic);
+
+  nh.getParam("provide_laser_status_service", params.provide_laser_status_service);
+  nh.getParam("request_status_service", params.request_status_service);
+
   return params;
 }
 

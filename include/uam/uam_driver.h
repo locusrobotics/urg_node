@@ -39,18 +39,18 @@
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
-#include <uam/io/tcp_client.h>
-#include <urg_c/urg_connection.h>
-#include <urg_node/Status.h>
 
 #include <sensor_msgs/LaserScan.h>
+#include <urg_node/Status.h>
+
+#include <uam/scan_params.h>
+#include <uam/io/tcp_client.h>
 #include <uam/workers/uam_command_worker.h>
 #include <uam/workers/yr_worker.h>
+#include <uam/workers/scip_worker.h>
 
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/iter_find.hpp>
-
-#include <uam/workers/scip_worker.h>
 
 #include <algorithm>
 #include <memory>
@@ -60,159 +60,6 @@
 
 namespace uam
 {
-/**
- * @brief Scan parameters structure
- */
-struct ScanParameters
-{
-  /**
-   * @brief
-   *
-   * @param reply
-   * @return
-   */
-  static ScanParameters fromMessage(const scip_protocol::PPReply& reply)
-  {
-    ScanParameters scan_details;
-    // Copy some of the raw params
-    scan_details.first_data_index = reply.start_step;
-    scan_details.last_data_index = reply.end_step;
-    scan_details.front_data_index = reply.front_data_index;
-    scan_details.rpm = reply.rpm;
-    scan_details.angular_resolution = reply.angular_resolution;
-
-    // Now calculate laser scan metadata
-    scan_details.range_min = reply.min_distance / 1000.0;
-    scan_details.range_max = reply.max_distance / 1000.0;
-    // Index to Step
-    scan_details.min_step = reply.start_step - reply.front_data_index;
-    scan_details.max_step = reply.end_step - reply.front_data_index;
-    //
-    scan_details.angle_increment = 2.0 * M_PI / reply.angular_resolution;
-    scan_details.angle_min_limit = 2.0 * M_PI * scan_details.min_step / reply.angular_resolution;
-    scan_details.angle_max_limit = 2.0 * M_PI * scan_details.max_step / reply.angular_resolution;
-
-    scan_details.scan_period = 60.0 / static_cast<double>(reply.rpm);
-    auto circle_fraction = (scan_details.angle_max_limit - scan_details.angle_min_limit) / (2.0 * M_PI);
-    scan_details.time_increment =
-      circle_fraction * scan_details.scan_period / static_cast<double>(scan_details.max_step - scan_details.min_step);
-    scan_details.setAngleLimits(scan_details.angle_min_limit, scan_details.angle_max_limit);
-    return scan_details;
-  }
-
-  /**
-   * @brief
-   * @param min_angle
-   * @param max_angle
-   */
-  void setAngleLimits(const double new_angle_min, const double new_angle_max)
-  {
-    // Set step limits
-    first_step = angle2step(new_angle_min);
-    last_step = angle2step(new_angle_max);
-
-    // Make sure step limits are not the same
-    if (first_step == last_step)
-    {
-      // Make sure we're not at a limit
-      if (first_step == max_step)  // At beginning of range
-      {
-        last_step = first_step + 1;
-      }
-      else  // At end of range (or all other cases)
-      {
-        first_step = last_step - 1;
-      }
-    }
-    // Make sure angle_max is greater than angle_min (should check this after end limits)
-    if (last_step < first_step)
-    {
-      double temp = first_step;
-      first_step = last_step;
-      last_step = temp;
-    }
-
-    // Update new angle min and angle max
-    angle_min = step2angle(first_step);
-    angle_max = step2angle(last_step);
-
-    // Update angular time offset
-    angular_time_offset = calculateTimeOffset();
-  }
-
-  inline auto getAngleMin() const { return angle_min; }
-  inline auto getAngleMax() const { return angle_max; }
-  inline auto getAngleIncrement() const { return angle_increment; }
-  inline auto getScanPeriod() const { return scan_period; }
-  inline auto getTimeIncrement() const { return time_increment; }
-  inline auto getRangeMin() const { return range_min; }
-  inline auto getRangeMax() const { return range_max; }
-  inline auto getAngularTimeOffset() const { return angular_time_offset; }
-
-private:
-  double calculateTimeOffset() const
-  {
-    // Adjust value for Hokuyo's timestamps
-    // Hokuyo's timestamps start from the rear center of the device (at Pi according to ROS standards)
-    double circle_fraction = 0.0;
-    if (first_step == 0 && last_step == 0)
-    {
-      circle_fraction = (angle_min_limit + M_PI) / (2.0 * M_PI);
-    }
-    else
-    {
-      circle_fraction = (getAngleMin() + M_PI) / (2.0 * M_PI);
-    }
-    return circle_fraction * getScanPeriod();
-  }
-
-  /**
-   *
-   * @param step
-   * @param area_resolution
-   * @return
-   */
-  double step2angle(const int step) const { return (2.0 * M_PI) * step / angular_resolution; }
-
-  int angle2step(const double angle) const { return index2step(angle2index(angle)); }
-
-  int angle2index(const double angle) const
-  {
-    int index = static_cast<int>(std::floor((angular_resolution * angle / (2.0 * M_PI) + 0.5))) + front_data_index;
-
-    return std::min(std::max(0, index), min_step);
-  }
-
-  int index2step(const int step) const { return step - front_data_index; }
-
-  double angle_min { 0. };
-  double angle_max { 0. };
-  int first_step { 0 };
-  int last_step { 0 };
-  double angular_time_offset { 0. };  // s
-
-  double angle_min_limit { 0. };  // start angle of the scan [rad]
-  double angle_max_limit { 0. };  // end angle of the scan [rad]
-  double angle_increment { 0. };  // angular distance between measurements [rad]
-
-  double time_increment { 0. };  // time between measurements [seconds]
-  double scan_time { 0. };  // time between scans [seconds]
-
-  double range_min { 0. };  // minimum range value [m]
-  double range_max { 0. };  // maximum range value [m]
-
-  double scan_period { 0. };
-
-  int first_data_index { 0 };
-  int last_data_index { 0 };
-
-  int min_step { 0 };
-  int max_step { 0 };
-
-  int front_data_index { 0 };
-  int angular_resolution { 0 };
-  int rpm;
-};
 
 /**
  * @brief Subscription Mode Enum
@@ -351,7 +198,7 @@ public:
           pending_command_reply_ready_ = true;
           pending_command_signal_.notify_one();
         }
-      }); //NOLINT
+      });  // NOLINT
 
     std::unique_lock<std::mutex> lock(pending_command_mutex_);
     if (pending_command_signal_.wait_for(lock, timeout, [this] { return pending_command_reply_ready_; }))

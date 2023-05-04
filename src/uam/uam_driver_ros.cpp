@@ -35,6 +35,8 @@
 #include <ros/callback_queue.h>
 #include <uam/uam_driver_ros.h>
 
+#include <urg_node/URGConfig.h>
+
 #include <urg_node/Status.h>
 
 #include <algorithm>
@@ -45,21 +47,30 @@
 
 namespace uam
 {
-
-UamROS::UamROS(const ros::NodeHandle& node_handle, const uam::UamROSParams& params) :
+UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const UamROSParams& params) :
   configured_(false),
   configure_attempts_(0),
   lidar_(),
   params_(params),
-  node_handle_(node_handle)
+  node_handle_(nh),
+  private_node_handle_(nh_prv),
+  publish_status_requested_(false),
+  params_changed_(false)
 {
   scan_publisher_ = node_handle_.advertise<sensor_msgs::LaserScan>(params.scan_topic, 1);
   status_publisher_ = node_handle_.advertise<urg_node::Status>(params.status_topic, 1, true);
+  if (params_.provide_laser_status_service)
+    request_status_service_ =
+      node_handle_.advertiseService(params.request_status_service, &UamROS::statusCallback, this);
 
   configure_timer_ =
-    node_handle.createTimer(params_.reconfiguration_timeout, &UamROS::configureTimerCallback, this, true, false);
+    node_handle_.createTimer(params_.reconfiguration_timeout, &UamROS::configureTimerCallback, this, true, false);
 
-  scan_watchdog_timer_ = node_handle.createTimer(params_.scan_timeout, &UamROS::scanWatchdogTimerCallback, this);
+  // Clear the dynamic reconfigure server
+  srv_.reset(new dynamic_reconfigure::Server<urg_node::URGConfig>(private_node_handle_));
+  srv_->setCallback(boost::bind(&UamROS::dynamicReconfigureCallback, this, _1, _2));
+
+  scan_watchdog_timer_ = node_handle_.createTimer(params_.scan_timeout, &UamROS::scanWatchdogTimerCallback, this);
   // Configure the lidar. On failure, start a timer to try again later.
   if (!configure())
   {
@@ -85,6 +96,12 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
   }
 }
 
+bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
+{
+  publish_status_requested_ = true;
+  return true;
+}
+
 void UamROS::configureTimerCallback(const ros::TimerEvent& event)
 {
   // Stop the timer so that it may be restarted later
@@ -105,6 +122,21 @@ void UamROS::triggerReconfigure()
   configure_timer_.start();
 }
 
+void UamROS::updateReconfigureLimits()
+{
+  urg_node::URGConfig min, max;
+  srv_->getConfigMin(min);
+  srv_->getConfigMax(max);
+
+  min.angle_min = scan_params_.getAngleMinLimit();
+  min.angle_max = min.angle_min;
+  max.angle_max = scan_params_.getAngleMaxLimit();
+  max.angle_min = max.angle_max;
+
+  srv_->setConfigMin(min);
+  srv_->setConfigMax(max);
+}
+
 bool UamROS::configure()
 {
   try
@@ -115,7 +147,8 @@ bool UamROS::configure()
     // TODO(cribeiromendes): make scip commands work seamlessly. Right now we
     // need to ask this before starting continuous async reads
     scan_params_ = lidar_.getScanDetails();
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    // Set the reconfigure limits after fetching scan details
+    updateReconfigureLimits();
     auto version_details = lidar_.getVersionDetails();
     ROS_INFO_STREAM("Sensor details: " << version_details);
     updateStatus(lidar_.getSensorStatus(), true);
@@ -161,6 +194,17 @@ void UamROS::scanCallback(const protocol::AR01CommandReply& reply, const ros::Ti
     std::lock_guard<std::mutex> lock(watchdog_mutex_);
     scan_stamp_ = ros::Time::now();
   }
+  ros::Duration time_offset;
+  {
+    std::lock_guard<std::mutex> lock(reconfigure_mutex_);
+    if (params_changed_)
+    {
+      time_offset = params_.time_offset;
+      scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
+      params_changed_ = false;
+    }
+  }
+
   sensor_msgs::LaserScan msg;
   msg.header.frame_id = params_.frame_id;
   msg.angle_min = scan_params_.getAngleMin();
@@ -173,12 +217,22 @@ void UamROS::scanCallback(const protocol::AR01CommandReply& reply, const ros::Ti
 
   // Grab scan
   msg.header.stamp = wall_time;
-  msg.header.stamp = msg.header.stamp + params_.time_offset + ros::Duration(scan_params_.getAngularTimeOffset());
+  msg.header.stamp = msg.header.stamp + time_offset + ros::Duration(scan_params_.getAngularTimeOffset());
 
   msg.ranges.resize(reply.ranges.size());
   msg.intensities.resize(reply.intensities.size());
 
-  for (size_t i = 0; i < reply.ranges.size(); i++)
+  // Filter out steps
+  auto first_step = scan_params_.getFirstStep();
+  auto last_step = scan_params_.getLastStep();
+
+  if (reply.ranges.size() <= last_step)
+  {
+    ROS_ERROR_STREAM("Unexpected outcome: " << reply.ranges.size() << " and last_step is " << last_step);
+    return;
+  }
+
+  for (size_t i = first_step; i < last_step; i++)
   {
     auto& range = reply.ranges[i];
     auto& intensity = reply.intensities[i];
@@ -203,6 +257,19 @@ void UamROS::scanCallback(const protocol::AR01CommandReply& reply, const ros::Ti
   scan_publisher_.publish(msg);
 }
 
+bool UamROS::dynamicReconfigureCallback(urg_node::URGConfig& config, int level)
+{
+  if (level < 0)
+	  return true;
+
+  std::lock_guard<std::mutex> lock(reconfigure_mutex_);
+  params_.angle_max = config.angle_max;
+  params_.angle_min = config.angle_min;
+  params_.time_offset = ros::Duration(config.time_offset);
+  params_changed_ = true;
+  return true;
+}
+
 void UamROS::scanCallback(const protocol::AR06CommandReply& scan_sector, const ros::Time& wall_time) {}
 
 void UamROS::scanCallback(const protocol::AR00CommandReply& scan_sector, const ros::Time& wall_time) {}
@@ -223,7 +290,7 @@ void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensi
            lhs.warning2_state == rhs.warning2_state;
   };
 
-  if (override_check || !equal(last_received_status_, sensing_data))
+  if (publish_status_requested_.load() || override_check || !equal(last_received_status_, sensing_data))
   {
     last_received_status_ = sensing_data;
     urg_node::Status msg;

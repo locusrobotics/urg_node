@@ -70,9 +70,9 @@ struct PPReply
   int min_distance;
   int max_distance;
   int angular_resolution;
-  int start_step;
-  int end_step;
-  int front_data_index;
+  int first_step;
+  int last_step;
+  int front_data_step;
   int rpm;
 };
 

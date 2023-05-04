@@ -35,12 +35,16 @@
 #ifndef UAM_UAM_DRIVER_ROS_H
 #define UAM_UAM_DRIVER_ROS_H
 
-#include "uam/uam_driver.h"
+#include <uam/uam_driver.h>
+#include <ros/callback_queue.h>
+#include <uam/uam_driver_ros_params.h>
+#include <dynamic_reconfigure/server.h>
+#include <urg_node/URGConfig.h>
+#include <std_srvs/Trigger.h>
+
 #include <atomic>
 #include <mutex>
-#include <ros/callback_queue.h>
 #include <string>
-#include <uam/uam_driver_ros_params.h>
 
 namespace uam
 {
@@ -55,7 +59,7 @@ public:
    * @param[in] node_handle - A node handle in the global namespace, used for advertising topics
    * @param[in] params - A populated parameters structure containing the node configuration
    */
-  UamROS(const ros::NodeHandle& node_handle, const UamROSParams& params);
+  UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const UamROSParams& params);
 
 private:
   /**
@@ -64,21 +68,23 @@ private:
   void scanWatchdogTimerCallback(const ros::TimerEvent& event);
 
   /**
-   * @brief Attempt to connect to and configure the lidar in response to a timer event
-   */
-  void configureTimerCallback(const ros::TimerEvent& event);
-
-  /**
-   * @brief Trigger reconfigure routine
-   */
-  void triggerReconfigure();
-
-  /**
    * @brief Connect and configure
    *
    * @return true if successfully connected
    */
   bool configure();
+
+  /**
+   * @brief Attempt to connect to and configure the lidar in response to a timer event
+   */
+  void configureTimerCallback(const ros::TimerEvent& event);
+
+  /**
+   * @brief
+   * @param config
+   * @param level
+   */
+  bool dynamicReconfigureCallback(urg_node::URGConfig& config, int level);
 
   /**
    * @brief
@@ -99,6 +105,25 @@ private:
    * @param scan_sector
    */
   void scanCallback(const protocol::AR06CommandReply& scan_sector, const ros::Time& wall_time);
+
+  /**
+   * @brief
+   *
+   * @param req
+   * @param res
+   * @return
+   */
+  bool statusCallback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+
+  /**
+   * @brief Trigger reconfigure routine
+   */
+  void triggerReconfigure();
+
+  /**
+   * @brief Update Reconfigure limits (as in urg_node_driver)
+   */
+  void updateReconfigureLimits();
 
   /**
    * @brief Update status
@@ -139,6 +164,14 @@ private:
    */
   std::mutex watchdog_mutex_;
 
+  /**
+   * @brief Synchronization guard for watchdog variables accessed by ROS and lidar callbacks
+   */
+  std::mutex reconfigure_mutex_;
+
+
+  bool params_changed_;
+
   /**@}*/
 
   /**
@@ -150,11 +183,20 @@ private:
    * @brief Node Handler
    */
   ros::NodeHandle node_handle_;
+  /**
+   * @brief Node Handler
+   */
+  ros::NodeHandle private_node_handle_;
 
   /**
    * @brief Configure Timer
    */
   ros::Timer configure_timer_;
+
+  /**
+   * @brief Dynamic reconfigure server
+   */
+  boost::shared_ptr<dynamic_reconfigure::Server<urg_node::URGConfig>> srv_;
 
   /**
    * @brief Scan Parameters
@@ -170,6 +212,11 @@ private:
    * @brief Status Publisher
    */
   ros::Publisher status_publisher_;
+
+  /**
+   * @brief Status Service
+   */
+  ros::ServiceServer request_status_service_;
 
   /**
    * @brief Watchdog timer to reconnect if no sectors are received
@@ -190,6 +237,12 @@ private:
    * @brief Last received sensing data status
    */
   protocol::sensing_data::SensingDataHeader last_received_status_;
+
+  /**
+   * @brief Flag the receiver thread to publish the status no mater if it
+   * is equal to the last published one
+   */
+  std::atomic_bool publish_status_requested_;
 
   /**@}*/
 };

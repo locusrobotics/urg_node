@@ -40,6 +40,7 @@
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "uam_driver_node");
-  auto lidar = uam::UamROS(ros::NodeHandle(), uam::UamROSParams::loadFromROS(ros::NodeHandle("~")));
+  auto lidar =
+    uam::UamROS(ros::NodeHandle(), ros::NodeHandle("~"), uam::UamROSParams::loadFromROS(ros::NodeHandle("~")));
   ros::spin();
 }
