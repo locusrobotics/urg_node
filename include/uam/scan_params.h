@@ -183,13 +183,13 @@ public:
    * @brief Get first step (step associated with min_angle)
    * @return first_step
    */
-  inline auto getFirstStep() { return first_step; }
+  inline auto getFirstStep() const { return first_step; }
 
   /**
    * @brief Get last step (step associated with max_angle)
    * @return last_step
    */
-  inline auto getLastStep() { return last_step; }
+  inline auto getLastStep() const { return last_step; }
 
 private:
   /**

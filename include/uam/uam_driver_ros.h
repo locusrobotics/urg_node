@@ -35,12 +35,12 @@
 #ifndef UAM_UAM_DRIVER_ROS_H
 #define UAM_UAM_DRIVER_ROS_H
 
-#include <uam/uam_driver.h>
-#include <ros/callback_queue.h>
-#include <uam/uam_driver_ros_params.h>
 #include <dynamic_reconfigure/server.h>
-#include <urg_node/URGConfig.h>
+#include <ros/callback_queue.h>
 #include <std_srvs/Trigger.h>
+#include <uam/uam_driver.h>
+#include <uam/uam_driver_ros_params.h>
+#include <urg_node/URGConfig.h>
 
 #include <atomic>
 #include <mutex>
@@ -91,20 +91,57 @@ private:
    *
    * @param scan_sector
    */
-  void scanCallback(const protocol::AR00CommandReply& scan_sector, const ros::Time& wall_time);
-  /**
-   * @brief
-   *
-   * @param scan_sector
-   */
-  void scanCallback(const protocol::AR01CommandReply& scan_sector, const ros::Time& wall_time);
+  template <typename T>
+  void fillScanMessageData(const T& scan_packet, const double range_offset, sensor_msgs::LaserScan& scan) const
+  {
+	  ROS_WARN_STREAM("Handler not implemented!");
+  }
 
   /**
-   * @brief
+   * @brief Scan callback packet callback
    *
-   * @param scan_sector
+   * @param[in] reply - Reply message
+   * @param[in] wall_time - wall time
    */
-  void scanCallback(const protocol::AR06CommandReply& scan_sector, const ros::Time& wall_time);
+  template <typename T>
+  void scanCallback(const T& reply, const ros::Time& wall_time)
+  {
+    {
+      std::lock_guard<std::mutex> lock(watchdog_mutex_);
+      scan_stamp_ = ros::Time::now();
+    }
+    ros::Duration time_offset;
+    double range_offset = 0;
+    {
+      std::lock_guard<std::mutex> lock(reconfigure_mutex_);
+      range_offset = params_.range_offset;
+      time_offset = params_.time_offset;
+      if (params_changed_)
+      {
+        scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
+        params_changed_ = false;
+      }
+    }
+    // Fill scan metadata and header
+    sensor_msgs::LaserScan msg;
+    msg.header.frame_id = params_.frame_id;
+    msg.angle_min = scan_params_.getAngleMin();
+    msg.angle_max = scan_params_.getAngleMax();
+    msg.angle_increment = scan_params_.getAngleIncrement();
+    msg.scan_time = scan_params_.getScanPeriod();
+    msg.time_increment = scan_params_.getTimeIncrement();
+    msg.range_min = scan_params_.getRangeMin();
+    msg.range_max = scan_params_.getRangeMax();
+
+    msg.header.stamp = wall_time;
+    msg.header.stamp = msg.header.stamp + time_offset + ros::Duration(scan_params_.getAngularTimeOffset());
+
+    // Read the right fields
+    fillScanMessageData(reply, range_offset, msg);
+    // Update status
+    updateStatus(reply.sensing_data);
+    scan_publisher_.publish(msg);
+  }
 
   /**
    * @brief
@@ -113,7 +150,7 @@ private:
    * @param res
    * @return
    */
-  bool statusCallback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   /**
    * @brief Trigger reconfigure routine
@@ -169,7 +206,9 @@ private:
    */
   std::mutex reconfigure_mutex_;
 
-
+  /**
+   * @brief Flag pointing that reconfigure was requested
+   */
   bool params_changed_;
 
   /**@}*/

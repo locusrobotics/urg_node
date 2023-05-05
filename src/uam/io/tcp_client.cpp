@@ -142,6 +142,19 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
   }
 
   ROS_INFO_STREAM("Connected to: " << remote_ip << ":" << remote_port);
+
+  int recv_buf_size;
+  socklen_t recv_buf_size_len = sizeof(recv_buf_size);
+  auto rc = getsockopt(socket_.native_handle(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &recv_buf_size_len);
+  if (rc == 0)
+  {
+      ROS_INFO_STREAM("Actual receive buffer size: " << recv_buf_size << " bytes");
+  }
+  else
+  {
+      ROS_ERROR_STREAM("Error getting receive buffer size: " << strerror(errno));
+  }
+
   return true;
 }
 

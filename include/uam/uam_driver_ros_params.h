@@ -65,14 +65,79 @@ public:
   double angle_max { 2.36 };
 
   /**
+   * @brief The amount of seconds the client waits for a reply to the requested command
+   */
+  ros::Duration command_reply_timeout { 2.0 };
+
+  /**
+   * @brief The frame id attached to the LaserScan message header
+   */
+  std::string frame_id { "laser" };
+
+  /**
+   * @brief The IP Address of the lidar server
+   */
+  std::string ip_address { "localhost" };
+
+  /**
+   * @brief The tcp client port number the client/robot/NUC is using to communicate with laser
+   */
+  unsigned int ip_port { 10940 };
+
+  /**
+   * @brief The user defined maximum range of the lidar
+   */
+  double max_range { 40.0 };
+
+  /**
+   * @brief The user defined minimum range of the lidar
+   */
+  double min_range { 0.0 };
+
+  /**
+   * @brief If the update_laser_status service is to be provided
+   */
+  bool provide_laser_status_service { false };
+
+  /**
+   * @brief User range Offset
+   */
+  double range_offset {0.f};
+
+  /**
+   * @brief Period between lidar reconfiguration attempts
+   */
+  ros::Duration reconfiguration_timeout { 5.0 };
+
+  /**
    * @brief Period between lidar reconnect attempts
    */
   ros::Duration reconnect_timeout { 5.0 };
 
+
+  /**
+   * @brief Update Laser Status service name
+   */
+  std::string request_status_service { "update_laser_status" };
+
   /**
    * @brief If no scan sectors have been received after this many seconds, reconnect to the lidar
    */
-  ros::Duration scan_timeout { 10.0 };
+  ros::Duration scan_timeout { 5.0 };
+
+  /**
+   * @brief The topic name where LaserScan messages will be published
+   */
+  std::string scan_topic { "scan" };
+
+  /**
+   * @brief The topic name where LaserScan messages will be published
+   */
+  std::string status_topic { "laser_status" };
+  /**
+   * @brief Additional time offset to add to the lidar timestamps to compensate for unmeasured delays
+   */
+  ros::Duration time_offset { 0. };
 
   /**
    * @brief Enable or disable intensity readings
@@ -85,66 +150,6 @@ public:
    * This setting cannot be set to true if intensity is to be used
    */
   bool use_multi_echo { false };
-
-  /**
-   * @brief The frame id attached to the LaserScan message header
-   */
-  std::string frame_id { "laser" };
-
-  /**
-   * @brief The tcp client port number the client/robot/NUC is using to communicate with laser
-   */
-  unsigned int ip_port { 10940 };
-
-  /**
-   * @brief The amount of seconds the client waits for a reply to the requested command
-   */
-  ros::Duration command_reply_timeout { 60.0 };
-
-  /**
-   * @brief The IP Address of the lidar server
-   */
-  std::string ip_address { "localhost" };
-
-  /**
-   * @brief The maximum range of the lidar
-   */
-  double max_range { 40.0 };
-
-  /**
-   * @brief The minimum range of the lidar
-   */
-  double min_range { 0.0 };
-
-  /**
-   * @brief Period between lidar reconfiguration attempts
-   */
-  ros::Duration reconfiguration_timeout { 5.0 };
-
-  /**
-   * @brief Additional time offset to add to the lidar timestamps to compensate for unmeasured delays
-   */
-  ros::Duration time_offset { -0.0218 };
-
-  /**
-   * @brief The topic name where LaserScan messages will be published
-   */
-  std::string scan_topic { "scan" };
-
-  /**
-   * @brief The topic name where LaserScan messages will be published
-   */
-  std::string status_topic { "laser_status" };
-
-  /**
-   * @brief If the update_laser_status service is to be provided
-   */
-  bool provide_laser_status_service { false };
-
-  /**
-   * @brief Update Laser Status service name
-   */
-  std::string request_status_service { "update_laser_status" };
 };
 }  // namespace uam
 

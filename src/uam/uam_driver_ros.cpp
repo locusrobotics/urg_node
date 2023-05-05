@@ -71,6 +71,26 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   srv_->setCallback(boost::bind(&UamROS::dynamicReconfigureCallback, this, _1, _2));
 
   scan_watchdog_timer_ = node_handle_.createTimer(params_.scan_timeout, &UamROS::scanWatchdogTimerCallback, this);
+
+  lidar_.registerCallback<AR01Worker>(std::bind(
+    static_cast<void (UamROS::*)(const protocol::AR01CommandReply&, const ros::Time&)>(
+      &UamROS::scanCallback<AR01Worker::Reply>),
+    this,
+    std::placeholders::_1,
+    std::placeholders::_2));
+  lidar_.registerCallback<AR06Worker>(std::bind(
+    static_cast<void (UamROS::*)(const protocol::AR06CommandReply&, const ros::Time&)>(
+      &UamROS::scanCallback<AR06Worker::Reply>),
+    this,
+    std::placeholders::_1,
+    std::placeholders::_2));
+  lidar_.registerCallback<AR00Worker>(std::bind(
+    static_cast<void (UamROS::*)(const protocol::AR00CommandReply&, const ros::Time&)>(
+      &UamROS::scanCallback<AR00Worker::Reply>),
+    this,
+    std::placeholders::_1,
+    std::placeholders::_2));
+
   // Configure the lidar. On failure, start a timer to try again later.
   if (!configure())
   {
@@ -153,22 +173,6 @@ bool UamROS::configure()
     ROS_INFO_STREAM("Sensor details: " << version_details);
     updateStatus(lidar_.getSensorStatus(), true);
 
-    lidar_.registerCallback<AR01Worker>(std::bind(
-      static_cast<void (UamROS::*)(const protocol::AR01CommandReply&, const ros::Time&)>(&UamROS::scanCallback),
-      this,
-      std::placeholders::_1,
-      std::placeholders::_2));
-    lidar_.registerCallback<AR06Worker>(std::bind(
-      static_cast<void (UamROS::*)(const protocol::AR06CommandReply&, const ros::Time&)>(&UamROS::scanCallback),
-      this,
-      std::placeholders::_1,
-      std::placeholders::_2));
-    lidar_.registerCallback<AR00Worker>(std::bind(
-      static_cast<void (UamROS::*)(const protocol::AR00CommandReply&, const ros::Time&)>(&UamROS::scanCallback),
-      this,
-      std::placeholders::_1,
-      std::placeholders::_2));
-
     lidar_.startStreaming(params_.use_intensity, params_.use_multi_echo);
     {
       std::lock_guard<std::mutex> lock(watchdog_mutex_);
@@ -187,40 +191,14 @@ bool UamROS::configure()
   return configured_;
 }
 
-
-void UamROS::scanCallback(const protocol::AR01CommandReply& reply, const ros::Time& wall_time)
+template <>
+void UamROS::fillScanMessageData(
+  const protocol::AR01CommandReply& reply,
+  const double range_offset,
+  sensor_msgs::LaserScan& scan) const
 {
-  {
-    std::lock_guard<std::mutex> lock(watchdog_mutex_);
-    scan_stamp_ = ros::Time::now();
-  }
-  ros::Duration time_offset;
-  {
-    std::lock_guard<std::mutex> lock(reconfigure_mutex_);
-    if (params_changed_)
-    {
-      time_offset = params_.time_offset;
-      scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
-      params_changed_ = false;
-    }
-  }
-
-  sensor_msgs::LaserScan msg;
-  msg.header.frame_id = params_.frame_id;
-  msg.angle_min = scan_params_.getAngleMin();
-  msg.angle_max = scan_params_.getAngleMax();
-  msg.angle_increment = scan_params_.getAngleIncrement();
-  msg.scan_time = scan_params_.getScanPeriod();
-  msg.time_increment = scan_params_.getTimeIncrement();
-  msg.range_min = scan_params_.getRangeMin();
-  msg.range_max = scan_params_.getRangeMax();
-
-  // Grab scan
-  msg.header.stamp = wall_time;
-  msg.header.stamp = msg.header.stamp + time_offset + ros::Duration(scan_params_.getAngularTimeOffset());
-
-  msg.ranges.resize(reply.ranges.size());
-  msg.intensities.resize(reply.intensities.size());
+  scan.ranges.resize(reply.ranges.size());
+  scan.intensities.resize(reply.intensities.size());
 
   // Filter out steps
   auto first_step = scan_params_.getFirstStep();
@@ -232,7 +210,7 @@ void UamROS::scanCallback(const protocol::AR01CommandReply& reply, const ros::Ti
     return;
   }
 
-  for (size_t i = first_step; i < last_step; i++)
+  for (size_t i = first_step; i <= last_step; i++)
   {
     auto& range = reply.ranges[i];
     auto& intensity = reply.intensities[i];
@@ -244,43 +222,81 @@ void UamROS::scanCallback(const protocol::AR01CommandReply& reply, const ros::Ti
     // 4. When the device is in laser off state the value will be 65532 (0xFFFC)
     if (range != 0 && range < 0xFFFC)
     {
-      msg.ranges[i] = /*range_offset_ +*/ static_cast<float>(reply.ranges[i]) / 1000.0f;
-      msg.intensities[i] = reply.intensities[i];
+      scan.ranges[i] = range_offset + static_cast<float>(reply.ranges[i]) / 1000.0f;
+      scan.intensities[i] = reply.intensities[i];
     }
     else
     {
-      msg.ranges[i] = std::numeric_limits<float>::quiet_NaN();
-      continue;
+      scan.ranges[i] = std::numeric_limits<float>::quiet_NaN();
     }
   }
-  updateStatus(reply.sensing_data);
-  scan_publisher_.publish(msg);
+}
+
+template <>
+void UamROS::fillScanMessageData(
+  const protocol::AR00CommandReply& reply,
+  const double range_offset,
+  sensor_msgs::LaserScan& scan) const
+{
+  scan.ranges.resize(reply.ranges.size());
+
+  // Filter out steps
+  auto first_step = scan_params_.getFirstStep();
+  auto last_step = scan_params_.getLastStep();
+
+  if (reply.ranges.size() <= last_step)
+  {
+    ROS_ERROR_STREAM("Unexpected outcome: " << reply.ranges.size() << " and last_step is " << last_step);
+    return;
+  }
+
+  for (size_t i = first_step; i <= last_step; i++)
+  {
+    auto& range = reply.ranges[i];
+
+    // According to the doc:
+    // 1. Values more than 40000 are error code (0xFFFF).
+    // 2. If object is not detected value will be 65534 (0xFFFE)
+    // 3. If object is at a very close range the value will be 65533 (0xFFFD).
+    // 4. When the device is in laser off state the value will be 65532 (0xFFFC)
+    if (range != 0 && range < 0xFFFC)
+    {
+      scan.ranges[i] = range_offset + static_cast<float>(reply.ranges[i]) / 1000.0f;
+    }
+    else
+    {
+      scan.ranges[i] = std::numeric_limits<float>::quiet_NaN();
+    }
+  }
 }
 
 bool UamROS::dynamicReconfigureCallback(urg_node::URGConfig& config, int level)
 {
   if (level < 0)
-	  return true;
+  {
+    config.angle_max = params_.angle_max;
+    config.angle_min = params_.angle_min;
+    config.time_offset = params_.time_offset.toSec();
+    config.range_offset = params_.range_offset;
+    return true;
+  }
 
   std::lock_guard<std::mutex> lock(reconfigure_mutex_);
   params_.angle_max = config.angle_max;
   params_.angle_min = config.angle_min;
   params_.time_offset = ros::Duration(config.time_offset);
+  params_.range_offset = config.range_offset;
   params_changed_ = true;
   return true;
 }
 
-void UamROS::scanCallback(const protocol::AR06CommandReply& scan_sector, const ros::Time& wall_time) {}
-
-void UamROS::scanCallback(const protocol::AR00CommandReply& scan_sector, const ros::Time& wall_time) {}
-
 void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensing_data, const bool override_check)
 {
-  // We have POD structures, not sure if we should add operator overload to them.
+  // We only want to compare a subset of members, so operator overload should not
+  // be done as it would not do the expected/
   const auto equal = [](
                        const protocol::sensing_data::SensingDataHeader& lhs,
                        const protocol::sensing_data::SensingDataHeader& rhs) -> bool
-
   {
     return lhs.area_number == rhs.area_number && lhs.error_code == rhs.error_code &&
            lhs.error_state == rhs.error_state && lhs.lockout_state == rhs.lockout_state &&
@@ -305,6 +321,7 @@ void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensi
     msg.warning2_state = sensing_data.warning2_state;
     msg.optical_window_contaminated = sensing_data.optical_window_contaminated;
     status_publisher_.publish(msg);
+    publish_status_requested_ = false;
   }
 }
 

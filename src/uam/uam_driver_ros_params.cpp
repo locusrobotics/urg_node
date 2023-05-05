@@ -61,6 +61,9 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
   }
   nh.getParam("max_range", params.max_range);
   nh.getParam("min_range", params.max_range);
+  double time_offset_sec = 0;
+  nh.getParam("time_offset", time_offset_sec);
+  params.time_offset = ros::Duration(time_offset_sec);
 
   double reconfig_timeout = params.reconfiguration_timeout.toSec();
   if (nh.param("reconfiguration_timeout", reconfig_timeout, reconfig_timeout))
@@ -71,6 +74,7 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
 
   nh.getParam("provide_laser_status_service", params.provide_laser_status_service);
   nh.getParam("request_status_service", params.request_status_service);
+  nh.getParam("range_offset", params.range_offset);
 
   return params;
 }
