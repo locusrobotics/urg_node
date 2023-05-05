@@ -57,6 +57,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <optional>
 
 namespace uam
 {

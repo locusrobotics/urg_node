@@ -5,7 +5,13 @@ find_package(catkin REQUIRED COMPONENTS
   diagnostic_updater dynamic_reconfigure laser_proc message_generation
   nodelet rosconsole roscpp sensor_msgs std_msgs std_srvs tf urg_c
 )
-set_directory_properties(PROPERTIES COMPILE_OPTIONS "-std=c++17")
+
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 20)
+endif()
+set(CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
+
 
 # Dynamic reconfigure support
 generate_dynamic_reconfigure_options(cfg/URG.cfg)

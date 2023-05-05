@@ -39,6 +39,7 @@
 #include <uam/workers/uam_worker_base.h>
 
 #include <string>
+#include <optional>
 
 namespace uam
 {

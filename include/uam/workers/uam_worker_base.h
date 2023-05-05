@@ -43,7 +43,6 @@
 #include <boost/crc.hpp>
 #include <iomanip>
 #include <string>
-
 #include <optional>
 
 namespace uam
@@ -142,7 +141,7 @@ public:
     if (!static_cast<const TDerived*>(this)->validateSize(recv_bytes))
     {
         ROS_ERROR_STREAM("Failed to validate size");
-    	return std::nullopt;
+        return std::nullopt;
     }
 
     // Validate Status

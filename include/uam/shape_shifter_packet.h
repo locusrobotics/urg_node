@@ -39,9 +39,7 @@
 #include <uam/protocol_types/uam_protocol_types.h>
 
 #include <array>
-#include <optional>
 #include <type_traits>
-#include <typeinfo>
 #include <utility>
 #include <variant>
 

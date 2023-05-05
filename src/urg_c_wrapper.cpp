@@ -521,7 +521,13 @@ std::string URGCWrapper::sendCommand(std::string cmd)
 
   // Get the socket reference and send
   int sock = urg_.connection.tcpclient.sock_desc;
-  write(sock, cmd.c_str(), cmd.size());
+  auto s_bytes = write(sock, cmd.c_str(), cmd.size());
+
+  if (s_bytes < 0)
+  {
+    ROS_ERROR_STREAM("Failed to send command.");
+    return result;
+  }
 
   // All serial command structures start with STX + LEN as
   // the first 5 bytes, read those in.

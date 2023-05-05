@@ -94,7 +94,7 @@ private:
   template <typename T>
   void fillScanMessageData(const T& scan_packet, const double range_offset, sensor_msgs::LaserScan& scan) const
   {
-	  ROS_WARN_STREAM("Handler not implemented!");
+    ROS_WARN_STREAM("Handler not implemented!");
   }
 
   /**

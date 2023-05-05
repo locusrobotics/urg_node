@@ -35,6 +35,7 @@
 #include <uam/workers/vr00_worker.h>
 
 #include <string>
+#include <optional>
 
 namespace uam
 {
