@@ -33,13 +33,11 @@
 
 #include "ros/ros.h"
 #include <urg_node/urg_c_wrapper.h>
-
-#include <chrono>
 #include <limits>
 #include <string>
 #include <vector>
 #include <boost/crc.hpp>
-#include <uam/workers/uam_command_worker.h>
+
 namespace urg_node
 {
 
@@ -342,196 +340,23 @@ bool URGCWrapper::grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg)
   return true;
 }
 
-bool URGCWrapper::getAR00Status(uam::protocol::AR00CommandReply& status)
+bool URGCWrapper::getAR00Status(URGStatus& status)
 {
-  bool restart = false;
+  // Construct and write AR00 command.
+  static uam::AR00Worker worker;
 
-  if (isStarted())
+  // Get the response
+  std::string response = sendCommand(worker.getCommand());
+  // Validate and deserialize it
+  auto reply = worker.process(&response);
+
+  if (!reply.has_value())
   {
-    restart = true;
-    // Scan must stop before sending a command
-    stop();
+	ROS_WARN_STREAM("Failed to decode incoming AR00 reply.");
+	return false;
   }
+  status = reply->sensing_data;
 
-  static uam::AR00Worker ar00;
-
-  bool success = sendAndReceive(ar00, status);
-
-  if (restart)
-    start();
-
-  return success;
-}
-
-bool URGCWrapper::getOtherStatus(const uint16_t req)
-{
-  static uam::AR00Worker ar00;
-  static uam::AR01Worker ar01;
-  static uam::XR00Worker xr00;
-  static uam::VR00Worker vr00;
-
-  bool restart = false;
-
-  if (isStarted())
-  {
-    restart = true;
-    // Scan must stop before sending a command
-    stop();
-  }
-
-  bool success { false };
-  switch (req)
-  {
-    case 0:
-    {
-      uam::protocol::AR00CommandReply status;
-      success = sendAndReceive(ar00, status);
-      if (success)
-      {
-        ROS_WARN_STREAM("area_number is: " << status.sensing_data.area_number);
-        ROS_WARN_STREAM("encoder_speed is: " << status.sensing_data.encoder_speed);
-        ROS_WARN_STREAM("error_code is: " << status.sensing_data.error_code);
-        ROS_WARN_STREAM("error_state is: " << status.sensing_data.error_state);
-        ROS_WARN_STREAM("laser_state_off is: " << status.sensing_data.laser_state_off);
-        ROS_WARN_STREAM("lockout_state is: " << status.sensing_data.lockout_state);
-        ROS_WARN_STREAM("muting_state1 is: " << status.sensing_data.muting_state1);
-        ROS_WARN_STREAM("muting_state2 is: " << status.sensing_data.muting_state2);
-        ROS_WARN_STREAM("operating_mode is: " << status.sensing_data.operating_mode);
-        ROS_WARN_STREAM("optical_window_contaminated is: " << status.sensing_data.optical_window_contaminated);
-        ROS_WARN_STREAM("ossd1_state is: " << status.sensing_data.ossd1_state);
-        ROS_WARN_STREAM("ossd2_state is: " << status.sensing_data.ossd2_state);
-        ROS_WARN_STREAM("ossd3_state is: " << status.sensing_data.ossd3_state);
-        ROS_WARN_STREAM("ossd4_state is: " << status.sensing_data.ossd4_state);
-        ROS_WARN_STREAM("reset_request1 is: " << status.sensing_data.reset_request1);
-        ROS_WARN_STREAM("reset_request2 is: " << status.sensing_data.reset_request2);
-        ROS_WARN_STREAM("timestamp is: " << status.sensing_data.timestamp);
-        ROS_WARN_STREAM("warning1_state is: " << status.sensing_data.warning1_state);
-        ROS_WARN_STREAM("warning2_state is: " << status.sensing_data.warning2_state);
-      }
-      break;
-    }
-    case 1:
-    {
-      uam::protocol::AR01CommandReply status;
-      success = sendAndReceive(ar01, status);
-      if (success)
-      {
-        ROS_WARN_STREAM("area_number is: " << status.sensing_data.area_number);
-        ROS_WARN_STREAM("encoder_speed is: " << status.sensing_data.encoder_speed);
-        ROS_WARN_STREAM("error_code is: " << status.sensing_data.error_code);
-        ROS_WARN_STREAM("error_state is: " << status.sensing_data.error_state);
-        ROS_WARN_STREAM("laser_state_off is: " << status.sensing_data.laser_state_off);
-        ROS_WARN_STREAM("lockout_state is: " << status.sensing_data.lockout_state);
-        ROS_WARN_STREAM("muting_state1 is: " << status.sensing_data.muting_state1);
-        ROS_WARN_STREAM("muting_state2 is: " << status.sensing_data.muting_state2);
-        ROS_WARN_STREAM("operating_mode is: " << status.sensing_data.operating_mode);
-        ROS_WARN_STREAM("optical_window_contaminated is: " << status.sensing_data.optical_window_contaminated);
-        ROS_WARN_STREAM("ossd1_state is: " << status.sensing_data.ossd1_state);
-        ROS_WARN_STREAM("ossd2_state is: " << status.sensing_data.ossd2_state);
-        ROS_WARN_STREAM("ossd3_state is: " << status.sensing_data.ossd3_state);
-        ROS_WARN_STREAM("ossd4_state is: " << status.sensing_data.ossd4_state);
-        ROS_WARN_STREAM("reset_request1 is: " << status.sensing_data.reset_request1);
-        ROS_WARN_STREAM("reset_request2 is: " << status.sensing_data.reset_request2);
-        ROS_WARN_STREAM("timestamp is: " << status.sensing_data.timestamp);
-        ROS_WARN_STREAM("warning1_state is: " << status.sensing_data.warning1_state);
-        ROS_WARN_STREAM("warning2_state is: " << status.sensing_data.warning2_state);
-      }
-      break;
-    }
-    case 2:
-    {
-      uam::protocol::VR00CommandReply status;
-      success = sendAndReceive(vr00, status);
-      if (success)
-      {
-        ROS_WARN_STREAM(
-          "firmware_version is: " << std::string(
-            status.version_details.firmware_version.data(),
-            status.version_details.firmware_version.size()));
-        ROS_WARN_STREAM(
-          "sensor_model is: " << std::string(
-            status.version_details.sensor_model.data(),
-            status.version_details.sensor_model.size()));
-        ROS_WARN_STREAM(
-          "serial_number is: " << std::string(
-            status.version_details.serial_number.data(),
-            status.version_details.serial_number.size()));
-      }
-      break;
-    }
-    case 3:
-    {
-      uam::protocol::XR00CommandReply status;
-      success = sendAndReceive(xr00, status);
-      if (success)
-      {
-        ROS_WARN_STREAM("area_number is: " << status.data.area_number);
-        ROS_WARN_STREAM("encoder_speed is: " << status.data.encoder_speed);
-        ROS_WARN_STREAM("error_code is: " << status.data.error_code);
-        ROS_WARN_STREAM("error_state is: " << status.data.error_state);
-        ROS_WARN_STREAM("laser_state_off is: " << status.data.laser_state_off);
-        ROS_WARN_STREAM("lockout_state is: " << status.data.lockout_state);
-        ROS_WARN_STREAM("muting_state1 is: " << status.data.muting_state1);
-        ROS_WARN_STREAM("muting_state2 is: " << status.data.muting_state2);
-        ROS_WARN_STREAM("operating_mode is: " << status.data.operating_mode);
-        ROS_WARN_STREAM("optical_window_contaminated is: " << status.data.optical_window_contaminated);
-        ROS_WARN_STREAM("ossd1_state is: " << status.data.ossd1_state);
-        ROS_WARN_STREAM("ossd2_state is: " << status.data.ossd2_state);
-        ROS_WARN_STREAM("ossd3_state is: " << status.data.ossd3_state);
-        ROS_WARN_STREAM("ossd4_state is: " << status.data.ossd4_state);
-        ROS_WARN_STREAM("reset_request1 is: " << status.data.reset_request1);
-        ROS_WARN_STREAM("reset_request2 is: " << status.data.reset_request2);
-
-        ROS_WARN_STREAM("slave1_error_state is: " << status.data.slave1_error_state);
-        ROS_WARN_STREAM("slave1_laser_off_state is: " << status.data.slave1_laser_off_state);
-        ROS_WARN_STREAM("slave1_ossd1_2_state is: " << status.data.slave1_ossd1_2_state);
-        ROS_WARN_STREAM("slave1_ossd3_4_state is: " << status.data.slave1_ossd3_4_state);
-        ROS_WARN_STREAM("slave1_warning_1_state is: " << status.data.slave1_warning_1_state);
-        ROS_WARN_STREAM("slave1_warning_2_state is: " << status.data.slave1_warning_2_state);
-
-        ROS_WARN_STREAM("slave2_error_state is: " << status.data.slave2_error_state);
-        ROS_WARN_STREAM("slave2_laser_off_state is: " << status.data.slave2_laser_off_state);
-        ROS_WARN_STREAM("slave2_ossd1_2_state is: " << status.data.slave2_ossd1_2_state);
-        ROS_WARN_STREAM("slave2_ossd3_4_state is: " << status.data.slave2_ossd3_4_state);
-        ROS_WARN_STREAM("slave2_warning_1_state is: " << status.data.slave2_warning_1_state);
-        ROS_WARN_STREAM("slave2_warning_2_state is: " << status.data.slave2_warning_2_state);
-
-        ROS_WARN_STREAM("slave3_error_state is: " << status.data.slave3_error_state);
-        ROS_WARN_STREAM("slave3_laser_off_state is: " << status.data.slave3_laser_off_state);
-        ROS_WARN_STREAM("slave3_ossd1_2_state is: " << status.data.slave3_ossd1_2_state);
-        ROS_WARN_STREAM("slave3_ossd3_4_state is: " << status.data.slave3_ossd3_4_state);
-        ROS_WARN_STREAM("slave3_warning_1_state is: " << status.data.slave3_warning_1_state);
-        ROS_WARN_STREAM("slave3_warning_2_state is: " << status.data.slave3_warning_2_state);
-
-        ROS_WARN_STREAM("timestamp is: " << status.data.timestamp);
-        ROS_WARN_STREAM("warning1_state is: " << status.data.warning1_state);
-        ROS_WARN_STREAM("warning2_state is: " << status.data.warning2_state);
-      }
-      break;
-    }
-    default:
-      break;
-  }
-
-  ROS_ERROR_STREAM_COND(!success, "Failed to request command!");
-
-  if (restart)
-    start();
-
-  return success;
-}
-
-bool URGCWrapper::deserializeSensingData(
-  const std::string& f_buffer,
-  UAMStatus& sensing_data,
-  const size_t& start_position) const
-{
-  size_t idx { start_position };
-  if (sizeof(UAMStatus) > (f_buffer.size() + start_position))
-  {
-    ROS_ERROR_STREAM("Deserialization not feasible, please check input buffer!");
-    return false;
-  }
   return true;
 }
 
@@ -682,7 +507,7 @@ uint16_t URGCWrapper::checkCRC(const char* bytes, const uint32_t size)
   return crc_kermit_type.checksum();
 }
 
-std::string URGCWrapper::sendCommand(const std::string& cmd)
+std::string URGCWrapper::sendCommand(std::string cmd)
 {
   std::string result;
   bool restart = false;
@@ -694,102 +519,75 @@ std::string URGCWrapper::sendCommand(const std::string& cmd)
     stop();
   }
 
-  if (connection_write(&urg_.connection, cmd.c_str(), cmd.size()) < 0)
+  // Get the socket reference and send
+  int sock = urg_.connection.tcpclient.sock_desc;
+  write(sock, cmd.c_str(), cmd.size());
+
+  // All serial command structures start with STX + LEN as
+  // the first 5 bytes, read those in.
+  size_t total_read_len = 0;
+  size_t read_len = 0;
+  // Read in the header, make sure we get all 5 bytes expcted
+  char recvb[5] = {0};
+  ssize_t expected_read = 5;
+  while (total_read_len < expected_read)
   {
-    ROS_ERROR_STREAM("Failed to send message. Skipping!");
+    read_len = read(sock, recvb + total_read_len, expected_read - total_read_len);  // READ STX
+    total_read_len += read_len;
+    if (read_len <= 0)
+    {
+      ROS_ERROR("Read socket failed: %s", strerror(errno));
+      result.clear();
+      return result;
+    }
+  }
+
+  std::string recv_header(recvb, read_len);
+  // Convert the read len from hex chars to int.
+  std::stringstream ss;
+  ss << recv_header.substr(1, 4);
+  ss >> std::hex >> expected_read;
+  ROS_DEBUG_STREAM("Read len " << expected_read);
+
+  // Already read len of 5, take that out.
+  uint32_t arr_size = expected_read - 5;
+  // Bounds check the size, we really shouldn't exceed 8703 bytes
+  // based on the currently known messages on the hokuyo documentations
+  if (arr_size > 10000)
+  {
+    ROS_ERROR("Buffer creation bounds exceeded, shouldn't allocate: %u bytes", arr_size);
     result.clear();
     return result;
   }
 
-  // All serial command structures start with STX + LEN as
-  // the first 5 bytes, read those in.
-  //  size_t total_read_len = 0;
-  //  size_t read_len = 0;
-  //  // Read in the header, make sure we get all 5 bytes expcted
-  //  char recvb[5] = {0};
-  //  ssize_t expected_read = 5;
-  //  while (total_read_len < expected_read)
-  //  {
-  //    read_len = read(sock, recvb + total_read_len, expected_read - total_read_len);  // READ STX
-  //    total_read_len += read_len;
-  //    if (read_len <= 0)
-  //    {
-  //      ROS_ERROR("Read socket failed: %s", strerror(errno));
-  //      result.clear();
-  //      return result;
-  //    }
-  //  }
+  ROS_DEBUG_STREAM("Creating buffer read of arr_Size: " << arr_size);
+  // Create buffer space for read.
+  boost::shared_array<char> data;
+  data.reset(new char[arr_size]);
 
-  //  // Command header
-  //  std::string buffer;
-  //  uam::CommandHeaderVisitor header;
-  //  size_t total_read_len = 0;
-  //  size_t read_len = 0;
-  //
-  //  const ssize_t stx_cmd_size_len =
-  //    sizeof(uam::protocol::CommandReplyHeader::stx) + sizeof(uam::protocol::CommandReplyHeader::cmd_size);
-  //  while (total_read_len < stx_cmd_size_len)
-  //  {
-  //	  connection_readline(&urg_.connection,
-  //	                              buffer, BUFFER_SIZE, extended_timeout);
-  //
-  //
-  //    read_len = read(sock, recvb + total_read_len, stx_cmd_size_len - total_read_len);  // READ STX
-  //    total_read_len += read_len;
-  //    if (read_len <= 0)
-  //    {
-  //      ROS_ERROR("Read socket failed: %s", strerror(errno));
-  //      result.clear();
-  //      return result;
-  //    }
-  //  }
-  //
-  //  std::string recv_header(recvb, read_len);
-  //  // Convert the read len from hex chars to int.
-  //  std::stringstream ss;
-  //  ss << recv_header.substr(1, 4);
-  //  ss >> std::hex >> expected_read;
-  //  ROS_DEBUG_STREAM("Read len " << expected_read);
-  //
-  //  // Already read len of 5, take that out.
-  //  uint32_t arr_size = expected_read - 5;
-  //  // Bounds check the size, we really shouldn't exceed 8703 bytes
-  //  // based on the currently known messages on the hokuyo documentations
-  //  if (arr_size > 10000)
-  //  {
-  //    ROS_ERROR("Buffer creation bounds exceeded, shouldn't allocate: %u bytes", arr_size);
-  //    result.clear();
-  //    return result;
-  //  }
-  //
-  //  ROS_DEBUG_STREAM("Creating buffer read of arr_Size: " << arr_size);
-  //  // Create buffer space for read.
-  //  boost::shared_array<char> data;
-  //  data.reset(new char[arr_size]);
-  //
-  //  // Read the remaining command
-  //  total_read_len = 0;
-  //  read_len = 0;
-  //  expected_read = arr_size;
-  //
-  //  ROS_DEBUG_STREAM("Expected body size: " << expected_read);
-  //  while (total_read_len < expected_read)
-  //  {
-  //    read_len = read(sock, data.get()+total_read_len, expected_read - total_read_len);
-  //    total_read_len += read_len;
-  //    ROS_DEBUG_STREAM("Read in after header " << read_len);
-  //    if (read_len <= 0)
-  //    {
-  //      ROS_ERROR("Read socket failed: %s", strerror(errno));
-  //      result.clear();
-  //      return result;
-  //    }
-  //  }
-  //
-  //  // Combine the read portions to return for processing.
-  //  result += recv_header;
-  //  result += std::string(data.get(), expected_read);
-  //
+  // Read the remaining command
+  total_read_len = 0;
+  read_len = 0;
+  expected_read = arr_size;
+
+  ROS_DEBUG_STREAM("Expected body size: " << expected_read);
+  while (total_read_len < expected_read)
+  {
+    read_len = read(sock, data.get()+total_read_len, expected_read - total_read_len);
+    total_read_len += read_len;
+    ROS_DEBUG_STREAM("Read in after header " << read_len);
+    if (read_len <= 0)
+    {
+      ROS_ERROR("Read socket failed: %s", strerror(errno));
+      result.clear();
+      return result;
+    }
+  }
+
+  // Combine the read portions to return for processing.
+  result += recv_header;
+  result += std::string(data.get(), expected_read);
+
   // Resume scan after sending.
   if (restart)
   {
@@ -1222,11 +1020,11 @@ ros::Time URGCWrapper::getSynchronizedTime(long time_stamp, long long system_tim
     // Reset the EMA and use the system time.
     if (fabs((stamp-system_time).toSec()) > 0.1)
     {
-      adj_count_ = 0;
-      hardware_clock_ = 0.0;
-      last_hardware_time_stamp_ = 0;
-      stamp = system_time;
-      ROS_INFO("%s: detected clock warp, reset EMA", __func__);
+        adj_count_ = 0;
+        hardware_clock_ = 0.0;
+        last_hardware_time_stamp_ = 0;
+        stamp = system_time;
+        ROS_INFO("%s: detected clock warp, reset EMA", __func__);
     }
   }
   return stamp;

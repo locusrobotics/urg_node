@@ -119,6 +119,8 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
 bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
 {
   publish_status_requested_ = true;
+  res.success = true;
+  res.message = "Status update requested";
   return true;
 }
 

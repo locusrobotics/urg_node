@@ -34,7 +34,7 @@
 
 #ifndef URG_NODE_URG_NODE_DRIVER_H
 #define URG_NODE_URG_NODE_DRIVER_H
-#include <uam/uam_driver.h>
+
 #include <string>
 #include <ros/ros.h>
 #include <dynamic_reconfigure/server.h>
@@ -44,7 +44,7 @@
 #include <urg_node/URGConfig.h>
 #include <std_srvs/Trigger.h>
 #include <bondcpp/bond.h>
-#include <urg_node/Hack.h>
+
 #include "urg_node/urg_c_wrapper.h"
 
 namespace urg_node
@@ -79,9 +79,7 @@ private:
   void populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrapper &stat);
   void scanThread();
   bool sensorStatusOk(const std::string& status) const;
-
   bool statusCallback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  void hackCallback(const urg_node::HackConstPtr& hack_msg);
 
   ros::NodeHandle nh_;
   ros::NodeHandle pnh_;
@@ -142,7 +140,6 @@ private:
   ros::Publisher status_pub_;
 
   ros::ServiceServer status_service_;
-  ros::Subscriber hack_sub_;
 };
 
 }  // namespace urg_node

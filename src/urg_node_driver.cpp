@@ -41,6 +41,7 @@
 
 namespace urg_node
 {
+
 // Useful typedefs
 typedef diagnostic_updater::FrequencyStatusParam FrequencyStatusParam;
 
@@ -92,8 +93,6 @@ void UrgNode::initSetup()
     laser_pub_ = nh_.advertise<sensor_msgs::LaserScan>("scan", 20);
   }
 
-  hack_sub_ = nh_.subscribe<urg_node::Hack>("hack_test", 1, &UrgNode::hackCallback,this);
-
   status_service_ = nh_.advertiseService("update_laser_status", &UrgNode::statusCallback, this);
   status_pub_ = nh_.advertise<urg_node::Status>("laser_status", 1, true);
 
@@ -127,11 +126,8 @@ bool UrgNode::updateStatus()
     device_status_.status_str = urg_->getSensorStatus();
     if (detailed_status_)
     {
-    	uam::protocol::AR00CommandReply reply;
-
-      if (urg_->getAR00Status(reply))
+	  if (urg_->getAR00Status(device_status_.detailed_status))
       {
-        device_status_.detailed_status = reply.sensing_data;
         urg_node::Status msg;
         msg.operating_mode = device_status_.detailed_status.operating_mode;
         msg.error_status = device_status_.detailed_status.error_state;
@@ -163,7 +159,7 @@ bool UrgNode::updateStatus()
       }
       else
       {
-        ROS_ERROR_STREAM("Failed to retrieve detailed status. Sensor is reporting: " << device_status_.status_str);
+        ROS_WARN("Failed to retrieve status");
       }
     }
   }
@@ -188,19 +184,6 @@ bool UrgNode::statusCallback(std_srvs::Trigger::Request &req, std_srvs::Trigger:
   }
 
   return true;
-}
-
-void UrgNode::hackCallback(const urg_node::HackConstPtr& hack_msg)
-{
-  bool result = false;
-  service_yield_ = true;
-  boost::mutex::scoped_lock lock(lidar_mutex_);
-
-  if (urg_)
-  {
-    result = urg_->getOtherStatus(hack_msg->code);
-  }
-  ROS_ERROR_STREAM_COND(!result, "Failed!");
 }
 
 bool UrgNode::reconfigure_callback(urg_node::URGConfig& config, int level)
@@ -374,7 +357,6 @@ void UrgNode::updateDiagnostics()
   addDiagnostics();
   while (!close_diagnostics_)
   {
-    boost::mutex::scoped_lock lock(lidar_mutex_);
     diagnostic_updater_->update();
     boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   }
@@ -696,6 +678,6 @@ void UrgNode::run()
 
   // Start scanning now that everything is configured.
   close_scan_ = false;
-  //scan_thread_ = boost::thread(boost::bind(&UrgNode::scanThread, this));
+  scan_thread_ = boost::thread(boost::bind(&UrgNode::scanThread, this));
 }
 }  // namespace urg_node

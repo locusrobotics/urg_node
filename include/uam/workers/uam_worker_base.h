@@ -137,14 +137,41 @@ public:
   {
     // Before decoding the message we need to double check if we got the expected
     // message size
-    //    auto reply = static_cast<const TDerived*>(this)->decode(buffer);
-    //    if (!reply.has_value())
-    //    {
-    //      ROS_ERROR_STREAM("Failed to decode message");
-    //      return std::nullopt;
-    //    }
-    ROS_ERROR_STREAM("Failed to decode message");
-    return std::nullopt;
+    auto recv_bytes = buffer->size();
+
+    if (!static_cast<const TDerived*>(this)->validateSize(recv_bytes))
+    {
+        ROS_ERROR_STREAM("Failed to validate size");
+    	return std::nullopt;
+    }
+
+    // Validate Status
+    uint16_t status;
+    header_visitor_.status.get(buffer, status);
+
+    // Status check failed?
+    if (!validateStatus(status))
+    {
+      return std::nullopt;
+    }
+
+    //  Validate CRC. We might get a different reply other than the official supported
+    // one (different protocol version)
+    bool is_crc_valid = false;
+
+    if (!validateCrc(buffer))
+    {
+      return std::nullopt;
+    }
+
+    // decode everything else
+    auto reply = static_cast<const TDerived*>(this)->decode(buffer);
+    if (!reply.has_value())
+    {
+      ROS_ERROR_STREAM("Failed to decode message");
+      return std::nullopt;
+    }
+    return reply;
   }
 
   /**
