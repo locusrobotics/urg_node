@@ -56,8 +56,8 @@ std::optional<AR06Worker::Reply> AR06Worker::decode(const std::string_view& buff
     return std::nullopt;
   if (!decodeSensingData(buffer, reply.sensing_data))
     return std::nullopt;
-  if (!decodeDistances(buffer, reply.ranges))
-    return std::nullopt;
+  // if (!decodeDistances(buffer, reply.ranges))
+  //   return std::nullopt;
   return reply;
 }
 

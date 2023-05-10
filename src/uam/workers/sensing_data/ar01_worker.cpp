@@ -57,10 +57,10 @@ std::optional<AR01Worker::Reply> AR01Worker::decode(const std::string_view& buff
     return std::nullopt;
   if (!decodeSensingData(buffer, reply.sensing_data))
     return std::nullopt;
-  if (!decodeDistances(buffer, reply.ranges))
-    return std::nullopt;
-  if (!decodeIntensities(buffer, reply.intensities))
-    return std::nullopt;
+  // if (!decodeDistances(buffer, reply.ranges))
+  //   return std::nullopt;
+  // if (!decodeIntensities(buffer, reply.intensities))
+  //   return std::nullopt;
   return reply;
 }
 
