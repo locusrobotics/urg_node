@@ -178,7 +178,7 @@ public:
       return std::nullopt;
     }
 
-    if (validateStatus(status))
+    if (!validateStatus(status))
     {
       // Something wrong with the status
       return std::nullopt;
