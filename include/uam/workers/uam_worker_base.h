@@ -41,28 +41,36 @@
 #include <uam/uam_visitors.h>
 
 #include <boost/crc.hpp>
+
 #include <iomanip>
-#include <string>
 #include <optional>
+#include <string_view>
 
 namespace uam
 {
 /**
  * @brief This template class for UAM workers. To decode each individual reply, each
  * child will have to implement custom decode methods. To decode each packet there
- * are two options, or sending a byte array in the for of a std::string or sending
- * already the raw_reply. This last approach does not require visitor members.
+ * are two options, a byte array in the form of a std::string or a raw_reply object.
+ * This last approach does not require visitor members.
  *
  * @tparam TDerived - CRTP Pattern to allow for static dispatch whenever possible.
+ *   		          Derived class should provide the following methods:
+ *   		          - std::optional<Reply> decode(const Reply& raw_reply) const;
+ *   		          - std::optional<Reply> decode(const std::string_view& buffer) const;
  * @tparam HeaderMSB - This is the MSByte in the Command header
  * @tparam HeaderLSB - This is the LSByte in the Command header
  * @tparam SubHeaderMSB - This is the MSByte in the Command sub header
  * @tparam SubHeaderLSB - This is the LSByte in the Command sub header
- * @tparam TReply - The reply type for the shild worker
+ * @tparam TReply - The reply type for the child worker
  */
 template <typename TDerived, char HeaderMSB, char HeaderLSB, char SubHeaderMSB, char SubHeaderLSB, typename TReply>
 class WorkerBase
 {
+#define DECODE_STRUCT_WITH_RET(field) \
+  if (!decodeField(field))            \
+    return false;
+
 public:
   /**
    * @brief provide access to the request type
@@ -75,12 +83,12 @@ public:
   using Reply = TReply;
 
   /**
-   * @brief Make Reply type public
+   * @brief Make Reply Header type public
    */
   using ReplyHeader = decltype(TReply::header);
 
   /**
-   * @brief Make Reply type public
+   * @brief Make Reply Footer type public
    */
   using ReplyFooter = decltype(TReply::footer);
 
@@ -108,6 +116,14 @@ public:
   }
 
   /**
+   * @brief Validate the expected size of the reply
+   *
+   * @param[in] recv_bytes - Number of received bytes
+   * @return true if size check passes, false otherwise
+   */
+  inline const bool validateSize(const size_t recv_bytes) const { return recv_bytes == sizeof(Reply); }
+
+  /**
    * @brief Validate if the reply is of the type TDerived
    *
    * @param[in] header - Command reply header
@@ -118,6 +134,7 @@ public:
     return header.header[0] == HeaderMSB && header.header[1] == HeaderLSB && header.sub_header[0] == SubHeaderMSB &&
            header.sub_header[1] == SubHeaderLSB;
   }
+
   /**
    * @brief Method to register the callback to be called by the derived class
    * when processing the packet.
@@ -132,34 +149,38 @@ public:
    * @param[in] buffer - Raw buffer
    * @return Reply decoded message if successful, std::nullopt otherwise
    */
-  std::optional<Reply> process(const std::string* buffer) const
+  std::optional<Reply> process(const std::string& buffer) const
   {
-    // Before decoding the message we need to double check if we got the expected
-    // message size
-    auto recv_bytes = buffer->size();
-
-    if (!static_cast<const TDerived*>(this)->validateSize(recv_bytes))
-    {
-        ROS_ERROR_STREAM("Failed to validate size");
-        return std::nullopt;
-    }
-
-    // Validate Status
+    // Check the expected packet size
+    uint32_t recv_bytes;
+    header_visitor_.cmd_size.get(buffer, recv_bytes);
+    bool is_size_valid = validateSize(recv_bytes) && buffer.size() == recv_bytes;
+    // Decode status
     uint16_t status;
     header_visitor_.status.get(buffer, status);
 
-    // Status check failed?
-    if (!validateStatus(status))
+    // validate crc
+    bool is_crc_valid = validateCrc(buffer, is_size_valid);
+
+    if (!is_size_valid || !is_crc_valid)
     {
+      // if crc is valid, we can call validate status
+      if (is_crc_valid)
+      {
+        // This means that despite not receiving the expected message we received
+        // something valid and we should call validateStatus to get why we are
+        // receiving this, we can ignore the output of it
+        validateStatus(status);
+      }
+      ROS_WARN_STREAM(
+        "Received unexpected packet. CRC check is " << is_crc_valid << " and size validity check is " << is_size_valid);
+
       return std::nullopt;
     }
 
-    //  Validate CRC. We might get a different reply other than the official supported
-    // one (different protocol version)
-    bool is_crc_valid = false;
-
-    if (!validateCrc(buffer))
+    if (validateStatus(status))
     {
+      // Something wrong with the status
       return std::nullopt;
     }
 
@@ -181,36 +202,47 @@ public:
    */
   std::optional<Reply> process(const Reply& raw_reply) const
   {
-    auto recv_bytes = raw_reply.header.cmd_size;
     // Decode number of received bytes
-    decodeField(recv_bytes);
-    // Decode status
-    auto status = raw_reply.header.status;
-    decodeField(status);
-
-    // validate size
-    bool is_size_valid = static_cast<const TDerived*>(this)->validateSize(recv_bytes);
-    bool is_status_ok = validateStatus(status);
-    // Did size check or status check failed?
-    if (!is_size_valid || !is_status_ok)
+    auto recv_bytes = raw_reply.header.cmd_size;
+    if (!decodeField(recv_bytes))
     {
+      ROS_WARN_STREAM("Could not decode reply size.");
       return std::nullopt;
     }
-    //  Validate CRC. We might get a different reply other than the official supported
-    // one (different protocol version)
-    bool is_crc_valid = false;
-
-    if (sizeof(Reply) != recv_bytes)
+    // validate size
+    bool is_size_valid = validateSize(recv_bytes);
+    // Decode status
+    auto status = raw_reply.header.status;
+    if (!decodeField(status))
     {
-      auto tmp_buffer = std::string(reinterpret_cast<const char*>(&raw_reply), recv_bytes);
-      is_crc_valid = validateCrc(&tmp_buffer);
-    }
-    else
-    {
-      is_crc_valid = validateCrc(raw_reply);
+      ROS_WARN_STREAM("Could not decode status.");
+      return std::nullopt;
     }
 
-    if (!is_crc_valid)
+    // If the size is not valid, this can only mean that we did not receive
+    // the expected message, so use the buffer crc calculation method
+    if (!is_size_valid)
+    {
+      if (validateCrc(std::string_view((char*)(&raw_reply), sizeof(Reply)), is_size_valid))
+      {
+        // This means that despite not receiving the expected message we received
+        // something valid and we should call validateStatus to get why we are
+        // receiving this, we can ignore the output of it
+        validateStatus(status);
+        ROS_WARN_STREAM("Received unexpected packet.");
+      }
+      else
+        ROS_WARN_STREAM("Received wrong packet size and crc check failed for packet type: " << HeaderMSB << HeaderLSB);
+      return std::nullopt;
+    }
+
+    if (!validateCrc(raw_reply))
+    {
+      ROS_WARN_STREAM_THROTTLE(5.0, "Failed to validate packet crc.");
+      return std::nullopt;
+    }
+
+    if (!validateStatus(status))
     {
       return std::nullopt;
     }
@@ -226,53 +258,63 @@ public:
   }
 
   /**
-   * @brief Process the incomming message using raw buffer
+   * @brief Process Reply using handler
    *
-   * @return true if message was successfully process, false otherwise
+   * @param reply - Optional reply structure
+   * @param time - Stamp
+   *
+   * @return true if message successfully decoded false otherwise
    */
-  bool processByHandler(const std::string* buffer, const ros::Time& wall_time) const
+  bool processReply(const std::optional<Reply>& reply, const ros::Time& time) const
   {
-    auto reply = process(buffer);
     if (!reply.has_value())
     {
       ROS_ERROR_STREAM("Failed to decode message");
       return false;
     }
     if (callback_)
-      callback_(*reply, wall_time);
+    {
+      callback_(*reply, time);
+    }
+    else
+    {
+      ROS_WARN_STREAM_THROTTLE(5.0, "No handler for " << HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB);
+    }
     return true;
   }
 
   /**
-   * @brief Process raw buffer and return decoded message
+   * @brief Process the incoming message using raw buffer
    *
-   * @param[in] buffer - Raw buffer
-   * @return Reply decoded message if successful, std::nullopt otherwise
+   * @return true if message was successfully process, false otherwise
    */
-  bool processByHandler(const Reply& raw_reply, const ros::Time& wall_time) const
+  bool processByHandler(const std::string& buffer, const ros::Time& time) const
   {
-    auto reply = process(raw_reply);
-    if (!reply.has_value())
-    {
-      ROS_ERROR_STREAM("Failed to decode message");
-      return false;
-    }
-    if (callback_)
-      callback_(*reply, wall_time);
-    else
-      ROS_WARN_STREAM(
-        "No handler for " << HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB << " and it is "
-                          << (int)(callback_ == nullptr));
+    return processReply(process(buffer), time);
+  }
 
-    return true;
+  /**
+   * @brief Process raw structure and call handler
+   *
+   * @param[in] raw_reply - Raw structure
+   * @return true if message successfully decoded false otherwise
+   */
+  bool processByHandler(const Reply& raw_reply, const ros::Time& time) const
+  {
+    return processReply(process(raw_reply), time);
   }
 
 protected:
   /**
+   * @brief Provide alias for base type
+   */
+  using BaseType = WorkerBase<TDerived, HeaderMSB, HeaderLSB, SubHeaderMSB, SubHeaderLSB, TReply>;
+
+  /**
    * @brief Default C'tor
    *
-   * This initialize
-   *
+   * This initialises the command request, which is fixed for all the child
+   * classes.
    */
   explicit WorkerBase(
     const uint32_t header_offset = 0,
@@ -331,14 +373,28 @@ protected:
    * @param[in] buffer - Input buffer
    * @return[out] crc value
    */
-  uint16_t calculateReplyCrc(const std::string* buffer) const
+  uint16_t calculateReplyCrc(const std::string_view& buffer) const
   {
     // validate crc with expected crc:
-    const auto buffer_size = buffer->size();
+    const auto buffer_size = buffer.size();
     const auto crc_buffer_size =
       buffer_size - (sizeof(protocol::CommandReplyHeader::stx) + sizeof(protocol::CommandFooter));
+    return calculateCrc(buffer.data() + sizeof(protocol::CommandReplyHeader::stx), crc_buffer_size);
+  }
+
+  /**
+   * @brief Calulate Reply CRC using structure
+   *
+   * @param[in] message - Message
+   * @return crc value
+   */
+  uint16_t calculateReplyCrc(const Reply message) const
+  {
+    // validate crc with expected crc:
+    const auto crc_buffer_size =
+      sizeof(Reply) - (sizeof(protocol::CommandReplyHeader::stx) + sizeof(protocol::CommandFooter));
     return calculateCrc(
-      buffer->substr(sizeof(protocol::CommandReplyHeader::stx), buffer_size - sizeof(protocol::CommandFooter)).data(),
+      reinterpret_cast<const char*>(&message) + sizeof(protocol::CommandReplyHeader::stx),
       crc_buffer_size);
   }
 
@@ -379,23 +435,6 @@ protected:
   }
 
   /**
-   * @brief Calulate Reply CRC using structure
-   *
-   * @param[in] message - Message
-   * @return crc value
-   */
-  template <typename T>
-  uint16_t calculateReplyCrc(const T message) const
-  {
-    // validate crc with expected crc:
-    const auto crc_buffer_size =
-      sizeof(T) - (sizeof(protocol::CommandReplyHeader::stx) + sizeof(protocol::CommandFooter));
-    return calculateCrc(
-      reinterpret_cast<const char*>(&message) + sizeof(protocol::CommandReplyHeader::stx),
-      crc_buffer_size);
-  }
-
-  /**
    * @brief Validate reply message, namely buffer size, expected crc vs calculated crc
    * using raw buffer. CRC and status are decoded to the reply message
    *
@@ -403,16 +442,31 @@ protected:
    * @param[out] reply - Output message with header and footer decoded
    * @return true if crc and size are valid
    */
-  bool validateCrc(const std::string* buffer) const
+  bool validateCrc(const std::string_view& buffer, const bool is_size_valid = true) const
   {
     // Calculate reply crc
     auto current_crc = calculateReplyCrc(buffer);
-    uint32_t decoded_crc;
-    footer_visitor_.crc.get(buffer, decoded_crc);
 
-    if (current_crc != decoded_crc)
+    uint32_t expected_crc;
+    if (is_size_valid)
+      footer_visitor_.crc.get(buffer, expected_crc);
+    else if (buffer.size() - 1 - sizeof(protocol::CommandFooter))
     {
-      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << decoded_crc);
+      ROS_ERROR_STREAM("Invalid packet size, cannot get crc!");
+      return false;
+    }
+    else
+    {
+      // This mean that we cannot trust the footer visitor as we have the wrong buffer
+      // offset, from the buffer size
+      auto expected_footer_position = buffer.size() - 1 - sizeof(protocol::CommandFooter);
+      CommandFooterVisitor tmp_visitor(expected_footer_position);
+      tmp_visitor.crc.get(buffer, expected_crc);
+    }
+
+    if (current_crc != expected_crc)
+    {
+      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << expected_crc);
       return false;
     }
     // Parse status
@@ -423,18 +477,18 @@ protected:
    * @brief Validate reply message, namely buffer size, expected crc vs calculated crc
    * using the reply structure. CRC and status are decoded to the reply message
    *
-   * @param[in/out] reply - Raw reply (not decoded)
-   * @return true if crc and size are valid false otherwise
+   * @param[in] reply - Raw reply (not decoded)
+   * @return true if crc valid false otherwise
    */
   bool validateCrc(const Reply& reply) const
   {
     // Calculate reply crc;
     auto current_crc = calculateReplyCrc(reply);
-    auto decoded_crc = reply.footer.crc;
-    decodeField(decoded_crc);
-    if (current_crc != decoded_crc)
+    auto expected_crc = reply.footer.crc;
+    decodeField(expected_crc);
+    if (current_crc != expected_crc)
     {
-      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << decoded_crc);
+      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << expected_crc);
       return false;
     }
     return true;
@@ -445,11 +499,15 @@ protected:
    * @param reply
    * @return
    */
-  void decodeHeaderAndFooter(Reply& reply) const
+  bool decodeHeaderAndFooter(Reply& reply) const
   {
-    decodeField(reply.header.cmd_size);
-    decodeField(reply.header.status);
-    decodeField(reply.footer.crc);
+    if (!decodeField(reply.header.cmd_size))
+      return false;
+    if (!decodeField(reply.header.status))
+      return false;
+    if (!decodeField(reply.footer.crc))
+      return false;
+    return true;
   }
 
   /**
@@ -457,11 +515,15 @@ protected:
    * @param reply
    * @return
    */
-  void decodeHeaderAndFooter(const std::string* buffer, Reply& reply) const
+  bool decodeHeaderAndFooter(const std::string_view& buffer, Reply& reply) const
   {
-    header_visitor_.cmd_size.get(buffer, reply.header.cmd_size);
-    header_visitor_.status.get(buffer, reply.header.status);
-    footer_visitor_.crc.get(buffer, reply.footer.crc);
+    if (!header_visitor_.cmd_size.get(buffer, reply.header.cmd_size))
+      return false;
+    if (!header_visitor_.status.get(buffer, reply.header.status))
+      return false;
+    if (!footer_visitor_.crc.get(buffer, reply.footer.crc))
+      return false;
+    return true;
   }
 
   /**
@@ -499,37 +561,59 @@ protected:
    *
    * @param[out] sensing_data - Decoded sensing data
    */
-  void decodeSensingData(protocol::sensing_data::SensingDataHeader& sensing_data) const
+  bool decodeSensingData(protocol::sensing_data::SensingDataHeader& sensing_data) const
   {
-    decodeField(sensing_data.operating_mode);
-    decodeField(sensing_data.area_number);
+    if (!decodeField(sensing_data.operating_mode))
+      return false;
+    if (!decodeField(sensing_data.area_number))
+      return false;
     sensing_data.area_number += 1;
 
     // Grab the Error Status
-    decodeField(sensing_data.error_state);
+    if (!decodeField(sensing_data.error_state))
+      return false;
     // Grab the error code and offset by 0x40 if non-zero as per documentation
-    decodeField(sensing_data.error_code);
+    if (!decodeField(sensing_data.error_code))
+      return false;
+
     if (sensing_data.error_code != 0)
     {
       sensing_data.error_code += 0x40;
     }
-    // Grab the lockout_state
-    decodeField(sensing_data.lockout_state);
-    decodeField(sensing_data.ossd1_state);
-    decodeField(sensing_data.ossd2_state);
-    decodeField(sensing_data.warning1_state);
-    decodeField(sensing_data.warning2_state);
-    decodeField(sensing_data.ossd3_state);
-    decodeField(sensing_data.ossd4_state);
 
-    decodeField(sensing_data.muting_state1);
-    decodeField(sensing_data.muting_state2);
-    decodeField(sensing_data.reset_request1);
-    decodeField(sensing_data.reset_request2);
-    decodeField(sensing_data.encoder_speed);
-    decodeField(sensing_data.timestamp);
-    decodeField(sensing_data.laser_state_off);
-    decodeField(sensing_data.optical_window_contaminated);
+    // Grab the lockout_state
+    if (!decodeField(sensing_data.lockout_state))
+      return false;
+    if (!decodeField(sensing_data.ossd1_state))
+      return false;
+    if (!decodeField(sensing_data.ossd2_state))
+      return false;
+    if (!decodeField(sensing_data.warning1_state))
+      return false;
+    if (!decodeField(sensing_data.warning2_state))
+      return false;
+    if (!decodeField(sensing_data.ossd3_state))
+      return false;
+    if (!decodeField(sensing_data.ossd4_state))
+      return false;
+    if (!decodeField(sensing_data.muting_state1))
+      return false;
+    if (!decodeField(sensing_data.muting_state2))
+      return false;
+    if (!decodeField(sensing_data.reset_request1))
+      return false;
+    if (!decodeField(sensing_data.reset_request2))
+      return false;
+    if (!decodeField(sensing_data.encoder_speed))
+      return false;
+    if (!decodeField(sensing_data.timestamp))
+      return false;
+    if (!decodeField(sensing_data.laser_state_off))
+      return false;
+    if (!decodeField(sensing_data.optical_window_contaminated))
+      return false;
+
+    return true;
   }
 
   /**

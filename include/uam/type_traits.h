@@ -32,57 +32,52 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/workers/vr00_worker.h>
+#ifndef UAM_TYPE_TRAITS_H
+#define UAM_TYPE_TRAITS_H
 
-#include <string_view>
-#include <optional>
+#include <type_traits>
 
 namespace uam
 {
-VR00Worker::VR00Worker(const uint32_t idx_offset) :
-  WorkerBase<VR00Worker, 'V', 'R', '0', '0', protocol::VR00CommandReply>(
-    idx_offset,
-    idx_offset + offsetof(Reply, footer)),
-  version_detail_visitor_(idx_offset + offsetof(Reply, version_details))
+template <typename Tuple, size_t Index0>
+constexpr size_t getMaxSize()
 {
-}
-std::optional<VR00Worker::Reply> VR00Worker::decode(const std::string_view& buffer) const
-{
-  Reply reply;
-  if (!decodeHeaderAndFooter(buffer, reply))
-    return std::nullopt;
-  if (!decodeVersionDetails(buffer, reply.version_details))
-    return std::nullopt;
-  return reply;
+  return sizeof(std::tuple_element<Index0, Tuple>);
 }
 
-std::optional<VR00Worker::Reply> VR00Worker::decode(const protocol::VR00CommandReply& raw_reply) const
+template <typename Tuple, size_t Index0, size_t Index1, size_t... TypeN>
+constexpr size_t getMaxSize()
 {
-  Reply reply = raw_reply;
-  if (!decodeHeaderAndFooter(reply))
-    return std::nullopt;
-  if (!decodeVersionDetails(reply.version_details))
-    return std::nullopt;
-  return reply;
+  return (
+    sizeof(std::tuple_element<Index0, Tuple>) >= sizeof(std::tuple_element<Index1, Tuple>) ?
+      getMaxSize<Tuple, Index0, TypeN...>() :
+      getMaxSize<Tuple, Index1, TypeN...>());
 }
 
-bool VR00Worker::decodeVersionDetails(
-  const std::string_view& buffer,
-  protocol::version_details::VersionDetails& version_details) const
+template <typename Tuple, size_t... TypeN>
+constexpr size_t getMaxSizeSequence(std::index_sequence<TypeN...>)
 {
-  if (!version_detail_visitor_.sensor_model.getRaw(buffer, version_details.sensor_model))
-    return false;
-  if (!version_detail_visitor_.firmware_version.getRaw(buffer, version_details.firmware_version))
-    return false;
-  if (!version_detail_visitor_.serial_number.getRaw(buffer, version_details.serial_number))
-    return false;
-  return true;
+  return getMaxSize<Tuple, TypeN...>();
 }
 
-bool VR00Worker::decodeVersionDetails(protocol::version_details::VersionDetails& version_details) const
+template <typename Tuple>
+constexpr size_t getMaxSizeTuple()
 {
- // VR command is not encoded
-  return true;
+  return getMaxSizeSequence<Tuple>(std::make_index_sequence<std::tuple_size<Tuple>::value>());
+}
+
+template <typename NewType, typename Tuple, size_t... IndexN>
+constexpr bool containsSequence(std::index_sequence<IndexN...>)
+{
+  return (std::is_same<NewType, typename std::tuple_element<IndexN, Tuple>::type>::value || ...);
+}
+
+template <typename NewType, typename Tuple>
+constexpr bool tupleContains()
+{
+  return containsSequence<NewType, Tuple>(std::make_index_sequence<std::tuple_size<Tuple>::value>());
 }
 
 }  // namespace uam
+
+#endif  // UAM_TYPE_TRAITS_H

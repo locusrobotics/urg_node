@@ -168,9 +168,9 @@ bool UamROS::configure()
 
     // TODO(cribeiromendes): make scip commands work seamlessly. Right now we
     // need to ask this before starting continuous async reads
-    scan_params_ = lidar_.getScanDetails();
+    //scan_params_ = lidar_.getScanDetails();
     // Set the reconfigure limits after fetching scan details
-    updateReconfigureLimits();
+    //updateReconfigureLimits();
     auto version_details = lidar_.getVersionDetails();
     ROS_INFO_STREAM("Sensor details: " << version_details);
     updateStatus(lidar_.getSensorStatus(), true);

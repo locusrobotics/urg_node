@@ -37,9 +37,10 @@
 
 #include <ros/console.h>
 #include <uam/protocol_types/uam_protocol_types.h>
+#include <uam/type_traits.h>
 
 #include <array>
-#include <type_traits>
+#include <tuple>
 #include <utility>
 #include <variant>
 
@@ -55,16 +56,20 @@ namespace protocol
  */
 class ShapeShifterPacket
 {
-  template <typename T>
-  static constexpr bool isSupportedType()
-  {
-    return (
-      std::is_same<AR00CommandReply, T>::value || std::is_same<AR01CommandReply, T>::value ||
-      std::is_same<EmptyCommandReply, T>::value || std::is_same<AR06CommandReply, T>::value ||
-      std::is_same<XR00CommandReply, T>::value || std::is_same<VR00CommandReply, T>::value ||
-      std::is_same<YRCommandReply, T>::value || std::is_same<YRCommandReplyHeader, T>::value ||
-      std::is_same<CommandReplyHeader, T>::value);
-  }
+  /**
+   * @brief Supported Type Alias
+   * TODO(cribeirmendes): once we have a variadic union, this can be removed
+   */
+  using SupportedTypes = std::tuple<
+    CommandReplyHeader,
+    AR00CommandReply,
+    AR01CommandReply,
+    EmptyCommandReply,
+    AR06CommandReply,
+    XR00CommandReply,
+    VR00CommandReply,
+    YRCommandReply>;
+
   /**
    * @brief Buffer type
    *
@@ -80,12 +85,11 @@ class ShapeShifterPacket
     XR00CommandReply xr00_reply;
     VR00CommandReply vr00_reply;
     YRCommandReply yr_reply;
-    YRCommandReplyHeader yr_reply_header;
-    std::array<char, sizeof(AR01CommandReply)> raw_buffer;
-  } buffer;  //NOLINT
+    std::array<char, getMaxSizeTuple<SupportedTypes>()> raw_buffer;
+  } buffer;  // NOLINT
 
   /**
-   * @brief Validate union size agains expected size
+   * @brief Validate union size against expected size
    */
   static_assert(sizeof(AR01CommandReply) == sizeof(UBufferType), "Invalid Union Size!");
 
@@ -108,7 +112,7 @@ public:
   inline const T& get() const
   {
     // Easier to understand why compilation failed with this
-    static_assert(isSupportedType<T>(), "Invalid expected message type!");
+    static_assert(tupleContains<T, SupportedTypes>(), "Invalid expected message type!");
     return getImplementation<T>();
   }
 
@@ -119,7 +123,7 @@ public:
   template <typename T>
   inline void set(T message)
   {
-    static_assert(isSupportedType<T>(), "Invalid message type!");
+    static_assert(tupleContains<T, SupportedTypes>(), "Invalid expected message type!");
     getImplementationRef<T>() = message;
   }
 
@@ -182,12 +186,6 @@ inline const YRCommandReply& ShapeShifterPacket::getImplementation() const
 }
 
 template <>
-inline const YRCommandReplyHeader& ShapeShifterPacket::getImplementation() const
-{
-  return buffer.yr_reply_header;
-}
-
-template <>
 inline const CommandReplyHeader& ShapeShifterPacket::getImplementation() const
 {
   return buffer.header;
@@ -235,11 +233,6 @@ inline YRCommandReply& ShapeShifterPacket::getImplementationRef()
   return buffer.yr_reply;
 }
 
-template <>
-inline YRCommandReplyHeader& ShapeShifterPacket::getImplementationRef()
-{
-  return buffer.yr_reply_header;
-}
 template <>
 inline CommandReplyHeader& ShapeShifterPacket::getImplementationRef()
 {

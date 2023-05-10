@@ -39,15 +39,13 @@
 #include <uam/workers/uam_worker_base.h>
 
 #include <optional>
-#include <string>
+#include <string_view>
 
 namespace uam
 {
 /**
  * @brief This template class for SCIP workers. To decode each individual reply, each
- * child will have to implement custom decode methods. To decode each packet there
- * are two options, or sending a byte array in the for of a std::string or sending
- * already the raw_reply. This last approach does not require visitor members.
+ * child will have to implement custom decode methods.
  *
  * @tparam TDerived - CRTP Pattern to allow for static dispatch whenever possible.
  * @tparam NR_LINES - Number of lines of the reply
@@ -100,6 +98,14 @@ public:
    */
   std::optional<Reply> process(const RawReply& raw_reply) const
   {
+    if (raw_reply.size() != NR_LINES)
+    {
+      ROS_ERROR_STREAM(
+        "Invalid response with only: " << raw_reply.size()
+                                          << " line. Expected: " << NR_LINES);
+      return std::nullopt;
+    }
+
     std::optional<Reply> reply = static_cast<const TDerived*>(this)->decode(raw_reply);
     if (!reply.has_value())
     {
@@ -119,7 +125,7 @@ protected:
    * @return
    */
   static std::string findSubstring(
-    const std::string& input,
+    const std::string_view& input,
     const std::string& first = ":",
     const std::string& last = ";")
   {
@@ -164,14 +170,6 @@ public:
    */
   std::optional<Reply> decode(const RawReply& raw_reply) const
   {
-    if (raw_reply.size() != scip_protocol::PPReplyLineIndex::NR_LINES)
-    {
-      ROS_ERROR_STREAM(
-        "Invalid PP response with only: " << raw_reply.size()
-                                          << " line. Expected: " << scip_protocol::PPReplyLineIndex::NR_LINES);
-      return std::nullopt;
-    }
-
     Reply reply;
     bool failed = !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::MIN_DISTANCE), reply.min_distance);
     failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::MAX_DISTANCE), reply.max_distance);
@@ -205,7 +203,7 @@ private:
    * @param[out] value - Output value
    * @return true if transformation was successful, false otherwise
    */
-  bool decodeField(const std::string& field, int& value) const
+  bool decodeField(const std::string_view& field, int& value) const
   {
     auto sub_str = findSubstring(field);
     if (!sub_str.empty())

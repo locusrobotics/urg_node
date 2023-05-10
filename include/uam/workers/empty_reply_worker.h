@@ -37,8 +37,8 @@
 
 #include <uam/workers/uam_worker_base.h>
 
-#include <string>
 #include <optional>
+#include <string_view>
 
 namespace uam
 {
@@ -83,14 +83,11 @@ public:
    * @param[in] buffer - Raw byte array
    * @return Decoded Reply or std::nullopt if decode failed
    */
-  std::optional<protocol::EmptyCommandReply> decode(const std::string* buffer) const
+  std::optional<protocol::EmptyCommandReply> decode(const std::string_view& buffer) const
   {
     protocol::EmptyCommandReply reply;
-    this->decodeHeaderAndFooter(buffer, reply);
-    if (!this->validateCrc(buffer, reply))
-    {
+    if (!this->decodeHeaderAndFooter(buffer, reply))
       return std::nullopt;
-    }
     return reply;
   }
 
@@ -103,19 +100,9 @@ public:
   std::optional<protocol::EmptyCommandReply> decode(const protocol::EmptyCommandReply& raw_reply) const
   {
     protocol::EmptyCommandReply reply = raw_reply;
-    this->decodeHeaderAndFooter(reply);
+    if (!this->decodeHeaderAndFooter(reply))
+      return std::nullopt;
     return reply;
-  }
-
-  /**
-   * @brief Validate the expected size of the reply
-   *
-   * @param[in] recv_bytes - Number of received bytes
-   * @return true if size check passes, false otherwise
-   */
-  inline const bool validateSize(const size_t recv_bytes) const
-  {
-    return recv_bytes == sizeof(protocol::EmptyCommandReply);
   }
 };
 }  // namespace uam

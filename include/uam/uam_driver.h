@@ -215,8 +215,7 @@ public:
   /**
    * @brief Process Command Reply and notify sender
    *
-   * @tparam T
-   * @param packet
+   * @param[in] packet - Packet to process
    */
   template <typename T>
   void processCommandReply(const T& packet)

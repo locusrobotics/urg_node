@@ -348,7 +348,7 @@ bool URGCWrapper::getAR00Status(URGStatus& status)
   // Get the response
   std::string response = sendCommand(worker.getCommand());
   // Validate and deserialize it
-  auto reply = worker.process(&response);
+  auto reply = worker.process(response);
 
   if (!reply.has_value())
   {

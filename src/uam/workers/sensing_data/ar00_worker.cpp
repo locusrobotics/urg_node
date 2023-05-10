@@ -36,10 +36,16 @@
 #include <uam/workers/sensing_data/ar00_worker.h>
 
 #include <optional>
-#include <string>
+#include <string_view>
 
 namespace uam
 {
+template <>
+bool getFromChars(bool& field)
+{
+  return true;
+}
+
 AR00Worker::AR00Worker(const uint32_t idx_offset) :
   WorkerBase<AR00Worker, 'A', 'R', '0', '0', protocol::AR00CommandReply>(
     idx_offset,
@@ -49,63 +55,90 @@ AR00Worker::AR00Worker(const uint32_t idx_offset) :
 {
 }
 
-std::optional<AR00Worker::Reply> AR00Worker::decode(const std::string* buffer) const
+std::optional<AR00Worker::Reply> AR00Worker::decode(const std::string_view& buffer) const
 {
   Reply reply;
-  decodeHeaderAndFooter(buffer, reply);
-  decodeSensingData(buffer, reply.sensing_data);
-  decodeDistances(buffer, reply.ranges);
+  if (!decodeHeaderAndFooter(buffer, reply))
+    return std::nullopt;
+  if (!decodeSensingData(buffer, reply.sensing_data))
+    return std::nullopt;
+  if (!decodeDistances(buffer, reply.ranges))
+    return std::nullopt;
   return reply;
 }
 
 std::optional<AR00Worker::Reply> AR00Worker::decode(const Reply& raw_reply) const
 {
   Reply reply = raw_reply;
-  decodeHeaderAndFooter(reply);
-  WorkerBase<AR00Worker, 'A', 'R', '0', '0', protocol::AR00CommandReply>::decodeSensingData(reply.sensing_data);
+  if (!decodeHeaderAndFooter(reply))
+    return std::nullopt;
+  if (!BaseType::decodeSensingData(reply.sensing_data))
+    return std::nullopt;
   // Decode ranges
-  decodeField(reply.ranges);
+  if (!decodeField(reply.ranges))
+    return std::nullopt;
   return reply;
 }
 
-void AR00Worker::decodeSensingData(const std::string* buffer, protocol::sensing_data::SensingDataHeader& sensing_data)
-  const
+bool AR00Worker::decodeSensingData(
+  const std::string_view& buffer,
+  protocol::sensing_data::SensingDataHeader& sensing_data) const
 {
-  sensing_data_visitor_.operating_mode.get(buffer, sensing_data.operating_mode);
-  sensing_data_visitor_.area_number.get(buffer, sensing_data.area_number, true);
+  if (!sensing_data_visitor_.operating_mode.get(buffer, sensing_data.operating_mode))
+    return false;
+  if (!sensing_data_visitor_.area_number.get(buffer, sensing_data.area_number))
+    return false;
 
   // Grab the Error Status
-  sensing_data_visitor_.error_state.get(buffer, sensing_data.error_state);
+  if (!sensing_data_visitor_.error_state.get(buffer, sensing_data.error_state))
+    return false;
   // Grab the error code and offset by 0x40 if non-zero as per documentation
-  sensing_data_visitor_.error_code.get(buffer, sensing_data.error_code);
+  if (!sensing_data_visitor_.error_code.get(buffer, sensing_data.error_code))
+    return false;
   if (sensing_data.error_code != 0)
   {
     sensing_data.error_code += 0x40;
   }
   // Grab the lockout_state
-  sensing_data_visitor_.lockout_state.get(buffer, sensing_data.lockout_state);
-  sensing_data_visitor_.ossd1_state.get(buffer, sensing_data.ossd1_state);
-  sensing_data_visitor_.ossd2_state.get(buffer, sensing_data.ossd2_state);
-  sensing_data_visitor_.warning1_state.get(buffer, sensing_data.warning1_state);
-  sensing_data_visitor_.warning2_state.get(buffer, sensing_data.warning2_state);
-  sensing_data_visitor_.ossd3_state.get(buffer, sensing_data.ossd3_state);
-  sensing_data_visitor_.ossd4_state.get(buffer, sensing_data.ossd4_state);
+  if (!sensing_data_visitor_.lockout_state.get(buffer, sensing_data.lockout_state))
+    return false;
+  if (!sensing_data_visitor_.ossd1_state.get(buffer, sensing_data.ossd1_state))
+    return false;
+  if (!sensing_data_visitor_.ossd2_state.get(buffer, sensing_data.ossd2_state))
+    return false;
+  if (!sensing_data_visitor_.warning1_state.get(buffer, sensing_data.warning1_state))
+    return false;
+  if (!sensing_data_visitor_.warning2_state.get(buffer, sensing_data.warning2_state))
+    return false;
+  if (!sensing_data_visitor_.ossd3_state.get(buffer, sensing_data.ossd3_state))
+    return false;
+  if (!sensing_data_visitor_.ossd4_state.get(buffer, sensing_data.ossd4_state))
+    return false;
 
-  sensing_data_visitor_.muting_state1.get(buffer, sensing_data.muting_state1);
-  sensing_data_visitor_.muting_state2.get(buffer, sensing_data.muting_state2);
-  sensing_data_visitor_.reset_request1.get(buffer, sensing_data.reset_request1);
-  sensing_data_visitor_.reset_request2.get(buffer, sensing_data.reset_request2);
-  sensing_data_visitor_.encoder_speed.get(buffer, sensing_data.encoder_speed);
-  sensing_data_visitor_.timestamp.get(buffer, sensing_data.timestamp);
-  sensing_data_visitor_.laser_state_off.get(buffer, sensing_data.laser_state_off);
-  sensing_data_visitor_.optical_window_contaminated.get(buffer, sensing_data.optical_window_contaminated);
+  if (!sensing_data_visitor_.muting_state1.get(buffer, sensing_data.muting_state1))
+    return false;
+  if (!sensing_data_visitor_.muting_state2.get(buffer, sensing_data.muting_state2))
+    return false;
+  if (!sensing_data_visitor_.reset_request1.get(buffer, sensing_data.reset_request1))
+    return false;
+  if (!sensing_data_visitor_.reset_request2.get(buffer, sensing_data.reset_request2))
+    return false;
+  if (!sensing_data_visitor_.encoder_speed.get(buffer, sensing_data.encoder_speed))
+    return false;
+  if (!sensing_data_visitor_.timestamp.get(buffer, sensing_data.timestamp))
+    return false;
+  if (!sensing_data_visitor_.laser_state_off.get(buffer, sensing_data.laser_state_off))
+    return false;
+  if (!sensing_data_visitor_.optical_window_contaminated.get(buffer, sensing_data.optical_window_contaminated))
+    return false;
+  return true;
 }
 
-void AR00Worker::decodeDistances(
-  const std::string* buffer,
-  protocol::sensing_data::DistanceDataArray<1081>& distance_data) const
+bool AR00Worker::decodeDistances(
+  const std::string_view& buffer,
+  protocol::sensing_data::DistanceDataArray<protocol::c_nr_ranges>& distance_data) const
 {
-  distances_visitor_.distances.get(buffer, distance_data);
+  return distances_visitor_.distances.get(buffer, distance_data);
 }
 
 }  // namespace uam

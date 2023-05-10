@@ -72,7 +72,7 @@ public:
    * @brief Call specific worker and get processed message
    *
    * @param[in] packet - Packet to process
-   * return Packet decoded or std::nullopt if
+   * return Packet decoded or std::nullopt if decoding failed
    */
   template <typename TWorkerType, typename... TArgs>
   std::string getCommand(const TArgs... args)
@@ -95,7 +95,7 @@ public:
    * @brief Call specific worker and get processed message
    *
    * @param[in] packet - Packet to process
-   * return Packet decoded or std::nullopt if
+   * @return Packet decoded or std::nullopt if decoding failed
    */
   template <typename TWorkerType, typename TReply = typename TWorkerType::Reply>
   std::optional<TReply> process(const TReply& packet)

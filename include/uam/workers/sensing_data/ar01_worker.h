@@ -37,9 +37,10 @@
 
 #include <uam/protocol_types/uam_protocol_types.h>
 #include <uam/workers/uam_worker_base.h>
+#include <uam/uam_visitors.h>
 
-#include <string>
 #include <optional>
+#include <string_view>
 
 namespace uam
 {
@@ -60,7 +61,7 @@ public:
    * @param[in] buffer - Raw byte array
    * @return Decoded Reply or std::nullopt if decode failed
    */
-  std::optional<Reply> decode(const std::string* buffer) const;
+  std::optional<Reply> decode(const std::string_view& buffer) const;
 
   /**
    * @brief Decode the incoming raw_reply
@@ -70,14 +71,6 @@ public:
    */
   std::optional<Reply> decode(const Reply& raw_reply) const;
 
-  /**
-   * @brief Validate the expected size of the reply
-   *
-   * @param[in] recv_bytes - Number of received bytes
-   * @return true if size check passes, false otherwise
-   */
-  inline const bool validateSize(const size_t recv_bytes) const { return recv_bytes == sizeof(Reply); }
-
 private:
   /**
    * @brief Decode sensing data using raw buffer
@@ -85,7 +78,7 @@ private:
    * @param[in] buffer - Raw byte array
    * @param[out] sensing_data - Decoded sensing data
    */
-  void decodeSensingData(const std::string* buffer, protocol::sensing_data::SensingDataHeader& sensing_data) const;
+  bool decodeSensingData(const std::string_view& buffer, protocol::sensing_data::SensingDataHeader& sensing_data) const;
 
   /**
    * @brief Decode distances using raw buffer
@@ -93,7 +86,9 @@ private:
    * @param[in] buffer - Raw byte array
    * @param[out] distance_data - Decoded distance data
    */
-  void decodeDistances(const std::string* buffer, protocol::sensing_data::DistanceDataArray<1081>& distance_data) const;
+  bool decodeDistances(
+    const std::string_view& buffer,
+    protocol::sensing_data::DistanceDataArray<protocol::c_nr_ranges>& distance_data) const;
 
   /**
    * @brief Decode intensity using raw buffer
@@ -101,8 +96,9 @@ private:
    * @param[in] buffer - Raw byte array
    * @param[out] distance_data - Decoded intensity data
    */
-  void decodeIntensities(const std::string* buffer, protocol::sensing_data::IntensityDataArray<1081>& intensity_data)
-    const;
+  bool decodeIntensities(
+    const std::string_view& buffer,
+    protocol::sensing_data::IntensityDataArray<protocol::c_nr_ranges>& intensity_data) const;
 
   /**
    * @brief Sensing data visitor (if buffer)
@@ -112,12 +108,12 @@ private:
   /**
    * @brief Distance data visitor (if buffer)
    */
-  DistanceDataVisitor<1081> distances_visitor_;
+  DistanceDataVisitor<protocol::c_nr_ranges> distances_visitor_;
 
   /**
    * @brief Intensity data visitor (if buffer)
    */
-  IntensityDataArrayVisitor<1081> intensities_visitor_;
+  IntensityDataArrayVisitor<protocol::c_nr_ranges> intensities_visitor_;
 };
 }  // namespace uam
 

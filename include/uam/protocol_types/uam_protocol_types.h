@@ -39,7 +39,6 @@
 #include <cstdint>
 
 #include <array>
-#include <urg_node/visitor.h>
 
 namespace uam
 {
@@ -47,6 +46,20 @@ namespace protocol
 {
 constexpr uint8_t STX_ID = 0x02;
 constexpr uint8_t ETX_ID = 0x03;
+/**
+ * @brief Maximum number of steps
+ */
+constexpr size_t c_nr_ranges = 1081;
+/**
+ * @brief Maximum number of range readings in multiecho mode
+ */
+constexpr size_t c_nr_ranges_multiecho = 2161;
+/**
+ * @brief Max safety area index for this the supported fw version
+ */
+constexpr uint16_t c_max_safety_area_index = 32;
+
+
 
 #pragma pack(1)
 struct CommandRequestHeader
@@ -549,7 +562,7 @@ struct AR00CommandReply
 {
   CommandReplyHeader header;
   sensing_data::SensingDataHeader sensing_data;
-  sensing_data::DistanceDataArray<1081> ranges;
+  sensing_data::DistanceDataArray<c_nr_ranges> ranges;
   CommandFooter footer;
 };
 #pragma pack()
@@ -559,8 +572,8 @@ struct AR01CommandReply
 {
   CommandReplyHeader header;
   sensing_data::SensingDataHeader sensing_data;
-  sensing_data::DistanceDataArray<1081> ranges;
-  sensing_data::IntensityDataArray<1081> intensities;
+  sensing_data::DistanceDataArray<c_nr_ranges> ranges;
+  sensing_data::IntensityDataArray<c_nr_ranges> intensities;
   CommandFooter footer;
 };
 #pragma pack()
@@ -589,7 +602,7 @@ struct AR06CommandReply
 {
   CommandReplyHeader header;
   sensing_data::SensingDataHeader sensing_data;
-  sensing_data::DistanceDataArray<2161> ranges;
+  sensing_data::DistanceDataArray<c_nr_ranges_multiecho> ranges;
   CommandFooter footer;
 };
 #pragma pack()
@@ -598,7 +611,7 @@ struct AR06CommandReply
  */
 using AR07CommandReply = EmptyCommandReply;
 /**
- * @brief AR05 reply to the the stop continuous data initiated by AR07 request
+ * @brief AR08 reply to the the stop continuous data initiated by AR07 request
  */
 using AR08CommandReply = EmptyCommandReply;
 
@@ -727,10 +740,6 @@ enum EYRAreaType : uint16_t
   MAX /**< MAX */
 };
 
-/**
- * @brief Max safety area index for this the supported fw version
- */
-constexpr uint16_t c_max_safety_area_index = 32;
 
 constexpr size_t c_sensing_data_start_idx { sizeof(protocol::CommandReplyHeader) };
 constexpr size_t c_distance_start_idx { sizeof(protocol::CommandReplyHeader) +  //NOLINT

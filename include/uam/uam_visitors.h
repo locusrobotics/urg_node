@@ -36,7 +36,7 @@
 #define UAM_UAM_VISITORS_H
 
 #include <uam/protocol_types/uam_protocol_types.h>
-#include <urg_node/visitor.h>
+#include <uam/visitor.h>
 
 namespace uam
 {
@@ -220,14 +220,14 @@ class DistanceDataVisitor
 public:
   explicit DistanceDataVisitor(const size_t initial_offset) : distances(initial_offset) {}
 
-  Visitor<protocol::sensing_data::DistanceDataArray<Steps>, 0> distances;
+  TVisitor<protocol::sensing_data::DistanceDataArray<Steps>, 0> distances;
 };
 template <size_t Steps>
 class IntensityDataArrayVisitor
 {
 public:
   explicit IntensityDataArrayVisitor(const size_t initial_offset) : intensities(initial_offset) {}
-  Visitor<protocol::sensing_data::IntensityDataArray<Steps>, 0> intensities;
+  TVisitor<protocol::sensing_data::IntensityDataArray<Steps>, 0> intensities;
 };
 
 class VersionDetailsVisitor

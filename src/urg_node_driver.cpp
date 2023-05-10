@@ -33,10 +33,10 @@
 
 #include "urg_node/urg_node_driver.h"
 
-#include <tf/tf.h>  // tf header for resolving tf prefix
-#include <string>
 #include <diagnostic_msgs/AddDiagnostics.h>
 #include <diagnostic_msgs/DiagnosticStatus.h>
+#include <string>
+#include <tf/tf.h>  // tf header for resolving tf prefix
 #include <urg_node/Status.h>
 
 namespace urg_node
@@ -126,7 +126,7 @@ bool UrgNode::updateStatus()
     device_status_.status_str = urg_->getSensorStatus();
     if (detailed_status_)
     {
-	  if (urg_->getAR00Status(device_status_.detailed_status))
+      if (urg_->getAR00Status(device_status_.detailed_status))
       {
         urg_node::Status msg;
         msg.operating_mode = device_status_.detailed_status.operating_mode;
@@ -166,7 +166,7 @@ bool UrgNode::updateStatus()
   return result;
 }
 
-bool UrgNode::statusCallback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res)
+bool UrgNode::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
 {
   ROS_INFO("Got update lidar status callback");
   res.success = false;
@@ -199,7 +199,7 @@ bool UrgNode::reconfigure_callback(urg_node::URGConfig& config, int level)
     urg_->setAngleLimitsAndCluster(config.angle_min, config.angle_max, config.cluster);
     urg_->setSkip(config.skip);
   }
-  else if (level > 0)   // Must stop
+  else if (level > 0)  // Must stop
   {
     urg_->stop();
     ROS_INFO("Stopped data due to reconfigure.");
@@ -367,8 +367,7 @@ void UrgNode::populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrap
 {
   if (!urg_)
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR,
-        "Not Connected");
+    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Not Connected");
     return;
   }
 
@@ -435,13 +434,17 @@ bool UrgNode::connect()
     urg_.reset();  // Clear any previous connections();
     if (!ip_address_.empty())
     {
-      urg_.reset(new urg_node::URGCWrapper(ip_address_, ip_port_,
-          publish_intensity_, publish_multiecho_, synchronize_time_));
+      urg_.reset(
+        new urg_node::URGCWrapper(ip_address_, ip_port_, publish_intensity_, publish_multiecho_, synchronize_time_));
     }
     else
     {
-      urg_.reset(new urg_node::URGCWrapper(serial_baud_, serial_port_,
-          publish_intensity_, publish_multiecho_, synchronize_time_));
+      urg_.reset(new urg_node::URGCWrapper(
+        serial_baud_,
+        serial_port_,
+        publish_intensity_,
+        publish_multiecho_,
+        synchronize_time_));
     }
 
     std::stringstream ss;
@@ -634,15 +637,11 @@ void UrgNode::scanThread()
 
 bool UrgNode::sensorStatusOk(const std::string& status) const
 {
-  static std::string NOT_CONNECTED = std::string("not connected.");
-  static std::string RECEIVE_ERROR_MESSAGE = std::string("not connected.");
   static std::string SENSOR_WORKS_WELL = std::string("Sensor works well.");
   static std::string SENSOR_STABLE_NO_ERROR = std::string("Stable 000 no error.");
   static std::string SENSOR_WORKING_NORMALLY = std::string("sensor is working normally");
 
-  return (status != NOT_CONNECTED && status != RECEIVE_ERROR_MESSAGE) &&
-         (status == std::string("Sensor works well.") || status == std::string("Stable 000 no error.") ||
-          status == std::string("sensor is working normally"));
+  return (status == SENSOR_WORKS_WELL || status == SENSOR_STABLE_NO_ERROR || status == SENSOR_WORKING_NORMALLY);
 }
 
 void UrgNode::run()

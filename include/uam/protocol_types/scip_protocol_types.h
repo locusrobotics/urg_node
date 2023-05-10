@@ -35,7 +35,6 @@
 #ifndef UAM_PROTOCOL_TYPES_SCIP_PROTOCOL_TYPES_H
 #define UAM_PROTOCOL_TYPES_SCIP_PROTOCOL_TYPES_H
 
-#include <array>
 #include <string>
 
 namespace uam
@@ -57,7 +56,7 @@ enum PPReplyLineIndex : size_t
   END_STEP, /**< END_STEP */
   STEP_FRONT_DIRECTION, /**< STEP_FRONT_DIRECTION */
   RPM, /**< RPM */
-  NR_LINES /**< PP_LINES */
+  NR_LINES /**< NR_LINES */
 };
 
 /**

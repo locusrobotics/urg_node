@@ -41,8 +41,8 @@
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <string>
 #include <memory>
+#include <string>
 
 namespace uam
 {
@@ -148,11 +148,11 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
   auto rc = getsockopt(socket_.native_handle(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &recv_buf_size_len);
   if (rc == 0)
   {
-      ROS_INFO_STREAM("Actual receive buffer size: " << recv_buf_size << " bytes");
+    ROS_INFO_STREAM("Actual receive buffer size: " << recv_buf_size << " bytes");
   }
   else
   {
-      ROS_ERROR_STREAM("Error getting receive buffer size: " << strerror(errno));
+    ROS_ERROR_STREAM("Error getting receive buffer size: " << strerror(errno));
   }
 
   return true;
@@ -212,12 +212,10 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
     {
       auto stamp = ros::Time::now();
       auto expected_total_size = receive_buffer_.get<protocol::CommandReplyHeader>().cmd_size;
-      decodeField(expected_total_size);
-      if (expected_total_size > sizeof(protocol::AR01CommandReply))
-      {
-        ROS_WARN_STREAM("Error in the expected size!");
-      }
-      else
+      auto valid_expected_size =
+        decodeField(expected_total_size) && expected_total_size <= sizeof(protocol::AR01CommandReply);
+
+      if (valid_expected_size)
       {
         boost::system::error_code new_error_code;
         auto missing_read = expected_total_size - bytes_transferred;
@@ -236,6 +234,10 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
         {
           callback_(receive_buffer_, stamp);
         }
+      }
+      else
+      {
+        ROS_WARN_STREAM("Error in the expected size!");
       }
     }
     else

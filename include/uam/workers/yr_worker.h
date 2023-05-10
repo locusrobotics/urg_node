@@ -32,7 +32,6 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-
 #ifndef UAM_WORKERS_YR_WORKER_H
 #define UAM_WORKERS_YR_WORKER_H
 
@@ -40,15 +39,11 @@
 #include <uam/uam_error_codes.h>
 #include <uam/workers/uam_worker_base.h>
 
-#include <string>
 #include <optional>
+#include <string>
 
 namespace uam
 {
-enum EAreaNumber : uint16_t
-{
-  MAX = 32 /**< MAX */
-};
 
 /**
  * @brief XR00 command worker
@@ -83,9 +78,9 @@ public:
    * @param reply
    * @return
    */
-  inline bool validateReplyType(const protocol::YRCommandReplyHeader& packet) const
+  inline bool validateReplyType(const protocol::CommandReplyHeader& packet) const
   {
-    return packet.header.header[0] == 'Y' && packet.header.header[1] == 'R';
+    return packet.header[0] == 'Y' && packet.header[1] == 'R';
   }
 
   /**
@@ -127,15 +122,26 @@ public:
     return encodeCommand(request);
   }
 
-
+  /**
+   * @brief
+   * @param raw_reply
+   * @return
+   */
   std::optional<Reply> process(const Reply& raw_reply) const
   {
     Reply reply = raw_reply;
+
     decodeHeaderAndfooter(reply);
     decodeField(reply.area_data);
     return reply;
   }
 
+  /**
+   * @brief
+   *
+   * @param raw_reply
+   * @return
+   */
   bool processByHandler(const Reply& raw_reply)
   {
     auto reply = process(raw_reply);

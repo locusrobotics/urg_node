@@ -37,8 +37,9 @@
 
 #include <uam/protocol_types/uam_protocol_types.h>
 #include <uam/workers/uam_worker_base.h>
+#include <uam/uam_visitors.h>
 
-#include <string>
+#include <string_view>
 #include <optional>
 
 namespace uam
@@ -62,7 +63,7 @@ public:
    * @param[in] buffer - Raw byte array
    * @return Decoded Reply or std::nullopt if decode failed
    */
-  std::optional<Reply> decode(const std::string* buffer) const;
+  std::optional<Reply> decode(const std::string_view& buffer) const;
 
   /**
    * @brief Decode the incoming raw_reply
@@ -72,14 +73,6 @@ public:
    */
   std::optional<Reply> decode(const Reply& raw_reply) const;
 
-  /**
-   * @brief Validate the expected size of the reply
-   *
-   * @param[in] recv_bytes - Number of received bytes
-   * @return true if size check passes, false otherwise
-   */
-  inline const bool validateSize(const size_t recv_bytes) const { return recv_bytes == sizeof(Reply); }
-
 private:
   /**
    * @brief Decode status data using raw buffer
@@ -87,14 +80,14 @@ private:
    * @param[in] buffer - Raw byte array
    * @param[out] sensing_data - Decoded sensing data
    */
-  void decodeStatusData(const std::string* buffer, protocol::sensing_data::StatusData& status_data) const;
+  bool decodeStatusData(const std::string_view& buffer, protocol::sensing_data::StatusData& status_data) const;
 
   /**
    * @brief Decode status data using raw reply
    *
    * @param[in/out] status_data - Raw reply struct
    */
-  void decodeStatusData(protocol::sensing_data::StatusData& status_data) const;
+  bool decodeStatusData(protocol::sensing_data::StatusData& status_data) const;
 
   /**
    * @brief Status data visitor (if buffer)

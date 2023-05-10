@@ -18,7 +18,6 @@ generate_dynamic_reconfigure_options(cfg/URG.cfg)
 
 add_message_files(FILES
   Status.msg
-  Hack.msg
 )
 
 generate_messages(
@@ -64,11 +63,8 @@ target_link_libraries(urg_node urg_node_driver ${catkin_LIBRARIES})
 add_executable(getID src/getID.cpp)
 target_link_libraries(getID urg_c_wrapper ${catkin_LIBRARIES})
 
-add_executable (uam_test_node src/uam_test_node.cpp)
-target_link_libraries(uam_test_node urg_c_wrapper ${catkin_LIBRARIES})
-
 add_executable (uam_driver_ros_node 
-src/uam/uam_driver_ros_params.cpp
+ src/uam/uam_driver_ros_params.cpp
  src/uam/uam_driver_ros_node.cpp
  src/uam/uam_driver.cpp 
  src/uam/uam_driver_ros.cpp
@@ -77,7 +73,7 @@ target_link_libraries(uam_driver_ros_node uam_workers ${catkin_LIBRARIES})
  
 
 ## Mark executables and/or libraries for installation
-install(TARGETS uam_workers urg_c_wrapper urg_node urg_node_driver getID uam_driver_ros_node uam_test_node
+install(TARGETS uam_workers urg_c_wrapper urg_node urg_node_driver getID uam_driver_ros_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -110,13 +106,15 @@ if(CATKIN_ENABLE_TESTING)
   file(GLOB SOURCE_FILES src/uam/*.cpp 
                          src/uam/io/*.cpp 
                          src/uam/workers/*.cpp
-                         src/uam/workers/sensing_data/*.cpp)
+                         src/uam/workers/sensing_data/*.cpp
+                         src/*.cpp)
 
   file(GLOB INCLUDE_FILES include/uam/*.h 
                           include/uam/io/*.h 
                           include/uam/protocol_types/*.h 
                           include/uam/workers/*.h
-                          include/uam/workers/sensing_data/*.h)
+                          include/uam/workers/sensing_data/*.h
+                          include/urg_node/*.h)
   # Ignore long -> int32_t warning, urg_c driver uses
   # long, etc. Wrapper must also use these
   set(ROSLINT_CPP_OPTS "--filter=-build/c++11,-runtime/references")
