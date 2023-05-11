@@ -40,12 +40,6 @@
 
 namespace uam
 {
-template <>
-bool getFromChars(bool& field)
-{
-  return true;
-}
-
 AR00Worker::AR00Worker(const uint32_t idx_offset) :
   WorkerBase<AR00Worker, 'A', 'R', '0', '0', protocol::AR00CommandReply>(
     idx_offset,

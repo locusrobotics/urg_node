@@ -67,10 +67,6 @@ namespace uam
 template <typename TDerived, char HeaderMSB, char HeaderLSB, char SubHeaderMSB, char SubHeaderLSB, typename TReply>
 class WorkerBase
 {
-#define DECODE_STRUCT_WITH_RET(field) \
-  if (!decodeField(field))            \
-    return false;
-
 public:
   /**
    * @brief provide access to the request type

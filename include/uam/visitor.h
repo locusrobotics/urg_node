@@ -56,7 +56,7 @@ inline bool getFromChars(const char* first, const char* last, Tp& value, int bas
 {
   if constexpr (std::is_same<bool, Tp>())
   {
-	// From bytes does not accept bool. We need a cast here
+    // From bytes does not accept bool. We need a cast here
     char tmp_value;
     if (std::from_chars(first, last, tmp_value, 16).ec != std::errc {})
     {
@@ -94,7 +94,6 @@ bool decodeField(
     {
       if (buffer_size <= (index + (step * idx) + width))
       {
-        std::cout << "Invalid request " << std::endl;
         return false;
       }
       const char* char_ptr = &buffer.at(index + (step * idx));
@@ -107,7 +106,6 @@ bool decodeField(
   {
     if (buffer.size() <= (index + width))
     {
-      std::cout << "Invalid request " << std::endl;
       return false;
     }
 
