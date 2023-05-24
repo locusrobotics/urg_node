@@ -49,6 +49,27 @@
 namespace uam
 {
 /**
+ * @brief Calculate crc
+ *
+ * CRC Standard: Kermit
+ * Polynomial: 0x1021
+ * Shift Direction: Right
+ * Initial Value: 0x0000
+ * Byte Swap: Yes
+ * Reverse CRC Result: Yes
+ *
+ * @param[in] buffer - Buffer
+ * @param[in] byte_count - Number of bytes in the buffer to use
+ * @return checksum
+ */
+inline uint16_t calculateCrc(const char* buffer, const std::size_t& byte_count)
+{
+  boost::crc_optimal<16, 0x1021, 0, 0, true, true> crc_kermit_type;
+  crc_kermit_type.process_bytes(buffer, byte_count);
+  return crc_kermit_type.checksum();
+}
+
+/**
  * @brief This template class for UAM workers. To decode each individual reply, each
  * child will have to implement custom decode methods. To decode each packet there
  * are two options, a byte array in the form of a std::string or a raw_reply object.
@@ -375,11 +396,11 @@ protected:
     const auto buffer_size = buffer.size();
     const auto crc_buffer_size =
       buffer_size - (sizeof(protocol::CommandReplyHeader::stx) + sizeof(protocol::CommandFooter));
-    return calculateCrc(buffer.data() + sizeof(protocol::CommandReplyHeader::stx), crc_buffer_size);
+    return uam::calculateCrc(buffer.data() + sizeof(protocol::CommandReplyHeader::stx), crc_buffer_size);
   }
 
   /**
-   * @brief Calulate Reply CRC using structure
+   * @brief Calculate Reply CRC using structure
    *
    * @param[in] message - Message
    * @return crc value
@@ -389,7 +410,7 @@ protected:
     // validate crc with expected crc:
     const auto crc_buffer_size =
       sizeof(Reply) - (sizeof(protocol::CommandReplyHeader::stx) + sizeof(protocol::CommandFooter));
-    return calculateCrc(
+    return uam::calculateCrc(
       reinterpret_cast<const char*>(&message) + sizeof(protocol::CommandReplyHeader::stx),
       crc_buffer_size);
   }
@@ -406,28 +427,7 @@ protected:
     // create a tmp string of cmd and header
     std::string size_cmd_str = toHexString(msg.header.cmd_size) + msg.header.header[0] + msg.header.header[1] +
                                msg.header.sub_header[0] + msg.header.sub_header[1];
-    return calculateCrc(size_cmd_str.data(), size_cmd_str.size());
-  }
-
-  /**
-   * @brief Calculate crc
-   *
-   * CRC Standard: Kermit
-   * Polynomial: 0x1021
-   * Shift Direction: Right
-   * Initial Value: 0x0000
-   * Byte Swap: Yes
-   * Reverse CRC Result: Yes
-   *
-   * @param[in] buffer - Buffer
-   * @param[in] byte_count - Number of bytes in the buffer to use
-   * @return checksum
-   */
-  uint16_t calculateCrc(const char* buffer, const std::size_t& byte_count) const
-  {
-    boost::crc_optimal<16, 0x1021, 0, 0, true, true> crc_kermit_type;
-    crc_kermit_type.process_bytes(buffer, byte_count);
-    return crc_kermit_type.checksum();
+    return uam::calculateCrc(size_cmd_str.data(), size_cmd_str.size());
   }
 
   /**
@@ -491,9 +491,10 @@ protected:
   }
 
   /**
-   * @brief Decode header
-   * @param reply
-   * @return
+   * @brief Decode header and footer using structure
+   *
+   * @param[in/out] reply - Reply to be decoded
+   * @return true if successfully decoded, false otherwise
    */
   bool decodeHeaderAndFooter(Reply& reply) const
   {
@@ -507,9 +508,11 @@ protected:
   }
 
   /**
-   * @brief Decode header
-   * @param reply
-   * @return
+   * @brief Decode header and footer using buffer
+   *
+   * @param[in] buffer - Raw buffer
+   * @param[out] reply - reply with decoded header and footer
+   * @return true if successfully decoded, false otherwise
    */
   bool decodeHeaderAndFooter(const std::string_view& buffer, Reply& reply) const
   {

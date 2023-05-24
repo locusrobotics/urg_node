@@ -117,13 +117,24 @@ public:
    * @brief Place and send order and wait for it to be sent
    *
    * @param[in] command - Command to send
+   * @param[in] timeout - How many seconds to wait until send command times out.
+   *
    * @return true if command successfully sent, false otherwise.
    */
-  inline bool asyncSend(const std::string& command)
+  inline bool asyncSend(
+    const std::string& command,
+    const std::chrono::seconds timeout = std::chrono::seconds(5))
   {
     if (!connected_)
       return false;
     auto send_length = socket_.async_send(boost::asio::buffer(command, command.size()), boost::asio::use_future);
+    auto status = send_length.wait_for(timeout);
+    if (status != std::future_status::ready)
+    {
+      // we are not expecting this to happen too often, no need to throttle this warning.
+      ROS_WARN_STREAM("Send command timed out...");
+      return false;
+    }
     return (send_length.get() == command.size());
   }
 

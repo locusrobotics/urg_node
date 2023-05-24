@@ -76,20 +76,25 @@ private:
 
   /**
    * @brief Attempt to connect to and configure the lidar in response to a timer event
+   *
+   * @param[in] event - Timer event
    */
   void configureTimerCallback(const ros::TimerEvent& event);
 
   /**
-   * @brief
-   * @param config
-   * @param level
+   * @brief Dynamic reconfigure callback
+   *
+   * @param[in] config - Configuration
+   * @param[in] level - Level
    */
   bool dynamicReconfigureCallback(urg_node::URGConfig& config, int level);
 
   /**
-   * @brief
+   * @brief Fill laser scan ros message
    *
-   * @param scan_sector
+   * @param[in] scan_packet - Incoming scan packet
+   * @param[in] range_offset - Range in meters to be added to each range reading
+   * @param[in/out] scan - scan ros message
    */
   template <typename T>
   void fillScanMessageData(const T& scan_packet, const double range_offset, sensor_msgs::LaserScan& scan) const
@@ -133,8 +138,7 @@ private:
     msg.range_min = scan_params_.getRangeMin();
     msg.range_max = scan_params_.getRangeMax();
 
-    msg.header.stamp = wall_time;
-    msg.header.stamp = msg.header.stamp + time_offset + ros::Duration(scan_params_.getAngularTimeOffset());
+    msg.header.stamp = wall_time + time_offset + ros::Duration(scan_params_.getAngularTimeOffset());
 
     // Read the right fields
     fillScanMessageData(reply, range_offset, msg);
@@ -144,11 +148,11 @@ private:
   }
 
   /**
-   * @brief
+   * @brief Request status service callback
    *
-   * @param req
-   * @param res
-   * @return
+   * @param[in] req - request
+   * @param[in] res - response
+   * @return always true
    */
   bool statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
@@ -172,7 +176,7 @@ private:
 
 private:
   /**
-   * \defgroup
+   * \defgroup Lidar communication Section
    * @{
    */
 
@@ -191,15 +195,17 @@ private:
    */
   UamDriver lidar_;
 
+  /**@}*/
+
+  /**
+   * \defgroup Dynamic reconfigure details section
+   * @{
+   */
+
   /**
    * @brief UAM configuration parameters
    */
   UamROSParams params_;
-
-  /**
-   * @brief Synchronization guard for watchdog variables accessed by ROS and lidar callbacks
-   */
-  std::mutex watchdog_mutex_;
 
   /**
    * @brief Synchronization guard for watchdog variables accessed by ROS and lidar callbacks
@@ -210,6 +216,33 @@ private:
    * @brief Flag pointing that reconfigure was requested
    */
   bool params_changed_;
+
+  /**@}*/
+
+  /**
+   * \defgroup Watchdog section
+   * @{
+   */
+
+  /**
+   * @brief Synchronization guard for watchdog variables accessed by ROS and lidar callbacks
+   */
+  std::mutex watchdog_mutex_;
+
+  /**
+   * @brief Watchdog timer to reconnect if no sectors are received
+   */
+  ros::Timer scan_watchdog_timer_;
+
+  /**
+   * @brief The last received scan sector timestamp
+   */
+  ros::Time scan_stamp_;
+
+  /**
+   * @brief The last time the lidar was configured
+   */
+  ros::Time configured_stamp_;
 
   /**@}*/
 
@@ -256,21 +289,6 @@ private:
    * @brief Status Service
    */
   ros::ServiceServer request_status_service_;
-
-  /**
-   * @brief Watchdog timer to reconnect if no sectors are received
-   */
-  ros::Timer scan_watchdog_timer_;
-
-  /**
-   * @brief The last received scan sector timestamp
-   */
-  ros::Time scan_stamp_;
-
-  /**
-   * @brief The last time the lidar was configured
-   */
-  ros::Time configured_stamp_;
 
   /**
    * @brief Last received sensing data status

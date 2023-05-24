@@ -45,6 +45,7 @@ UamDriver::UamDriver() :
   uam_packet_worker_(),
   scip_pp_worker_(),
   command_timeout_(10.0),
+  command_send_timeout_(std::chrono::seconds(5)),
   subscription_mode_(ESubscriptionMode::INVALID)
 {
   // Register command callback (VR, XR, YR)
