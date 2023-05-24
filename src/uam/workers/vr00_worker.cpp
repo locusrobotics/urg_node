@@ -81,7 +81,7 @@ bool VR00Worker::decodeVersionDetails(
 
 bool VR00Worker::decodeVersionDetails(protocol::version_details::VersionDetails& version_details) const
 {
- // VR command is not encoded
+  // VR command is not encoded
   return true;
 }
 
