@@ -156,6 +156,8 @@ public:
       return true;
     }
 
+    // TODO(carlos-m159): add guard to check if async read line task in
+    // in progress.
     asyncReadData();
     stopped_ = false;
     stop_requested_ = false;
@@ -285,17 +287,17 @@ private:
   OnNewDataCallback scip_callback_;
 
   /**
-   * @brief
+   * @brief Callback to filter packet header
    */
   FilterCallback filter_callback_;
 
   /**
-   * @brief Async read is in progress
+   * @brief State of the async read task
    */
   std::atomic_bool stopped_;
 
   /**
-   * @brief Async read is in progress
+   * @brief Request stop to the async read task
    */
   std::atomic_bool stop_requested_;
 };
