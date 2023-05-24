@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-@Library('tailor-meta@0.1.14')_
+@Library('tailor-meta@0.1.20')_
 tailorTestPipeline(
   // Name of job that generated this test definition.
   rosdistro_job: '/ci/rosdistro/master',
@@ -14,7 +14,7 @@ tailorTestPipeline(
   // Version of tailor_meta to build against
   tailor_meta: '0.1.20',
   // Master or release branch associated with this track
-  source_branch: 'indigo-devel',
+  source_branch: 'locus-devel',
   // Docker registry where test image is stored
   docker_registry: 'https://084758475884.dkr.ecr.us-east-1.amazonaws.com/locus-tailor'
 )
