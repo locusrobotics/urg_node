@@ -45,8 +45,9 @@
 namespace uam
 {
 
+// TODO (cribeiromendes): This command class is not yet fully nor tested.
 /**
- * @brief XR00 command worker
+ * @brief YR command worker.
  */
 class YRWorker
 {
@@ -74,9 +75,10 @@ public:
   inline void registerEventCallback(PacketEventCallback callback) { callback_ = callback; }
 
   /**
-   * @brief
-   * @param reply
-   * @return
+   * @brief Validate if the reply is of the type YR
+   *
+   * @param[in] header - Command reply header
+   * @return true if the reply is of the type TDerived::Reply, false otherwise
    */
   inline bool validateReplyType(const protocol::CommandReplyHeader& packet) const
   {
@@ -84,22 +86,24 @@ public:
   }
 
   /**
-   * @brief
-   * @param reply
-   * @return
+   * @brief Validate if the reply is of the type TDerived
+   *
+   * @param[in] header - Command reply header
+   * @return true if the reply is of the type TDerived::Reply, false otherwise
    */
   inline bool validateCommandHeader(const std::array<char, 2>& header) const
   {
     return header[0] == 'Y' && header[1] == 'R';
   }
+
   /**
-   * @brief
+   * @brief Get the enconded command
    *
-   * @param[in] area_type -
-   * @param[in] area_number - from 1 to TBD
-   * @param[in] start_step
-   * @param[in] end_step
-   * @return
+   * @param[in] area_type - from 0 to 8 (check protocol definition for details on this)
+   * @param[in] area_number - from 1 to 32 (check protocol definition for details on this)
+   * @param[in] start_step - TBD
+   * @param[in] end_step - TBD
+   * @return The encoded command
    */
   std::string getCommand(
     const protocol::EYRAreaType area_type,
@@ -123,9 +127,10 @@ public:
   }
 
   /**
-   * @brief
-   * @param raw_reply
-   * @return
+   * @brief Process raw received structure and return decoded message
+   *
+   * @param[in] raw_reply - Received raw reply
+   * @return Reply decoded message if successful, std::nullopt otherwise
    */
   std::optional<Reply> process(const Reply& raw_reply) const
   {
@@ -137,10 +142,9 @@ public:
   }
 
   /**
-   * @brief
+   * @brief Process the incoming message using raw buffer
    *
-   * @param raw_reply
-   * @return
+   * @return true if message was successfully process, false otherwise
    */
   bool processByHandler(const Reply& raw_reply)
   {
@@ -157,7 +161,7 @@ public:
 
 protected:
   /**
-   * @bief Convert value to Hexadecimal in string form
+   * @brief Convert value to Hexadecimal in string form
    *
    * @param[in] value - Value to be converted
    * @param[in] size - The number of bytes of the value
@@ -171,6 +175,12 @@ protected:
     return stream.str();
   }
 
+  /**
+   * @brief Method to encode the command type Request
+   *
+   * @param[in] request - Request to encode.
+   * @return encoded command
+   */
   static std::string encodeCommand(const Request& request)
   {
     std::string encoded_request;
@@ -189,6 +199,12 @@ protected:
     return encoded_request;
   }
 
+  /**
+   * @brief Calculate crc for the request type
+   *
+   * @param[in] msg - Caculate CRC
+   * @return crc value
+   */
   uint16_t calculateCrc(const Request& msg) const
   {
     // CRC Calculation
@@ -197,38 +213,23 @@ protected:
                                toHexString(msg.header.area_type) + toHexString(msg.header.area_number) +
                                toHexString(msg.header.start_step) + toHexString(msg.header.end_step) +
                                toHexString(msg.header.resolution);
-    return calculateCrc(size_cmd_str.data(), size_cmd_str.size());
+    return uam::calculateCrc(size_cmd_str.data(), size_cmd_str.size());
   }
 
+  /**
+   * @brief Calculate Reply CRC using structure
+   *
+   * @param[in] message - Message
+   * @return crc value
+   */
   uint16_t calculateReplyCrc(const Reply& message) const
   {
     // validate crc with expected crc:
     const auto crc_buffer_size =
       sizeof(Reply) - (sizeof(protocol::CommandReplyHeader::stx) + sizeof(protocol::CommandFooter));
-    return calculateCrc(
+    return uam::calculateCrc(
       reinterpret_cast<const char*>(&message) + sizeof(protocol::CommandReplyHeader::stx),
       crc_buffer_size);
-  }
-
-  /**
-   * @brief Calculate crc
-   *
-   * CRC Standard: Kermit
-   * Polynomial: 0x1021
-   * Shift Direction: Right
-   * Initial Value: 0x0000
-   * Byte Swap: Yes
-   * Reverse CRC Result: Yes
-   *
-   * @param[in] buffer - Buffer
-   * @param[in] byte_count - Number of bytes in the buffer to use
-   * @return checksum
-   */
-  uint16_t calculateCrc(const char* buffer, const std::size_t& byte_count) const
-  {
-    boost::crc_optimal<16, 0x1021, 0, 0, true, true> crc_kermit_type;
-    crc_kermit_type.process_bytes(buffer, byte_count);
-    return crc_kermit_type.checksum();
   }
 
   /**
@@ -251,6 +252,12 @@ protected:
     return true;
   }
 
+  /**
+   * @brief Decode header and footer using structure
+   *
+   * @param[in/out] reply - Reply to be decoded
+   * @return true if successfully decoded, false otherwise
+   */
   inline void decodeHeaderAndfooter(Reply& reply) const
   {
     decodeField(reply.header.header.cmd_size);
@@ -263,6 +270,15 @@ protected:
     decodeField(reply.footer.crc);
   }
 
+  /**
+   * @brief Validate status field.
+   * Here, in case the status field is not 0, an Error code is looked up in the
+   * error_code::StatusErrorCodeToString table and in the
+   * error_codes::YRStatusErrorCodeToString
+   *
+   * @param[in] reply - Decoded reply
+   * @return[out] true if message is valid, false otherwise
+   */
   inline bool validateStatus(const uint16_t& status) const
   {
     // Check if status is ok

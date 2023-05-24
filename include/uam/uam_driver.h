@@ -147,7 +147,7 @@ public:
       pending_command_reply_ready_ = false;
     }
 
-    if (!client_.asyncSend(uam_packet_worker_.getCommand<TWorker>(args...)))
+    if (!client_.asyncSend(uam_packet_worker_.getCommand<TWorker>(args...), command_send_timeout_))
     {
       throw std::runtime_error("Cannot send command to lidar.");
     }
@@ -175,7 +175,7 @@ public:
       throw std::runtime_error("Cannot send command to lidar while disconnected.");
     }
 
-    if (!client_.asyncSend(scip_pp_worker_.getCommand()))
+    if (!client_.asyncSend(scip_pp_worker_.getCommand(), command_send_timeout_))
     {
       throw std::runtime_error("Cannot send command to lidar.");
     }
@@ -296,30 +296,9 @@ public:
   }
 
   /**
-   * @brief
+   * @brief Stop streaming laser scan
    */
   void stopStreaming();
-
-  template <typename TAny>
-  void unsubscribeCallback(const TAny message)
-  {
-    if (subscription_mode_ == ESubscriptionMode::INVALID)
-    {
-      ROS_WARN_STREAM("Bug, it should not be here!");
-    }
-    else
-    {
-      ROS_INFO_STREAM(
-        "Stopping subscription, with: " << message.header[0] << message.header[1] << message.sub_header[0]
-                                        << message.sub_header[1]);
-      subscription_mode_ = ESubscriptionMode::INVALID;
-    }
-  }
-
-  /**
-   * @brief Handle Unsubscribe
-   */
-  void handleUnsubscribe();
 
   /**
    * @brief Packet Callback from the io handlers
@@ -333,9 +312,10 @@ public:
   }
 
   /**
-   * @brief
-   * @param header
-   * @return
+   * @brief Filter callback to check if header is known by any of the workers
+   * 
+   * @param[in] header - Incoming header
+   * @return true if header is recognised false otherwise
    */
   inline bool filterCallback(const std::array<char, 2>& header)
   {
@@ -356,12 +336,6 @@ public:
     const uint16_t area_number,
     const uint32_t start_step,
     const uint32_t end_step);
-
-  template <typename TWorker, typename... TArgs>
-  inline bool asyncSend(TArgs&&... args)
-  {
-    return client_.asyncSend(uam_packet_worker_.getCommand<TWorker>(std::forward<TArgs>(args)...));
-  }
 
 private:
   /**
@@ -412,6 +386,11 @@ private:
    * @brief Timeout used when waiting for a response from the lidar
    */
   std::chrono::duration<double> command_timeout_;
+
+  /**
+   * @brief Timeout used when sending
+   */
+  std::chrono::seconds command_send_timeout_;
 
   /**
    * @brief Flag to store message subscription mode
