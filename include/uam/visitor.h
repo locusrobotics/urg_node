@@ -151,7 +151,7 @@ public:
    * @param field_index Index of the field in the buffer
    * @param offset Custom offset that needs to be applied to the field
    */
-  TVisitor(const size_t idx_offset, const uint32_t param_offset = 0) :
+  explicit TVisitor(const size_t idx_offset, const uint32_t param_offset = 0) :
     index_(TIndex + idx_offset),
     offset_(param_offset),
     width_(sizeof(TField))

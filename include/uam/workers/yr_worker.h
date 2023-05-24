@@ -45,7 +45,7 @@
 namespace uam
 {
 
-// TODO (cribeiromendes): This command class is not yet fully nor tested.
+// TODO(cribeiromendes): This command class is not yet fully nor tested.
 /**
  * @brief YR command worker.
  */
