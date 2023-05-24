@@ -103,25 +103,10 @@ install(DIRECTORY urdf meshes launch
 
 if(CATKIN_ENABLE_TESTING)
   find_package(roslint)
-  file(GLOB SOURCE_FILES src/uam/*.cpp 
-                         src/uam/io/*.cpp 
-                         src/uam/workers/*.cpp
-                         src/uam/workers/sensing_data/*.cpp
-                         src/*.cpp)
-
-  file(GLOB INCLUDE_FILES include/uam/*.h 
-                          include/uam/io/*.h 
-                          include/uam/protocol_types/*.h 
-                          include/uam/workers/*.h
-                          include/uam/workers/sensing_data/*.h
-                          include/urg_node/*.h)
   # Ignore long -> int32_t warning, urg_c driver uses
   # long, etc. Wrapper must also use these
   set(ROSLINT_CPP_OPTS "--filter=-build/c++11,-runtime/references")
-  roslint_cpp(
-   ${INCLUDE_FILES}
-   ${SRC_FILES}
-  )
+  roslint_cpp()
   roslint_add_test()
 
   find_package(roslaunch REQUIRED)

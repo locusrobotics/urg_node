@@ -241,7 +241,7 @@ public:
     // the expected message, so use the buffer crc calculation method
     if (!is_size_valid)
     {
-      if (validateCrc(std::string_view(reinterpret_cast<char*>(&raw_reply), sizeof(Reply)), is_size_valid))
+      if (validateCrc(std::string_view(reinterpret_cast<const char*>(&raw_reply), sizeof(Reply)), is_size_valid))
       {
         // This means that despite not receiving the expected message we received
         // something valid and we should call validateStatus to get why we are

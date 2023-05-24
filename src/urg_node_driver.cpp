@@ -139,7 +139,7 @@ bool UrgNode::updateStatus()
         msg.warning1_state = device_status_.detailed_status.warning1_state;
         msg.warning2_state = device_status_.detailed_status.warning2_state;
         msg.optical_window_contaminated = device_status_.detailed_status.optical_window_contaminated;
-        // TODO: Detection log should not be requested together with status.
+        // TODO(carlos-m159): Detection log should not be requested together with status.
         // For now keep the old code commented out.
         // UrgDetectionReport report;
         // if (urg_->getDL00Status(report))
