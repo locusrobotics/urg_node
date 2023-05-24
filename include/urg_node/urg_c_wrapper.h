@@ -70,7 +70,7 @@ public:
 
 class URGCWrapper
 {
-public:  
+public:
   using URGStatus = uam::protocol::sensing_data::SensingDataHeader;
   URGCWrapper(const std::string& ip_address, const int ip_port,
       bool& using_intensity, bool& using_multiecho, bool synchronize_time);
@@ -171,7 +171,7 @@ private:
    * @param system_time_stamp The current system time stamp.
    * @returns ros::Time stamp representing synchronized time
    */
-  ros::Time getSynchronizedTime(long time_stamp, long long system_time_stamp);
+  ros::Time getSynchronizedTime(long time_stamp, long long system_time_stamp); // NOLINT
 
   /**
    * @brief Set the Hokuyo URG-04LX from SCIP 1.1 mode to SCIP 2.0 mode.
@@ -200,8 +200,8 @@ private:
   urg_t urg_;
   bool started_;
 
-  std::vector<long> data_;
-  std::vector<unsigned short> intensity_;
+  std::vector<long> data_;  // NOLINT
+  std::vector<unsigned short> intensity_; // NOLINT
 
   bool use_intensity_;
   bool use_multiecho_;
@@ -218,7 +218,7 @@ private:
   // used for clock synchronziation
   bool synchronize_time_;
   double hardware_clock_;
-  long last_hardware_time_stamp_;
+  long last_hardware_time_stamp_; // NOLINT
   double hardware_clock_adj_;
   const double adj_alpha_ = .01;
   uint64_t adj_count_;

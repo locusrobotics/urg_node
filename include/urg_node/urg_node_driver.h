@@ -112,7 +112,7 @@ private:
      * @brief Detailed status, when this is available (ex: UAM-05LP)
      */
     uam::protocol::sensing_data::SensingDataHeader detailed_status;
-  } device_status_;
+  } device_status_; // NOLINT
 
   int error_count_;
   double freq_min_;
