@@ -282,8 +282,17 @@ private:
 
   /**
    * @brief Status Publisher
+   * 
+   * Publishes lidar status on request
    */
-  ros::Publisher status_publisher_;
+  ros::Publisher status_on_request_publisher_;
+
+  /**
+   * @brief Status Publisher
+   * 
+   * Publishes lidar status on update
+   */
+  ros::Publisher status_on_update_publisher_;
 
   /**
    * @brief Status Service

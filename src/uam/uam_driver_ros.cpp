@@ -58,7 +58,9 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   params_changed_(false)
 {
   scan_publisher_ = node_handle_.advertise<sensor_msgs::LaserScan>(params.scan_topic, 1);
-  status_publisher_ = node_handle_.advertise<urg_node::Status>(params.status_topic, 1, true);
+  status_on_request_publisher_ = node_handle_.advertise<urg_node::Status>(params.status_topic, 1, true);
+  status_on_update_publisher_ =
+    node_handle_.advertise<urg_node::Status>(status_on_request_publisher_.getTopic() + "_update", 1, true);
   if (params_.provide_laser_status_service)
     request_status_service_ =
       node_handle_.advertiseService(params.request_status_service, &UamROS::statusCallback, this);
@@ -118,9 +120,44 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
 
 bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
 {
+  // Check if the lidar is connected/configured
+  if (!configured_)
+  {
+    res.success = false;
+    res.message = "Status update requested but lidar is not connected!";
+    return true;
+  }
+
+  // Number of scan cycles to wait for status update
+  // Because we wait 1/2 of scan cycle for the status
+  // 3 scan cycles -> 6 half(s) of scan
+  static const uint32_t half_scan_cycles_timeout_counter = 6;
+  static const ros::Duration sleep_time(scan_params_.getScanPeriod() / 2);
+
+  // Let the received thread know that we are expecting status
   publish_status_requested_ = true;
-  res.success = true;
-  res.message = "Status update requested";
+
+  // Number of half scan cycles waited
+  uint32_t cycles_waited = 0;
+
+  // Mimic old behaviour: status is published in the service call
+  while (ros::ok() && true == publish_status_requested_.load() && cycles_waited < half_scan_cycles_timeout_counter)
+  {
+    // Sleep for 1/2 scan period
+    sleep_time.sleep();
+    cycles_waited++;
+  }
+
+  if (!publish_status_requested_.load())
+  {
+    res.success = true;
+    res.message = "Status update requested";
+  }
+  else
+  {
+    res.success = false;
+    res.message = "Status update was not successfully retrieved";
+  }
   return true;
 }
 
@@ -308,7 +345,10 @@ void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensi
            lhs.warning2_state == rhs.warning2_state;
   };
 
-  if (publish_status_requested_.load() || override_check || !equal(last_received_status_, sensing_data))
+  const bool on_request_status = override_check || publish_status_requested_.load();
+  const bool on_update_status = override_check || !equal(last_received_status_, sensing_data);
+
+  if (on_request_status || on_update_status)
   {
     last_received_status_ = sensing_data;
     urg_node::Status msg;
@@ -322,8 +362,15 @@ void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensi
     msg.warning1_state = sensing_data.warning1_state;
     msg.warning2_state = sensing_data.warning2_state;
     msg.optical_window_contaminated = sensing_data.optical_window_contaminated;
-    status_publisher_.publish(msg);
-    publish_status_requested_ = false;
+    if (on_request_status)
+    {
+      status_on_request_publisher_.publish(msg);
+      publish_status_requested_ = false;
+    }
+    if (on_update_status)
+    {
+      status_on_update_publisher_.publish(msg);
+    }
   }
 }
 
