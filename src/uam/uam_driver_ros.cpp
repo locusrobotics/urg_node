@@ -130,8 +130,10 @@ bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::
 
   // Number of scan cycles to wait for status update
   // Because we wait 1/2 of scan cycle for the status
-  // 3 scan cycles -> 6 half(s) of scan
-  static const uint32_t half_scan_cycles_timeout_counter = 6;
+  // Half cycle expected to be 0.03[s] / 2 = 0.015 [s]
+  // 2 scan cycles -> 4 half(s) of scan
+  static const uint32_t scan_cycles_timeout = 2;
+  static const uint32_t half_scan_cycles_timeout = scan_cycles_timeout * 2;
   static const ros::Duration sleep_time(scan_params_.getScanPeriod() / 2);
 
   // Let the received thread know that we are expecting status
@@ -141,7 +143,7 @@ bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::
   uint32_t cycles_waited = 0;
 
   // Mimic old behaviour: status is published in the service call
-  while (ros::ok() && true == publish_status_requested_.load() && cycles_waited < half_scan_cycles_timeout_counter)
+  while (ros::ok() && true == publish_status_requested_.load() && cycles_waited < half_scan_cycles_timeout)
   {
     // Sleep for 1/2 scan period
     sleep_time.sleep();
@@ -151,12 +153,15 @@ bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::
   if (!publish_status_requested_.load())
   {
     res.success = true;
-    res.message = "Status update requested";
+    res.message = "Detailed status was successfully published";
   }
   else
   {
+    ROS_WARN_STREAM_THROTTLE(
+      5.0,
+      "Failed to retrieved detailed status after " << scan_cycles_timeout << " scan cycles.");
     res.success = false;
-    res.message = "Status update was not successfully retrieved";
+    res.message = "Failed to retrieved detailed status";
   }
   return true;
 }
