@@ -51,7 +51,7 @@ URGCWrapper::URGCWrapper(const std::string& ip_address, const int ip_port,
   serial_baud_ = 0;
 
 
-  long baudrate_or_port = (long)ip_port;
+  long baudrate_or_port = (long)ip_port;  // NOLINT
   const char *device = ip_address.c_str();
 
   int result = urg_open(&urg_, URG_ETHERNET, device, baudrate_or_port);
@@ -76,7 +76,7 @@ URGCWrapper::URGCWrapper(const int serial_baud, const std::string& serial_port,
   ip_address_ = "";
   ip_port_ = 0;
 
-  long baudrate_or_port = (long)serial_baud;
+  long baudrate_or_port = (long)serial_baud;  // NOLINT
   const char *device = serial_port.c_str();
 
   int result = urg_open(&urg_, URG_SERIAL, device, baudrate_or_port);
@@ -217,8 +217,8 @@ bool URGCWrapper::grabScan(const sensor_msgs::LaserScanPtr& msg)
 
   // Grab scan
   int num_beams = 0;
-  long time_stamp = 0;
-  unsigned long long system_time_stamp = 0;
+  long time_stamp = 0;  // NOLINT
+  unsigned long long system_time_stamp = 0;  // NOLINT
 
   if (use_intensity_)
   {
@@ -281,8 +281,8 @@ bool URGCWrapper::grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg)
 
   // Grab scan
   int num_beams = 0;
-  long time_stamp = 0;
-  unsigned long long system_time_stamp;
+  long time_stamp = 0;  // NOLINT
+  unsigned long long system_time_stamp;  // NOLINT
 
   if (use_intensity_)
   {
@@ -343,78 +343,20 @@ bool URGCWrapper::grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg)
 bool URGCWrapper::getAR00Status(URGStatus& status)
 {
   // Construct and write AR00 command.
-  std::string str_cmd;
-  str_cmd += 0x02;  // STX
-  str_cmd.append("000EAR00A012");  // AR00 cmd with length and checksum.
-  str_cmd += 0x03;  // ETX
+  static uam::AR00Worker worker;
 
   // Get the response
-  std::string response = sendCommand(str_cmd);
+  std::string response = sendCommand(worker.getCommand());
+  // Validate and deserialize it
+  auto reply = worker.process(response);
 
-  ROS_DEBUG_STREAM("Full response: " << response);
-
-  // Strip STX and ETX before calculating the CRC.
-  response.erase(0, 1);
-  response.erase(response.size() - 1, 1);
-
-  // Get the CRC, it's the last 4 chars.
-  std::stringstream ss;
-  ss << response.substr(response.size() - 4, 4);
-  uint16_t crc;
-  ss >> std::hex >> crc;
-
-  // Remove the CRC from the check.
-  std::string msg = response.substr(0, response.size() - 4);
-  // Check the checksum.
-  uint16_t checksum_result = checkCRC(msg.data(), msg.size());
-
-  if (checksum_result != crc)
+  if (!reply.has_value())
   {
-    ROS_WARN("Received bad frame, incorrect checksum");
+    ROS_WARN_STREAM("Failed to decode incoming AR00 reply.");
     return false;
   }
+  status = reply->sensing_data;
 
-  return this->deserializeSensingData(response, status, protocol::sensing_data::c_sensing_data_start_idx);
-}
-
-bool URGCWrapper::deserializeSensingData(
-  const std::string& f_buffer,
-  URGStatus& sensing_data,
-  const size_t& start_position) const
-{
-  size_t idx { start_position };
-  if (sizeof(URGStatus) > (f_buffer.size() + start_position))
-  {
-    std::cout << "Deserialization not feasible, please check input buffer!" << std::endl;
-    return false;
-  }
-  protocol::sensing_data::SensingDataReplyHelper deserialize(&f_buffer, idx);
-  // Get Status
-  deserialize.status.get(sensing_data.status);
-  if (sensing_data.status != 0)
-  {
-    ROS_WARN("Received bad status");
-    return false;
-  }
-
-  deserialize.operating_mode.get(sensing_data.operating_mode);
-  deserialize.area_number.get(sensing_data.area_number);
-
-  // Grab the Error Status
-  deserialize.error_state.get(sensing_data.error_state);
-  // Grab the error code and offset by 0x40 if non-zero as per documentation
-  deserialize.error_code.get(sensing_data.error_code);
-  if (sensing_data.error_code != 0)
-  {
-    sensing_data.error_code += 0x40;
-  }
-  // Grab the lockout_state
-  deserialize.lockout_state.get(sensing_data.lockout_state);
-  deserialize.ossd1_state.get(sensing_data.ossd1_state);
-  deserialize.ossd2_state.get(sensing_data.ossd2_state);
-  deserialize.warning1_state.get(sensing_data.warning1_state);
-  deserialize.warning2_state.get(sensing_data.warning2_state);
-  deserialize.optical_window_contaminated.get(sensing_data.optical_window_contaminated);
   return true;
 }
 
@@ -550,7 +492,7 @@ bool URGCWrapper::setToSCIP2()
 
   // Check if switching was successful.
   if (n > 0 && strcmp(buffer, "SCIP2.0") == 0
-    && urg_open(&urg_, URG_SERIAL, serial_port_.c_str(), (long)serial_baud_) >= 0)
+    && urg_open(&urg_, URG_SERIAL, serial_port_.c_str(), (long)serial_baud_) >= 0)  // NOLINT
   {
     ROS_DEBUG_STREAM("Set sensor to SCIP 2.0.");
     return true;
@@ -579,7 +521,13 @@ std::string URGCWrapper::sendCommand(std::string cmd)
 
   // Get the socket reference and send
   int sock = urg_.connection.tcpclient.sock_desc;
-  write(sock, cmd.c_str(), cmd.size());
+  auto s_bytes = write(sock, cmd.c_str(), cmd.size());
+
+  if (s_bytes < 0)
+  {
+    ROS_ERROR_STREAM("Failed to send command.");
+    return result;
+  }
 
   // All serial command structures start with STX + LEN as
   // the first 5 bytes, read those in.
@@ -662,16 +610,16 @@ bool URGCWrapper::isStarted() const
 
 double URGCWrapper::getRangeMin() const
 {
-  long minr;
-  long maxr;
+  long minr;  // NOLINT
+  long maxr;  // NOLINT
   urg_distance_min_max(&urg_, &minr, &maxr);
   return static_cast<double>(minr) / 1000.0;
 }
 
 double URGCWrapper::getRangeMax() const
 {
-  long minr;
-  long maxr;
+  long minr;  // NOLINT
+  long maxr;  // NOLINT
   urg_distance_min_max(&urg_, &minr, &maxr);
   return static_cast<double>(maxr) / 1000.0;
 }
@@ -711,7 +659,7 @@ double URGCWrapper::getAngleIncrement() const
 
 double URGCWrapper::getScanPeriod() const
 {
-  long scan_usec = urg_scan_usec(&urg_);
+  long scan_usec = urg_scan_usec(&urg_);  // NOLINT
   return 1.e-6 * static_cast<double>(scan_usec);
 }
 
@@ -1000,8 +948,8 @@ ros::Duration URGCWrapper::getTimeStampOffset(size_t num_measurements)
   std::vector<ros::Duration> time_offsets(num_measurements);
   for (size_t i = 0; i < num_measurements; i++)
   {
-    long time_stamp;
-    unsigned long long system_time_stamp;
+    long time_stamp;  // NOLINT
+    unsigned long long system_time_stamp;  // NOLINT
     int ret = 0;
 
     if (measurement_type_ == URG_DISTANCE)
@@ -1044,7 +992,7 @@ ros::Duration URGCWrapper::getTimeStampOffset(size_t num_measurements)
   return time_offsets[time_offsets.size() / 2];
 }
 
-ros::Time URGCWrapper::getSynchronizedTime(long time_stamp, long long system_time_stamp)
+ros::Time URGCWrapper::getSynchronizedTime(long time_stamp, long long system_time_stamp)  // NOLINT
 {
   ros::Time stamp, system_time;
   system_time.fromNSec((uint64_t)system_time_stamp);

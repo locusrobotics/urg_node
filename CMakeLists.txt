@@ -5,7 +5,13 @@ find_package(catkin REQUIRED COMPONENTS
   diagnostic_updater dynamic_reconfigure laser_proc message_generation
   nodelet rosconsole roscpp sensor_msgs std_msgs std_srvs tf urg_c
 )
-set_directory_properties(PROPERTIES COMPILE_OPTIONS "-std=c++11")
+
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 20)
+endif()
+set(CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
+
 
 # Dynamic reconfigure support
 generate_dynamic_reconfigure_options(cfg/URG.cfg)
@@ -30,13 +36,24 @@ catkin_package(
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 ## Declare a cpp library
+add_library(uam_workers 
+  src/uam/workers/sensing_data/ar00_worker.cpp
+  src/uam/workers/sensing_data/ar01_worker.cpp
+  src/uam/workers/sensing_data/ar06_worker.cpp
+  src/uam/workers/vr00_worker.cpp
+  src/uam/workers/xr00_worker.cpp
+  src/uam/workers/uam_command_worker.cpp
+  src/uam/io/tcp_client.cpp
+  )
+target_link_libraries(uam_workers ${catkin_LIBRARIES})
 add_library(urg_c_wrapper src/urg_c_wrapper.cpp)
-target_link_libraries(urg_c_wrapper ${catkin_LIBRARIES})
+target_link_libraries(urg_c_wrapper uam_workers ${catkin_LIBRARIES})
 
 # Declare the cpp as a lib also
 add_library(urg_node_driver src/urg_node_driver.cpp)
 add_dependencies(urg_node_driver ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_gencpp)
 target_link_libraries(urg_node_driver urg_c_wrapper ${catkin_LIBRARIES})
+
 
 ## Declare a cpp executable
 add_executable(urg_node src/urg_node.cpp)
@@ -46,8 +63,17 @@ target_link_libraries(urg_node urg_node_driver ${catkin_LIBRARIES})
 add_executable(getID src/getID.cpp)
 target_link_libraries(getID urg_c_wrapper ${catkin_LIBRARIES})
 
+add_executable (uam_driver_ros_node 
+ src/uam/uam_driver_ros_params.cpp
+ src/uam/uam_driver_ros_node.cpp
+ src/uam/uam_driver.cpp 
+ src/uam/uam_driver_ros.cpp
+ )
+target_link_libraries(uam_driver_ros_node uam_workers ${catkin_LIBRARIES})
+ 
+
 ## Mark executables and/or libraries for installation
-install(TARGETS urg_c_wrapper urg_node urg_node_driver getID
+install(TARGETS uam_workers urg_c_wrapper urg_node urg_node_driver getID uam_driver_ros_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -79,15 +105,8 @@ if(CATKIN_ENABLE_TESTING)
   find_package(roslint)
   # Ignore long -> int32_t warning, urg_c driver uses
   # long, etc. Wrapper must also use these
-  set(ROSLINT_CPP_OPTS "--filter=-runtime/references,-runtime/int")
-  roslint_cpp(
-    include/urg_node/urg_c_wrapper.h
-    include/urg_node/urg_node_driver.h
-    src/getID.cpp
-    src/urg_c_wrapper.cpp
-    src/urg_node_driver.cpp
-    src/urg_node.cpp
-  )
+  set(ROSLINT_CPP_OPTS "--filter=-build/c++11,-runtime/references")
+  roslint_cpp()
   roslint_add_test()
 
   find_package(roslaunch REQUIRED)
