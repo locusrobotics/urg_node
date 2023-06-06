@@ -2,8 +2,8 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.2 (2023-06-06)
+------------------
 * Bugfix/ci build (`#12 <https://github.com/locusrobotics/urg_node/issues/12>`_)
   * Add gen message as dependency for uam target, added also missing install (`#10 <https://github.com/locusrobotics/urg_node/issues/10>`_)
   * Added missing atomic include (`#11 <https://github.com/locusrobotics/urg_node/issues/11>`_)
