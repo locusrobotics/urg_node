@@ -2,6 +2,36 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Rst 6898 investigate hokuyo lidar scan outage (`#8 <https://github.com/locusrobotics/urg_node/issues/8>`_) (`#9 <https://github.com/locusrobotics/urg_node/issues/9>`_)
+  * Minor improvements, fixed some concurrency with the diagnostics
+  * Added command workers
+  * added new sendcmd method
+  * Trying new socket + decode process
+  * Improved workers, added experimental YR worker
+  * Added uam driver ros, still not tested
+  * Refactored to use async comm
+  * Updated license and comments
+  * Enable and fix roslint for new files
+  * Added dyn reconfigure
+  * Added support for ar00 laser scan
+  * Removed debug code from old urg_node
+  * added missing includes
+  * Changed decode procedure to use from_bytes, moved visitor into uam folder, PR review findings, shapeshifter more generic, added type traits
+  * Minor bugfixes
+  * Comment out array deserialization with visitor (not working, even before refactor)
+  * Bugfix for ar00 packet
+  * refactored after review findings, removed dead code
+  * Updated jenkins file
+  * Fix roslint
+  * Updated jenkins file
+  * Fix build
+  * Added missing description
+  * Status service now behaves as urg_node before
+  * Added log if it fails, changed timeout to 2 cycles
+* Contributors: Carlos Mendes
+
 0.6.0 (2023-02-22)
 ------------------
 * Rst 5623 improve hokuyo lidar driver so it can communicate safety scanner error codes (#3)
