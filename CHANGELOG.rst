@@ -2,6 +2,13 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Bugfix/ci build (`#12 <https://github.com/locusrobotics/urg_node/issues/12>`_)
+  * Add gen message as dependency for uam target, added also missing install (`#10 <https://github.com/locusrobotics/urg_node/issues/10>`_)
+  * Added missing atomic include (`#11 <https://github.com/locusrobotics/urg_node/issues/11>`_)
+* Contributors: Carlos Mendes
+
 0.6.1 (2023-06-06)
 ------------------
 * Rst 6898 investigate hokuyo lidar scan outage (`#8 <https://github.com/locusrobotics/urg_node/issues/8>`_) (`#9 <https://github.com/locusrobotics/urg_node/issues/9>`_)
