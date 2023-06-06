@@ -44,7 +44,7 @@
 
 #include <urg_c/urg_sensor.h>
 #include <urg_c/urg_utils.h>
-#include <urg_node/uam_protocol_types.h>
+#include <uam/workers/sensing_data/ar00_worker.h>
 
 
 
@@ -70,8 +70,8 @@ public:
 
 class URGCWrapper
 {
-public:  
-  using URGStatus = protocol::sensing_data::SensingDataReply;
+public:
+  using URGStatus = uam::protocol::sensing_data::SensingDataHeader;
   URGCWrapper(const std::string& ip_address, const int ip_port,
       bool& using_intensity, bool& using_multiecho, bool synchronize_time);
 
@@ -171,7 +171,7 @@ private:
    * @param system_time_stamp The current system time stamp.
    * @returns ros::Time stamp representing synchronized time
    */
-  ros::Time getSynchronizedTime(long time_stamp, long long system_time_stamp);
+  ros::Time getSynchronizedTime(long time_stamp, long long system_time_stamp); // NOLINT
 
   /**
    * @brief Set the Hokuyo URG-04LX from SCIP 1.1 mode to SCIP 2.0 mode.
@@ -195,22 +195,13 @@ private:
    */
   std::string sendCommand(std::string cmd);
 
-  /**
-   * @brief Deserialize URGStatus from received data (which has ASCII encoding)
-   * @param f_buffer Received buffer
-   * @param sensing_data Sensing data
-   * @param start_position Start index in the buffer, case an offset is wanted
-   * @return true if success, false otherwise
-   */
-  bool deserializeSensingData(const std::string& f_buffer, URGStatus& sensing_data, const size_t& start_position = 0) const;
-
   std::string frame_id_;  ///< Output frame_id for each laserscan.
 
   urg_t urg_;
   bool started_;
 
-  std::vector<long> data_;
-  std::vector<unsigned short> intensity_;
+  std::vector<long> data_;  // NOLINT
+  std::vector<unsigned short> intensity_; // NOLINT
 
   bool use_intensity_;
   bool use_multiecho_;
@@ -227,7 +218,7 @@ private:
   // used for clock synchronziation
   bool synchronize_time_;
   double hardware_clock_;
-  long last_hardware_time_stamp_;
+  long last_hardware_time_stamp_; // NOLINT
   double hardware_clock_adj_;
   const double adj_alpha_ = .01;
   uint64_t adj_count_;
