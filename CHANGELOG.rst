@@ -2,8 +2,8 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.1 (2023-06-06)
+------------------
 * Rst 6898 investigate hokuyo lidar scan outage (`#8 <https://github.com/locusrobotics/urg_node/issues/8>`_) (`#9 <https://github.com/locusrobotics/urg_node/issues/9>`_)
   * Minor improvements, fixed some concurrency with the diagnostics
   * Added command workers
