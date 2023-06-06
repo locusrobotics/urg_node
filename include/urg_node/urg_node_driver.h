@@ -35,6 +35,7 @@
 #ifndef URG_NODE_URG_NODE_DRIVER_H
 #define URG_NODE_URG_NODE_DRIVER_H
 
+#include <atomic>
 #include <string>
 #include <ros/ros.h>
 #include <dynamic_reconfigure/server.h>

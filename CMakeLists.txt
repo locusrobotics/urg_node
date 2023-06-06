@@ -69,6 +69,7 @@ add_executable (uam_driver_ros_node
  src/uam/uam_driver.cpp 
  src/uam/uam_driver_ros.cpp
  )
+add_dependencies(uam_driver_ros_node ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_gencpp)
 target_link_libraries(uam_driver_ros_node uam_workers ${catkin_LIBRARIES})
  
 
@@ -87,8 +88,11 @@ install(
 ## Mark cpp header files for installation
 install(DIRECTORY include/${PROJECT_NAME}/
    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-   FILES_MATCHING PATTERN "*.h"
-   PATTERN ".svn" EXCLUDE
+)
+
+install(
+  DIRECTORY include/uam/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
 )
 
 ## Install script to set IP addresses
