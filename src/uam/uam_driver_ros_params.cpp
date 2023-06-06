@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2022, Locus Robotics
+ *  Copyright (c) 2023, Locus Robotics
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -32,67 +32,51 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef INCLUDE_URG_NODE_VISITOR_H_
-#define INCLUDE_URG_NODE_VISITOR_H_
+#include <uam/uam_driver_ros_params.h>
 
-#include <sstream>
-#include <string>
-
-/**
- * @brief A visitor class for the field of type TField
- * @tparam TField
- */
-template <typename TField, size_t TIndex>
-class Visitor
+namespace uam
 {
-public:
-  /**
-   * @brief Default C'tor
-   * @param buffer buffer where fields are accessed
-   * @param field_index Index of the field in the buffer
-   * @param offset Custom offset that needs to be applied to the field
-   */
-  Visitor(const std::string* buffer, const uint8_t idx_offset = 0, const uint8_t param_offset = 0) :
-    buffer_(buffer),
-    index(TIndex + idx_offset),
-    offset_(param_offset),
-    width(sizeof(TField))
+UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
+{
+  UamROSParams params;
+  nh.getParam("angle_min", params.angle_min);
+  nh.getParam("angle_max", params.angle_max);
+  nh.getParam("publish_intensity", params.use_intensity);
+  nh.getParam("publish_multiecho", params.use_multi_echo);
+  if (params.use_multi_echo && params.use_intensity)
   {
+    ROS_WARN_STREAM("Multiecho and intensity are not supported. Publishing only intensity.");
+    params.use_multi_echo = false;
   }
-
-  /**
-   * @brief Method to retrieve field from buffer
-   * @param field
-   */
-  void get(TField& field) const
+  nh.getParam("frame_id", params.frame_id);
+  nh.getParam("ip_address", params.ip_address);
+  auto port = nh.param("ip_port", static_cast<int>(params.ip_port));
+  if (params.ip_port < 0)
   {
-    std::stringstream ss;
-    ss << buffer_->substr(this->index, this->width);
-    ss >> std::hex >> field;
-    field += offset_;
+    ROS_WARN_STREAM("Invalid port! Using: " << params.ip_port);
   }
+  else
+  {
+    params.ip_port = static_cast<unsigned int>(port);
+  }
+  nh.getParam("max_range", params.max_range);
+  nh.getParam("min_range", params.max_range);
+  double time_offset_sec = 0;
+  nh.getParam("time_offset", time_offset_sec);
+  params.time_offset = ros::Duration(time_offset_sec);
 
-private:
-  /**
-   * @brief Pointer to buffer
-   */
-  const std::string* buffer_;
-  /**
-   * @brief Index of the field in the buffer
-   */
-  const uint8_t index;
-  /**
-   * @brief Custom offset that need to be added into the field
-   */
-  const uint8_t offset_;
-  /**
-   * @brief Size of the field in the buffer in bytes
-   */
-  const uint8_t width;
-};
-/**
- * @brief Usefull macro to declare an accessor.
- */
-#define VISITOR_MEMBER(struct_name, field) Visitor<decltype(struct_name::field), offsetof(struct_name, field)> field
+  double reconfig_timeout = params.reconfiguration_timeout.toSec();
+  if (nh.param("reconfiguration_timeout", reconfig_timeout, reconfig_timeout))
+  {
+    params.reconfiguration_timeout = ros::Duration(reconfig_timeout);
+  }
+  nh.getParam("topic", params.scan_topic);
 
-#endif /* INCLUDE_URG_NODE_VISITOR_H_ */
+  nh.getParam("provide_laser_status_service", params.provide_laser_status_service);
+  nh.getParam("request_status_service", params.request_status_service);
+  nh.getParam("range_offset", params.range_offset);
+
+  return params;
+}
+
+}  // namespace uam
