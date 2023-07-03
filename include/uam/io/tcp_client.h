@@ -160,7 +160,6 @@ public:
     // in progress.
     asyncReadData();
     stopped_ = false;
-    stop_requested_ = false;
     return true;
   }
 
@@ -295,11 +294,6 @@ private:
    * @brief State of the async read task
    */
   std::atomic_bool stopped_;
-
-  /**
-   * @brief Request stop to the async read task
-   */
-  std::atomic_bool stop_requested_;
 };
 
 }  // namespace uam

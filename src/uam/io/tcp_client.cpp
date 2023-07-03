@@ -52,8 +52,7 @@ TcpClient::TcpClient(OnNewDataCallback callback) :
   io_service_(std::make_shared<boost::asio::io_service>()),
   socket_(*io_service_),
   callback_(callback),
-  stopped_(true),
-  stop_requested_(false)
+  stopped_(true)
 {
   // Add a fake task to the io_service to prevent it from exiting until desired
   io_work_ = std::make_unique<boost::asio::io_service::work>(*io_service_);
@@ -67,8 +66,7 @@ TcpClient::TcpClient(OnNewDataCallback callback, std::shared_ptr<boost::asio::io
   io_service_(external_context),
   socket_(*io_service_),
   callback_(callback),
-  stopped_(true),
-  stop_requested_(false)
+  stopped_(true)
 {
 }
 
@@ -95,6 +93,8 @@ void TcpClient::disconnect()
         ROS_WARN_STREAM("Failed to close socket. " << error_code.message());
       }
     }
+    // Clear async read flag
+    stopped_ = true;
   }
 }
 
@@ -160,7 +160,7 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
 
 void TcpClient::asyncReadData(const size_t packet_offset)
 {
-  if (!connected_ || stop_requested_)
+  if (!connected_)
   {
     stopped_ = true;
     return;
