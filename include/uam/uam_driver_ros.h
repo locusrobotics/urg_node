@@ -127,6 +127,18 @@ private:
         params_changed_ = false;
       }
     }
+
+    // Update status
+    updateStatus(reply.sensing_data);
+
+    if (reply.sensing_data.lockout_state)
+    {
+      // According to the documentation, when the sensor gets into lockout state
+      // it will keep sending pointcloud but the measurement values are not updated.
+      ROS_WARN_STREAM_THROTTLE(5.0, "Sensor is in lockout state, skipping scan readings!");
+      return;
+    }
+
     // Fill scan metadata and header
     sensor_msgs::LaserScan msg;
     msg.header.frame_id = params_.frame_id;
@@ -142,8 +154,6 @@ private:
 
     // Read the right fields
     fillScanMessageData(reply, range_offset, msg);
-    // Update status
-    updateStatus(reply.sensing_data);
     scan_publisher_.publish(msg);
   }
 
