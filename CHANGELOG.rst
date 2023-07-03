@@ -2,8 +2,8 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.3 (2023-07-03)
+------------------
 * Rst 7631 rst 7563 backport (`#15 <https://github.com/locusrobotics/urg_node/issues/15>`_)
   * Add guard for lockout state (`#13 <https://github.com/locusrobotics/urg_node/issues/13>`_)
   * bugfix: clear async read flag if we disconnect (`#14 <https://github.com/locusrobotics/urg_node/issues/14>`_)
