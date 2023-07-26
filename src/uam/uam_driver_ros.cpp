@@ -224,6 +224,7 @@ bool UamROS::configure()
     ROS_INFO_STREAM("Sensor details: " << version_details);
     updateStatus(lidar_.getSensorStatus(), true);
 
+    readSafetyAreas();
     lidar_.startStreaming(params_.use_intensity, params_.use_multi_echo);
     {
       std::lock_guard<std::mutex> lock(watchdog_mutex_);
@@ -307,4 +308,48 @@ void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensi
   }
 }
 
+void UamROS::readSafetyAreas()
+{
+  // Areas already read
+  if (!safety_areas_.empty())
+	  return;
+
+  auto lambda = [this](const protocol::YRCommandReply& yr) -> sensor_msgs::LaserScan
+  {
+    sensor_msgs::LaserScan msg;
+    msg.header.frame_id = params_.frame_id;
+    msg.angle_min = scan_params_.getAngleMin();
+    msg.angle_max = scan_params_.getAngleMax();
+    msg.angle_increment = scan_params_.getAngleIncrement();
+    msg.scan_time = scan_params_.getScanPeriod();
+    msg.time_increment = scan_params_.getTimeIncrement();
+    msg.range_min = scan_params_.getRangeMin();
+    msg.range_max = scan_params_.getRangeMax();
+
+    msg.ranges.reserve(yr.area_data.size());
+    for (const auto& reading : yr.area_data)
+    {
+      uam::protocol::SafetyRangeReading adjusted_val;
+      adjusted_val.v = reading;
+      msg.ranges.emplace_back(static_cast<float>(adjusted_val.s.value) / 1000.0f);
+    }
+
+    return msg;
+  };
+  for (size_t area_number = 1; area_number <= 32; area_number++)
+  {
+    for (uint16_t area_type = (uint16_t)uam::protocol::EYRAreaType::protection_1; area_type <= (uint16_t)uam::protocol::EYRAreaType::MAX;
+         area_type++)
+    {
+      dummy_publishers_[area_number][(uam::protocol::EYRAreaType)area_type] = ros::NodeHandle("~").advertise<sensor_msgs::LaserScan>("safety/area_" + std::to_string(area_number) + "/" + std::to_string(area_type), 1, true);
+      ROS_INFO_STREAM("Reading: " << area_number << " area_type " << (int)(area_type));
+      auto yr_area = lidar_.getSafetyArea((uam::protocol::EYRAreaType)(area_type), area_number, 0, uam::protocol::c_nr_ranges);
+      if (yr_area.has_value())
+      {
+        safety_areas_[area_number][(uam::protocol::EYRAreaType)area_type] = lambda(*yr_area);
+        dummy_publishers_[area_number][(uam::protocol::EYRAreaType)area_type].publish(safety_areas_[area_number][(uam::protocol::EYRAreaType)area_type]);
+      }
+    }
+  }
+}
 }  // namespace uam

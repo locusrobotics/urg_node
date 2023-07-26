@@ -718,7 +718,7 @@ struct YRCommandRequest
 struct YRCommandReply
 {
   YRCommandReplyHeader header;
-  std::array<uint32_t, 1080> area_data;
+  std::array<uint32_t, c_nr_ranges> area_data;
   CommandFooter footer;
 };
 #pragma pack()
