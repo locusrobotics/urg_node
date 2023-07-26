@@ -246,10 +246,8 @@ std::optional<protocol::YRCommandReply> UamDriver::getSafetyArea(
   const uint32_t end_step)
 {
   // TODO(cribeirmendes): Should we support async send?
-  if (isTheSensorStreaming())
-  {
-    this->stopStreaming();
-  }
+  if (client_.isStopped())
+    client_.startAsyncReadTask();
 
   const uint16_t adjusted_area_number = area_number == 0 ? area_number : area_number - 1;
   const uint32_t adjusted_start_step = start_step == 0 ? start_step : start_step - 1;

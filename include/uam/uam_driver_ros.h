@@ -48,7 +48,7 @@
 #include <limits>
 #include <mutex>
 #include <string>
-
+#include <optional>
 namespace uam
 {
 class UamROS
@@ -223,6 +223,8 @@ private:
    */
   void updateStatus(const protocol::sensing_data::SensingDataHeader& sensing_data, const bool override_check = false);
 
+
+  void readSafetyAreas();
 private:
   /**
    * \defgroup Lidar communication Section
@@ -360,6 +362,9 @@ private:
   std::atomic_bool publish_status_requested_;
 
   /**@}*/
+
+  std::map<size_t, std::map<uam::protocol::EYRAreaType,sensor_msgs::LaserScan>> safety_areas_;
+  std::map<size_t, std::map<uam::protocol::EYRAreaType, ros::Publisher>> dummy_publishers_;
 };
 
 }  // namespace uam
