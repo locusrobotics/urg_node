@@ -223,7 +223,7 @@ private:
    *
    * This will handle the initial packet filtering. Once we validated that
    * the sequence of bytes might form a valid packet, we create a new async
-   * read task to get the reamining bytes.
+   * read task to get the remaining bytes.
    *
    * @param[in] error_code - Error Code
    * @param[in] bytes_transferred - Number of bytes written into the buffer
