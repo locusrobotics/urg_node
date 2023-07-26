@@ -132,7 +132,7 @@ public:
     if (status != std::future_status::ready)
     {
       // we are not expecting this to happen too often, no need to throttle this warning.
-      ROS_WARN_STREAM("Send command timed out...");
+      ROS_WARN_STREAM("Failed sending command " << command << " : " << status == std::future_status::timeout ? "timeout" : "deferred");
       return false;
     }
     return (send_length.get() == command.size());

@@ -73,6 +73,15 @@ TcpClient::TcpClient(OnNewDataCallback callback, std::shared_ptr<boost::asio::io
 TcpClient::~TcpClient()
 {
   this->disconnect();
+  if (io_service_owner_)
+  {
+	  io_work_.reset();
+	  // Wait for the io thread to terminate cleanly
+	  if (io_thread_.joinable())
+	  {
+	    io_thread_.join();
+	  }
+  }
 }
 
 void TcpClient::disconnect()
