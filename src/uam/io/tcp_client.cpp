@@ -191,17 +191,20 @@ void TcpClient::asyncReadData(const size_t packet_offset)
 
 void TcpClient::handlePacket(const boost::system::error_code& error_code, size_t bytes_transferred,const size_t missing_read, const ros::Time& stamp)
 {
-  if (!connected_)
+  if (error_code)
   {
-    stopped_ = true;
-    return;
+    // "operation_aborted" errors will occur if the socket is closed for any reason. Don't spam the logs with expected
+    // error conditions.
+    if (connected_ || error_code != boost::asio::error::operation_aborted)
+    {
+      ROS_ERROR_STREAM("Error receiving lidar message. " << error_code.message());
+    }
   }
-
-  if (error_code || bytes_transferred != missing_read)
+  else if (bytes_transferred != missing_read)
   {
     ROS_WARN_STREAM(
-      "Failed to read: " << error_code.message() << " Received " << bytes_transferred << "bytes\n"
-                         << "Expected " << missing_read << " bytes");
+      "Failed to read missing bytes. Received " << bytes_transferred << "bytes\n"
+                                                << "Expected " << missing_read << " bytes");
   }
   else
   {
