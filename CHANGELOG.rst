@@ -2,6 +2,19 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Rst 7779 uam command timeout issue (`#16 <https://github.com/locusrobotics/urg_node/issues/16>`_)
+  * Added debug information, fix destrutor if io contex owner
+  * Moved missing read bytes to async read
+  * Added new check in handlePacket for aborted
+  * fix lint
+  * Update include/uam/io/tcp_client.h
+  Co-authored-by: Stephen Williams <stephen.vincent.williams@gmail.com>
+  ---------
+  Co-authored-by: Stephen Williams <stephen.vincent.williams@gmail.com>
+* Contributors: Carlos Mendes
+
 0.6.3 (2023-07-03)
 ------------------
 * Rst 7631 rst 7563 backport (`#15 <https://github.com/locusrobotics/urg_node/issues/15>`_)
