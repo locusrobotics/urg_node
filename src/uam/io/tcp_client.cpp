@@ -75,12 +75,12 @@ TcpClient::~TcpClient()
   this->disconnect();
   if (io_service_owner_)
   {
-	  io_work_.reset();
-	  // Wait for the io thread to terminate cleanly
-	  if (io_thread_.joinable())
-	  {
-	    io_thread_.join();
-	  }
+    io_work_.reset();
+    // Wait for the io thread to terminate cleanly
+    if (io_thread_.joinable())
+    {
+      io_thread_.join();
+    }
   }
 }
 
@@ -189,7 +189,11 @@ void TcpClient::asyncReadData(const size_t packet_offset)
       boost::asio::placeholders::bytes_transferred));
 }
 
-void TcpClient::handlePacket(const boost::system::error_code& error_code, size_t bytes_transferred,const size_t missing_read, const ros::Time& stamp)
+void TcpClient::handlePacket(
+  const boost::system::error_code& error_code,
+  size_t bytes_transferred,
+  const size_t missing_read,
+  const ros::Time& stamp)
 {
   if (error_code)
   {
@@ -250,7 +254,7 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
 
       if (valid_expected_size)
       {
-    	// Add an async read task to read the rest of the packet
+        // Add an async read task to read the rest of the packet
         boost::system::error_code new_error_code;
         auto missing_read = expected_total_size - bytes_transferred;
         boost::asio::async_read(
@@ -262,7 +266,8 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
             this,
             boost::asio::placeholders::error,
             boost::asio::placeholders::bytes_transferred,
-            missing_read, stamp));
+            missing_read,
+            stamp));
         return;
       }
       else

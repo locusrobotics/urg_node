@@ -121,9 +121,7 @@ public:
    *
    * @return true if command successfully sent, false otherwise.
    */
-  inline bool asyncSend(
-    const std::string& command,
-    const std::chrono::seconds timeout = std::chrono::seconds(5))
+  inline bool asyncSend(const std::string& command, const std::chrono::seconds timeout = std::chrono::seconds(5))
   {
     if (!connected_)
       return false;
@@ -132,7 +130,9 @@ public:
     if (status != std::future_status::ready)
     {
       // we are not expecting this to happen too often, no need to throttle this warning.
-      ROS_WARN_STREAM("Failed sending command " << command << " : " << (status == std::future_status::timeout ? "timeout" : "deferred"));
+      ROS_WARN_STREAM(
+        "Failed sending command " << command << " : "
+                                  << (status == std::future_status::timeout ? "timeout" : "deferred"));
       return false;
     }
     return (send_length.get() == command.size());
@@ -201,7 +201,7 @@ public:
           line.clear();
         }
         handler(reply);
-      });  //NOLINT
+      });  // NOLINT
 
     return;
   }
@@ -220,7 +220,7 @@ private:
 
   /**
    * @brief Receive handler for initial async read
-   * 
+   *
    * This will handle the initial packet filtering. Once we validated that
    * the sequence of bytes might form a valid packet, we create a new async
    * read task to get the reamining bytes.
@@ -229,7 +229,7 @@ private:
    * @param[in] bytes_transferred - Number of bytes written into the buffer
    */
   void handleReceive(const boost::system::error_code& error_code, size_t bytes_transferred);
-  
+
   /**
    * @brief Receive handler for Async read
    *
@@ -238,7 +238,11 @@ private:
    * @param[in] missing_read - Missing read bytes to complete packet
    * @param[in] stamp - Stamp from the packet header reception
    */
-  void handlePacket(const boost::system::error_code& error_code, size_t bytes_transferred, const size_t missing_read, const ros::Time& stamp);
+  void handlePacket(
+    const boost::system::error_code& error_code,
+    size_t bytes_transferred,
+    const size_t missing_read,
+    const ros::Time& stamp);
 
 private:
   /**
