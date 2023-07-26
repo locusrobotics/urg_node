@@ -2,8 +2,8 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.4 (2023-07-26)
+------------------
 * Rst 7779 uam command timeout issue (`#16 <https://github.com/locusrobotics/urg_node/issues/16>`_)
   * Added debug information, fix destrutor if io contex owner
   * Moved missing read bytes to async read
