@@ -73,6 +73,15 @@ TcpClient::TcpClient(OnNewDataCallback callback, std::shared_ptr<boost::asio::io
 TcpClient::~TcpClient()
 {
   this->disconnect();
+  if (io_service_owner_)
+  {
+    io_work_.reset();
+    // Wait for the io thread to terminate cleanly
+    if (io_thread_.joinable())
+    {
+      io_thread_.join();
+    }
+  }
 }
 
 void TcpClient::disconnect()
@@ -180,10 +189,38 @@ void TcpClient::asyncReadData(const size_t packet_offset)
       boost::asio::placeholders::bytes_transferred));
 }
 
+void TcpClient::handlePacket(
+  const boost::system::error_code& error_code,
+  size_t bytes_transferred,
+  const size_t missing_read,
+  const ros::Time& stamp)
+{
+  if (error_code)
+  {
+    // "operation_aborted" errors will occur if the socket is closed for any reason. Don't spam the logs with expected
+    // error conditions.
+    if (connected_ || error_code != boost::asio::error::operation_aborted)
+    {
+      ROS_ERROR_STREAM("Error receiving lidar message. " << error_code.message());
+    }
+  }
+  else if (bytes_transferred != missing_read)
+  {
+    ROS_WARN_STREAM(
+      "Failed to read missing bytes. Received " << bytes_transferred << "bytes\n"
+                                                << "Expected " << missing_read << " bytes");
+  }
+  else
+  {
+    callback_(receive_buffer_, stamp);
+  }
+  // Resume async read
+  asyncReadData();
+}
+
 void TcpClient::handleReceive(const boost::system::error_code& error_code, size_t bytes_transferred)
 {
   // Grab a packet received time as soon as possible
-  auto received_stamp = ros::Time::now();
   size_t packet_offset = 0;
 
   if (error_code)
@@ -217,23 +254,21 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
 
       if (valid_expected_size)
       {
+        // Add an async read task to read the rest of the packet
         boost::system::error_code new_error_code;
         auto missing_read = expected_total_size - bytes_transferred;
-        auto recv_bytes = boost::asio::read(
+        boost::asio::async_read(
           socket_,
           boost::asio::buffer(receive_buffer_.getRawPacket().data() + bytes_transferred, missing_read),
           boost::asio::transfer_exactly(missing_read),
-          new_error_code);
-        if (new_error_code || recv_bytes != missing_read)
-        {
-          ROS_WARN_STREAM(
-            "Failed to read: " << new_error_code.message() << " Received " << recv_bytes << "bytes\n"
-                               << "Expected " << expected_total_size << " bytes");
-        }
-        else
-        {
-          callback_(receive_buffer_, stamp);
-        }
+          boost::bind(
+            &TcpClient::handlePacket,
+            this,
+            boost::asio::placeholders::error,
+            boost::asio::placeholders::bytes_transferred,
+            missing_read,
+            stamp));
+        return;
       }
       else
       {
@@ -242,7 +277,7 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
     }
     else
     {
-      ROS_WARN_STREAM("Packet was received but could not make sense of them, skipping it.");
+      ROS_WARN_STREAM("Packet was received but could not make sense of it, skipping it.");
     }
   }
   asyncReadData(packet_offset);
