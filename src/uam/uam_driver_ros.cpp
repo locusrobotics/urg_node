@@ -55,7 +55,7 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   node_handle_(nh),
   private_node_handle_(nh_prv),
   publish_status_requested_(false),
-  params_changed_(true)
+  params_changed_(false)
 {
   scan_publisher_ = node_handle_.advertise<sensor_msgs::LaserScan>(params.scan_topic, 1);
   status_on_request_publisher_ = node_handle_.advertise<urg_node::Status>(params.status_topic, 1, true);
@@ -210,7 +210,14 @@ bool UamROS::configure()
 
     // TODO(cribeiromendes): make scip commands work seamlessly. Right now we
     // need to ask this before starting continuous async reads
+
+    // At this point the receiver thread is not yet running, so we can safely
+    // write into scan_params
     scan_params_ = lidar_.getScanDetails();
+    // Since the spinner is running this method and is also the responsible to
+    // run the reconfigure callback, we can safely access params_ without mutex
+    scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
+
     // Set the reconfigure limits after fetching scan details
     updateReconfigureLimits();
     auto version_details = lidar_.getVersionDetails();
