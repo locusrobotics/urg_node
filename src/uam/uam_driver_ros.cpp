@@ -55,7 +55,7 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   node_handle_(nh),
   private_node_handle_(nh_prv),
   publish_status_requested_(false),
-  params_changed_(false)
+  params_changed_(true)
 {
   scan_publisher_ = node_handle_.advertise<sensor_msgs::LaserScan>(params.scan_topic, 1);
   status_on_request_publisher_ = node_handle_.advertise<urg_node::Status>(params.status_topic, 1, true);
