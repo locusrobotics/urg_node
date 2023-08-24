@@ -78,6 +78,32 @@ constexpr bool tupleContains()
   return containsSequence<NewType, Tuple>(std::make_index_sequence<std::tuple_size<Tuple>::value>());
 }
 
+// TODO(cribeiromendes): With c++ 20 we can drop the following lines.
+// Taken from: https://en.cppreference.com/w/cpp/experimental/is_detected
+namespace detail
+{
+template <class Default, class AlwaysVoid, template <class...> class Op, class... Args>
+struct detector
+{
+  using value_t = std::false_type;
+  using type = Default;
+};
+
+template <class Default, template <class...> class Op, class... Args>
+struct detector<Default, std::void_t<Op<Args...>>, Op, Args...>
+{
+  using value_t = std::true_type;
+  using type = Op<Args...>;
+};
+
+}  // namespace detail
+
+struct nonesuch
+{
+};
+
+template <template <class...> class Op, class... Args>
+using is_detected = typename detail::detector<nonesuch, void, Op, Args...>::value_t;
 }  // namespace uam
 
 #endif  // UAM_TYPE_TRAITS_H
