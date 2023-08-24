@@ -214,7 +214,7 @@ bool UamROS::configure()
     // At this point the receiver thread is not yet running, so we can safely
     // write into scan_params
     scan_params_ = lidar_.getScanDetails();
-    // Since the spinner is running this method and is also the responsible to
+    // Since the spinner is running this method and is also responsible to
     // run the reconfigure callback, we can safely access params_ without mutex
     scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
 
