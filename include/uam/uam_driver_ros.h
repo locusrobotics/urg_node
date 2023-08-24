@@ -36,13 +36,16 @@
 #define UAM_UAM_DRIVER_ROS_H
 
 #include <dynamic_reconfigure/server.h>
+#include <sensor_msgs/LaserScan.h>
 #include <ros/callback_queue.h>
 #include <std_srvs/Trigger.h>
 #include <uam/uam_driver.h>
 #include <uam/uam_driver_ros_params.h>
 #include <urg_node/URGConfig.h>
+#include <uam/type_traits.h>
 
 #include <atomic>
+#include <limits>
 #include <mutex>
 #include <string>
 
@@ -50,6 +53,12 @@ namespace uam
 {
 class UamROS
 {
+  /**
+   * @brief Alias to validate if a given type has intensities field.
+   */
+  template <typename T>
+  using detected_intensities = decltype(T::intensities);
+
 public:
   /**
    * @brief Constructor
@@ -88,19 +97,6 @@ private:
    * @param[in] level - Level
    */
   bool dynamicReconfigureCallback(urg_node::URGConfig& config, int level);
-
-  /**
-   * @brief Fill laser scan ros message
-   *
-   * @param[in] scan_packet - Incoming scan packet
-   * @param[in] range_offset - Range in meters to be added to each range reading
-   * @param[in/out] scan - scan ros message
-   */
-  template <typename T>
-  void fillScanMessageData(const T& scan_packet, const double range_offset, sensor_msgs::LaserScan& scan) const
-  {
-    ROS_WARN_STREAM("Handler not implemented!");
-  }
 
   /**
    * @brief Scan callback packet callback
@@ -152,8 +148,51 @@ private:
 
     msg.header.stamp = wall_time + time_offset + ros::Duration(scan_params_.getAngularTimeOffset());
 
-    // Read the right fields
-    fillScanMessageData(reply, range_offset, msg);
+    // First and last steps
+    auto first_step = scan_params_.getFirstStep();
+    auto last_step = scan_params_.getLastStep();
+
+    const auto number_of_readings = last_step - first_step + 1;
+
+    if (reply.ranges.size() < number_of_readings)
+    {
+      ROS_ERROR_STREAM(
+        "Unexpected outcome: " << reply.ranges.size() << ", first and last_step are " << first_step << ", "
+                               << last_step);
+      return;
+    }
+
+
+    msg.ranges.reserve(number_of_readings);
+    std::transform(
+      reply.ranges.begin() + first_step,
+      reply.ranges.begin() + last_step,
+      std::back_inserter(msg.ranges),
+      [&range_offset](const auto& range)
+    {
+      // According to the doc:
+      // 1. Values more than 40000 are error code (0xFFFF).
+      // 2. If object is not detected value will be 65534 (0xFFFE)
+      // 3. If object is at a very close range the value will be 65533 (0xFFFD).
+      // 4. When the device is in laser off state the value will be 65532 (0xFFFC)
+      return (range != 0 && range < 0xFFFC) ? static_cast<float>(range_offset) + static_cast<float>(range) / 1000.0f :
+                                            std::numeric_limits<float>::quiet_NaN();
+    }
+    ); // NOLINT 
+
+    if constexpr (is_detected<detected_intensities, T>::value)
+    {
+      msg.intensities.reserve(number_of_readings);
+      std::copy(
+        reply.intensities.begin() + first_step,
+        reply.intensities.begin() + last_step,
+        std::back_inserter(msg.intensities));
+    }
+    else
+    {
+      // else is required by the if constexpr
+    }
+
     scan_publisher_.publish(msg);
   }
 
