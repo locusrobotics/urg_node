@@ -154,14 +154,11 @@ private:
 
     const auto number_of_readings = last_step - first_step + 1;
 
-    if (reply.ranges.size() < number_of_readings)
+    if (reply.ranges.size() <= last_step)
     {
-      ROS_ERROR_STREAM(
-        "Unexpected outcome: " << reply.ranges.size() << ", first and last_step are " << first_step << ", "
-                               << last_step);
+      ROS_ERROR_STREAM("Unexpected outcome: " << reply.ranges.size() << " and last_step is " << last_step);
       return;
     }
-
 
     msg.ranges.reserve(number_of_readings);
     std::transform(
