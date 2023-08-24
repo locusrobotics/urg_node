@@ -210,7 +210,14 @@ bool UamROS::configure()
 
     // TODO(cribeiromendes): make scip commands work seamlessly. Right now we
     // need to ask this before starting continuous async reads
+
+    // At this point the receiver thread is not yet running, so we can safely
+    // write into scan_params
     scan_params_ = lidar_.getScanDetails();
+    // Since the spinner is running this method and is also responsible to
+    // run the reconfigure callback, we can safely access params_ without mutex
+    scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
+
     // Set the reconfigure limits after fetching scan details
     updateReconfigureLimits();
     auto version_details = lidar_.getVersionDetails();
@@ -233,85 +240,6 @@ bool UamROS::configure()
     configured_ = false;
   }
   return configured_;
-}
-
-template <>
-void UamROS::fillScanMessageData(
-  const protocol::AR01CommandReply& reply,
-  const double range_offset,
-  sensor_msgs::LaserScan& scan) const
-{
-  scan.ranges.resize(reply.ranges.size());
-  scan.intensities.resize(reply.intensities.size());
-
-  // Filter out steps
-  auto first_step = scan_params_.getFirstStep();
-  auto last_step = scan_params_.getLastStep();
-
-  if (reply.ranges.size() <= last_step)
-  {
-    ROS_ERROR_STREAM("Unexpected outcome: " << reply.ranges.size() << " and last_step is " << last_step);
-    return;
-  }
-
-  for (size_t i = first_step; i <= last_step; i++)
-  {
-    auto& range = reply.ranges[i];
-    auto& intensity = reply.intensities[i];
-
-    // According to the doc:
-    // 1. Values more than 40000 are error code (0xFFFF).
-    // 2. If object is not detected value will be 65534 (0xFFFE)
-    // 3. If object is at a very close range the value will be 65533 (0xFFFD).
-    // 4. When the device is in laser off state the value will be 65532 (0xFFFC)
-    if (range != 0 && range < 0xFFFC)
-    {
-      scan.ranges[i] = range_offset + static_cast<float>(reply.ranges[i]) / 1000.0f;
-      scan.intensities[i] = reply.intensities[i];
-    }
-    else
-    {
-      scan.ranges[i] = std::numeric_limits<float>::quiet_NaN();
-    }
-  }
-}
-
-template <>
-void UamROS::fillScanMessageData(
-  const protocol::AR00CommandReply& reply,
-  const double range_offset,
-  sensor_msgs::LaserScan& scan) const
-{
-  scan.ranges.resize(reply.ranges.size());
-
-  // Filter out steps
-  auto first_step = scan_params_.getFirstStep();
-  auto last_step = scan_params_.getLastStep();
-
-  if (reply.ranges.size() <= last_step)
-  {
-    ROS_ERROR_STREAM("Unexpected outcome: " << reply.ranges.size() << " and last_step is " << last_step);
-    return;
-  }
-
-  for (size_t i = first_step; i <= last_step; i++)
-  {
-    auto& range = reply.ranges[i];
-
-    // According to the doc:
-    // 1. Values more than 40000 are error code (0xFFFF).
-    // 2. If object is not detected value will be 65534 (0xFFFE)
-    // 3. If object is at a very close range the value will be 65533 (0xFFFD).
-    // 4. When the device is in laser off state the value will be 65532 (0xFFFC)
-    if (range != 0 && range < 0xFFFC)
-    {
-      scan.ranges[i] = range_offset + static_cast<float>(reply.ranges[i]) / 1000.0f;
-    }
-    else
-    {
-      scan.ranges[i] = std::numeric_limits<float>::quiet_NaN();
-    }
-  }
 }
 
 bool UamROS::dynamicReconfigureCallback(urg_node::URGConfig& config, int level)
