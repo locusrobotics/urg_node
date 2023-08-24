@@ -68,7 +68,7 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   configure_timer_ =
     node_handle_.createTimer(params_.reconfiguration_timeout, &UamROS::configureTimerCallback, this, true, false);
 
-  //safety_markers_pub_ = private_node_handle_.advertise<visualization_msgs::Marker>("safety_violation", 10);
+  safety_markers_pub_ = private_node_handle_.advertise<visualization_msgs::Marker>("safety_violation", 10);
 
   // Advertise safety area publisher
   // Note(cribeiromendes): kept the array of publishers as input argument in case
