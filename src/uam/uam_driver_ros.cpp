@@ -44,6 +44,7 @@
 #include <limits>
 #include <mutex>
 #include <string>
+#include <utility>
 
 namespace uam
 {
@@ -71,10 +72,7 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   safety_markers_pub_ = private_node_handle_.advertise<visualization_msgs::Marker>("safety_violation", 10);
 
   // Advertise safety area publisher
-  // Note(cribeiromendes): kept the array of publishers as input argument in case
-  // we want all the safety areas available. Right now only the current safety
-  // area is going to be published
-  advertiseSafetyAreaPublishers(safety_area_publishers_);
+  advertiseSafetyAreaPublishers();
 
   // Clear the dynamic reconfigure server
   srv_.reset(new dynamic_reconfigure::Server<urg_node::URGConfig>(private_node_handle_));
@@ -108,32 +106,32 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   }
 }
 
-void UamROS::advertiseSafetyAreaPublishers(std::array<ros::Publisher, uam::protocol::EYRAreaType::MAX>& publishers)
+void UamROS::advertiseSafetyAreaPublishers()
 {
-  publishers[protocol::EYRAreaType::protection_1] =
+  safety_area_publishers_[protocol::EYRAreaType::protection_1] =
     private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/protection_1", 1, true);
-  publishers[protocol::EYRAreaType::protection_2] =
+  safety_area_publishers_[protocol::EYRAreaType::protection_2] =
     private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/protection_2", 1, true);
-  publishers[protocol::EYRAreaType::warning_1] =
+  safety_area_publishers_[protocol::EYRAreaType::warning_1] =
     private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/warning_1", 1, true);
-  publishers[protocol::EYRAreaType::warning_2] =
+  safety_area_publishers_[protocol::EYRAreaType::warning_2] =
     private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/warning_2", 1, true);
-  publishers[protocol::EYRAreaType::muting_1] =
+  safety_area_publishers_[protocol::EYRAreaType::muting_1] =
     private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/muting_1", 1, true);
-  publishers[protocol::EYRAreaType::muting_2] =
+  safety_area_publishers_[protocol::EYRAreaType::muting_2] =
     private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/muting_2", 1, true);
-  publishers[protocol::EYRAreaType::reference_center] =
+  safety_area_publishers_[protocol::EYRAreaType::reference_center] =
     private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/reference_center", 1, true);
-  publishers[protocol::EYRAreaType::reference_max] =
+  safety_area_publishers_[protocol::EYRAreaType::reference_max] =
     private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/reference_max", 1, true);
-  publishers[protocol::EYRAreaType::reference_min] =
+  safety_area_publishers_[protocol::EYRAreaType::reference_min] =
     private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/reference_min", 1, true);
 }
 
 void UamROS::publishSafetyArea(const size_t area_number)
 {
   if (safety_areas_.empty())
-	  return;
+    return;
   else if (!safety_areas_.count(area_number))
   {
     ROS_ERROR_STREAM("Cannot find requested area number in the database.");
@@ -278,6 +276,7 @@ bool UamROS::configure()
     // Read laser safety areas
     readSafetyAreas();
 
+    // Update laser status
     updateStatus(lidar_.getSensorStatus(), true);
 
     // Start streaming
@@ -370,7 +369,7 @@ void UamROS::readSafetyAreas()
 {
   // Areas already read
   if (!safety_areas_.empty())
-	  return;
+    return;
 
   ROS_INFO_STREAM("Going to read Laser Safety areas");
 
@@ -396,6 +395,7 @@ void UamROS::readSafetyAreas()
     return msg;
   };
 
+  decltype(safety_areas_) cached_areas;
   for (size_t area_number = 1; area_number <= protocol::c_max_safety_area_index; area_number++)
   {
     for (uint16_t area_type = static_cast<uint16_t>(protocol::EYRAreaType::protection_1);
@@ -409,10 +409,12 @@ void UamROS::readSafetyAreas()
         uam::protocol::c_nr_ranges);
       if (yr_area.has_value())
       {
-        safety_areas_[area_number][static_cast<uam::protocol::EYRAreaType>(area_type)] = toScan(*yr_area);
+        cached_areas[area_number][static_cast<uam::protocol::EYRAreaType>(area_type)] = toScan(*yr_area);
       }
     }
   }
+  // We got the complete list of areas, swap
+  std::swap(cached_areas, safety_areas_);
   ROS_INFO_STREAM("Done reading Laser Safety areas.");
 }
 }  // namespace uam
