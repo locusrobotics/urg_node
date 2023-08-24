@@ -166,7 +166,7 @@ private:
     msg.ranges.reserve(number_of_readings);
     std::transform(
       reply.ranges.begin() + first_step,
-      reply.ranges.begin() + last_step,
+      reply.ranges.begin() + last_step + 1,
       std::back_inserter(msg.ranges),
       [&range_offset](const auto& range)
     {
@@ -185,7 +185,7 @@ private:
       msg.intensities.reserve(number_of_readings);
       std::copy(
         reply.intensities.begin() + first_step,
-        reply.intensities.begin() + last_step,
+        reply.intensities.begin() + last_step + 1,
         std::back_inserter(msg.intensities));
     }
     else
