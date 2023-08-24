@@ -43,6 +43,7 @@
 #include <uam/uam_driver_ros_params.h>
 #include <urg_node/URGConfig.h>
 #include <uam/type_traits.h>
+#include <visualization_msgs/Marker.h>
 
 #include <atomic>
 #include <limits>
@@ -190,9 +191,20 @@ private:
       // else is required by the if constexpr
     }
 
+//    if (!safety_areas_.empty() && safety_markers_pub_.getNumSubscribers())
+//    {
+//      if (
+//        safety_areas_.count(reply.sensing_data.area_number) &&
+//        safety_areas_.at(reply.sensing_data.area_number).count(protocol::EYRAreaType::warning_2))
+//      {
+//        publishWarningMarkers(reply, safety_areas_.at(reply.sensing_data.area_number).at(protocol::EYRAreaType::warning_2));
+//      }
+//    }
+
     scan_publisher_.publish(msg);
   }
 
+  //ros::Publisher safety_markers_pub_;
   /**
    * @brief Request status service callback
    *
@@ -221,7 +233,85 @@ private:
   void updateStatus(const protocol::sensing_data::SensingDataHeader& sensing_data, const bool override_check = false);
 
 
+  void advertiseSafetyAreaPublishers(std::array<ros::Publisher, uam::protocol::EYRAreaType::MAX>& publishers);
+  void publishSafetyArea(const size_t area_number);
+
   void readSafetyAreas();
+//  struct LaserScanCachedLookup
+//      {
+//        float scan_angle_min { std::numeric_limits<float>::max() };
+//        float scan_angle_max { std::numeric_limits<float>::lowest() };
+//        float scan_angle_increment { std::numeric_limits<float>::lowest() };
+//        std::vector<float> sin_lookup;
+//        std::vector<float> cos_lookup;
+//      };
+//  template <typename T>
+//  void publishWarningMarkers(const T& packet, const sensor_msgs::LaserScan& safety_area)
+//  {
+//    auto getLut = [this](const ScanParameters& scan_params, const T& packet)
+//    {
+//      LaserScanCachedLookup lut;
+//      lut.scan_angle_min = scan_params_.getAngleMinLimit();
+//      lut.scan_angle_max = scan_params_.getAngleMaxLimit();
+//      lut.scan_angle_increment = scan_params_.getAngleIncrement();
+//
+//      lut.sin_lookup.clear();
+//      lut.cos_lookup.clear();
+//
+//      lut.sin_lookup.reserve(packet.ranges.size());
+//      lut.cos_lookup.reserve(packet.ranges.size());
+//
+//      for (size_t i = 0; i < packet.ranges.size(); ++i)
+//      {
+//        const float angle = lut.scan_angle_min + static_cast<float>(i) * lut.scan_angle_increment;
+//        lut.sin_lookup.emplace_back(::sinf(angle));
+//        lut.cos_lookup.emplace_back(::cosf(angle));
+//      }
+//      return lut;
+//    };
+//
+//    if (safety_area.ranges.size() != packet.ranges.size())
+//      return;
+//
+//    static auto cached_lookup = getLut(scan_params_, packet);
+//
+//    visualization_msgs::Marker marker;
+//    marker.header.frame_id = params_.frame_id;
+//    marker.type = visualization_msgs::Marker::LINE_LIST;
+//    marker.ns = "dtz";
+//    marker.scale.x = 0.001;
+//    marker.color.a = 1.0;
+//    marker.color.r = 1.0;
+//
+//    for (size_t idx = 0; idx < safety_area.ranges.size(); ++idx)
+//    {
+//      auto& safety_range = safety_area.ranges[idx];
+//      if (std::isnan(safety_range))
+//      {
+//        // No range for that ray
+//        continue;
+//      }
+//      auto& raw_range = packet.ranges[idx];
+//      if (raw_range != 0 && raw_range < 0xFFFC)
+//      {
+//        auto range = static_cast<float>(raw_range) / 1000.0f;
+//        if (raw_range <= safety_range)
+//        {
+//          geometry_msgs::Point pt;
+//          pt.x = 0;
+//          pt.y = 0;
+//          marker.points.push_back(pt);
+//          pt.x = static_cast<double>(range * cached_lookup.cos_lookup[idx]);
+//          pt.y = static_cast<double>(range * cached_lookup.sin_lookup[idx]);
+//          marker.points.push_back(pt);
+//        }
+//      }
+//    }
+//
+//    marker.header.stamp = ros::Time::now();
+//    safety_markers_pub_.publish(marker);
+//  }
+
 private:
   /**
    * \defgroup Lidar communication Section
@@ -360,8 +450,8 @@ private:
 
   /**@}*/
 
-  std::map<size_t, std::map<uam::protocol::EYRAreaType,sensor_msgs::LaserScan>> safety_areas_;
-  std::map<size_t, std::map<uam::protocol::EYRAreaType, ros::Publisher>> dummy_publishers_;
+  std::map<size_t, std::map<uam::protocol::EYRAreaType, sensor_msgs::LaserScan>> safety_areas_;
+  std::array<ros::Publisher, uam::protocol::EYRAreaType::MAX> safety_area_publishers_;
 };
 
 }  // namespace uam

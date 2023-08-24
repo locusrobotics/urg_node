@@ -57,7 +57,7 @@ constexpr size_t c_nr_ranges_multiecho = 2161;
 /**
  * @brief Max safety area index for this the supported fw version
  */
-constexpr uint16_t c_max_safety_area_index = 32;
+constexpr uint32_t c_max_safety_area_index = 32;
 
 
 
