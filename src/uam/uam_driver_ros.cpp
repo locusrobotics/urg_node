@@ -44,6 +44,7 @@
 #include <limits>
 #include <mutex>
 #include <string>
+#include <utility>
 
 namespace uam
 {
@@ -67,6 +68,11 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
 
   configure_timer_ =
     node_handle_.createTimer(params_.reconfiguration_timeout, &UamROS::configureTimerCallback, this, true, false);
+
+  safety_markers_pub_ = private_node_handle_.advertise<visualization_msgs::Marker>("safety_violation", 10);
+
+  // Advertise safety area publisher
+  advertiseSafetyAreaPublishers();
 
   // Clear the dynamic reconfigure server
   srv_.reset(new dynamic_reconfigure::Server<urg_node::URGConfig>(private_node_handle_));
@@ -97,6 +103,50 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   if (!configure())
   {
     configure_timer_.start();
+  }
+}
+
+void UamROS::advertiseSafetyAreaPublishers()
+{
+  safety_area_publishers_[protocol::EYRAreaType::protection_1] =
+    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/protection_1", 1, true);
+  safety_area_publishers_[protocol::EYRAreaType::protection_2] =
+    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/protection_2", 1, true);
+  safety_area_publishers_[protocol::EYRAreaType::warning_1] =
+    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/warning_1", 1, true);
+  safety_area_publishers_[protocol::EYRAreaType::warning_2] =
+    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/warning_2", 1, true);
+  safety_area_publishers_[protocol::EYRAreaType::muting_1] =
+    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/muting_1", 1, true);
+  safety_area_publishers_[protocol::EYRAreaType::muting_2] =
+    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/muting_2", 1, true);
+  safety_area_publishers_[protocol::EYRAreaType::reference_center] =
+    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/reference_center", 1, true);
+  safety_area_publishers_[protocol::EYRAreaType::reference_max] =
+    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/reference_max", 1, true);
+  safety_area_publishers_[protocol::EYRAreaType::reference_min] =
+    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/reference_min", 1, true);
+}
+
+void UamROS::publishSafetyArea(const size_t area_number)
+{
+  if (safety_areas_.empty())
+    return;
+  else if (!safety_areas_.count(area_number))
+  {
+    ROS_ERROR_STREAM("Cannot find requested area number in the database.");
+    return;
+  }
+
+  for (uint16_t area_type = static_cast<uint16_t>(protocol::EYRAreaType::protection_1);
+       area_type < static_cast<uint16_t>(uam::protocol::EYRAreaType::MAX);
+       area_type++)
+  {
+    auto message = safety_areas_.at(area_number).find(static_cast<protocol::EYRAreaType>(area_type));
+    if (message != safety_areas_.at(area_number).end())
+    {
+      safety_area_publishers_[static_cast<protocol::EYRAreaType>(area_type)].publish(message->second.second);
+    }
   }
 }
 
@@ -222,8 +272,14 @@ bool UamROS::configure()
     updateReconfigureLimits();
     auto version_details = lidar_.getVersionDetails();
     ROS_INFO_STREAM("Sensor details: " << version_details);
+
+    // Read laser safety areas
+    readSafetyAreas();
+
+    // Update laser status
     updateStatus(lidar_.getSensorStatus(), true);
 
+    // Start streaming
     lidar_.startStreaming(params_.use_intensity, params_.use_multi_echo);
     {
       std::lock_guard<std::mutex> lock(watchdog_mutex_);
@@ -298,13 +354,81 @@ void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensi
     if (on_request_status)
     {
       status_on_request_publisher_.publish(msg);
+      publishSafetyArea(sensing_data.area_number);
       publish_status_requested_ = false;
     }
     if (on_update_status)
     {
       status_on_update_publisher_.publish(msg);
+      publishSafetyArea(sensing_data.area_number);
     }
   }
 }
 
+void UamROS::readSafetyAreas()
+{
+  // Areas already read
+  if (!safety_areas_.empty())
+    return;
+
+  ROS_INFO_STREAM("Going to read Laser Safety areas");
+
+  auto toSafetyArea = [this](const protocol::YRCommandReply& yr) -> ScanWithCRC
+  {
+    sensor_msgs::LaserScan msg;
+    msg.header.frame_id = params_.frame_id;
+    msg.angle_min = scan_params_.getAngleMinLimit();
+    msg.angle_max = scan_params_.getAngleMaxLimit();
+    msg.angle_increment = scan_params_.getAngleIncrement();
+    msg.scan_time = scan_params_.getScanPeriod();
+    msg.time_increment = scan_params_.getTimeIncrement();
+    msg.range_min = scan_params_.getRangeMin();
+    msg.range_max = scan_params_.getRangeMax();
+
+    msg.ranges.reserve(yr.area_data.size());
+    std::transform(
+      yr.area_data.begin(),
+      yr.area_data.end(),
+      std::back_inserter(msg.ranges),
+      [](const auto& range)
+      { return (range < 0x7FFF) ? static_cast<float>(range) / 1000.0f : std::numeric_limits<float>::quiet_NaN(); });
+    return std::make_pair(yr.footer.crc, msg);
+  };
+
+  decltype(safety_areas_) cached_areas;
+  for (size_t area_number = 1; area_number <= protocol::c_max_safety_area_index; area_number++)
+  {
+    for (uint16_t area_type = static_cast<uint16_t>(protocol::EYRAreaType::protection_1);
+         area_type < static_cast<uint16_t>(uam::protocol::EYRAreaType::MAX);
+         area_type++)
+    {
+      auto yr_area = lidar_.getSafetyArea(
+        static_cast<uam::protocol::EYRAreaType>(area_type),
+        area_number,
+        0,
+        uam::protocol::c_nr_ranges);
+      if (yr_area.has_value())
+      {
+        cached_areas[area_number][static_cast<uam::protocol::EYRAreaType>(area_type)] = toSafetyArea(*yr_area);
+      }
+    }
+  }
+  // We got the complete list of areas, swap
+  std::swap(cached_areas, safety_areas_);
+  ROS_INFO_STREAM("Done reading Laser Safety areas.");
+  if (params_.log_safety_areas_crc)
+  {
+    std::string area_crc_array = "";
+    for (const auto& [area_number, area] : safety_areas_)
+    {
+      for (const auto& [area_type, safety_area] : area)
+      {
+        area_crc_array += std::to_string(area_number) + "," + std::to_string(static_cast<uint16_t>(area_type)) + "," +
+                          std::to_string(safety_area.first);
+      }
+      area_crc_array += ";";
+    }
+    ROS_INFO_STREAM("Safety area CRC: " << area_crc_array);
+  }
+}
 }  // namespace uam
