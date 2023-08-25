@@ -2,6 +2,29 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Rst 7977 add safety areas visualization support to uam driver (`#20 <https://github.com/locusrobotics/urg_node/issues/20>`_)
+  * Make the params flag true in the beginning to force the same path as in reconfigure
+  * reverted last change and moved the set limits to the configure method
+  * Added debug code to viz safety areas
+  * Updated viz code
+  * Debug marker test
+  * Code cleanup
+  * PR feedback and bug on the safety area angular limitis
+  * Address PR feedback and add log safety area CRC
+* Update Angle limits (`#18 <https://github.com/locusrobotics/urg_node/issues/18>`_)
+  * Make the params flag true in the beginning to force the same path as in reconfigure
+  * reverted last change and moved the set limits to the configure method
+  * Refactored scan callback
+  * Bugfix: transform last element
+  * Update src/uam/uam_driver_ros.cpp
+  Co-authored-by: Stephen Williams <stephen.vincent.williams@gmail.com>
+  * Refactored after review findings
+  ---------
+  Co-authored-by: Stephen Williams <stephen.vincent.williams@gmail.com>
+* Contributors: Carlos Mendes
+
 0.6.4 (2023-07-26)
 ------------------
 * Rst 7779 uam command timeout issue (`#16 <https://github.com/locusrobotics/urg_node/issues/16>`_)
