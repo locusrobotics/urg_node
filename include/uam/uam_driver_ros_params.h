@@ -36,6 +36,7 @@
 #define UAM_UAM_DRIVER_ROS_PARAMS_H
 
 #include <ros/node_handle.h>
+#include <uam/protocol_types/uam_protocol_types.h>
 
 #include <string>
 
@@ -139,6 +140,19 @@ public:
    * @brief The topic name where LaserScan messages will be published
    */
   std::string status_topic { "laser_status" };
+
+  /**
+   * @brief The topic name where the area violating points will be published
+   * as sensor_msgs::PointCloud2
+   */
+  std::string points_in_safety_area_topic { "points_in_safety_area" };
+
+  /**
+   * @brief If a points area detected within this area, these will be published
+   * on the violating_points topic
+   */
+  std::optional<uam::protocol::EYRAreaType> reference_safety_area {std::nullopt};
+
   /**
    * @brief Additional time offset to add to the lidar timestamps to compensate for unmeasured delays
    */
