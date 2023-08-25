@@ -43,11 +43,16 @@
 #include <uam/uam_driver_ros_params.h>
 #include <urg_node/URGConfig.h>
 #include <uam/type_traits.h>
+#include <visualization_msgs/Marker.h>
 
 #include <atomic>
 #include <limits>
+#include <map>
 #include <mutex>
+#include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace uam
 {
@@ -58,6 +63,28 @@ class UamROS
    */
   template <typename T>
   using detected_intensities = decltype(T::intensities);
+
+  /**
+   * @brief Pair of CRC and safety area as laser scan
+   */
+  using ScanWithCRC = std::pair<uint32_t, sensor_msgs::LaserScan>;
+
+  /**
+   * @brief Safety Area Alias
+   */
+  using SafetyArea = std::map<uam::protocol::EYRAreaType, ScanWithCRC>;
+
+  /**
+   * @brief Laser Scan cached lookup, used to convert to cartesian coordiantes
+   */
+  struct LaserScanCachedLookup
+  {
+    float scan_angle_min { std::numeric_limits<float>::max() };
+    float scan_angle_max { std::numeric_limits<float>::lowest() };
+    float scan_angle_increment { std::numeric_limits<float>::lowest() };
+    std::vector<float> sin_lookup;
+    std::vector<float> cos_lookup;
+  };
 
 public:
   /**
@@ -190,6 +217,19 @@ private:
       // else is required by the if constexpr
     }
 
+    if (!safety_areas_.empty() && safety_markers_pub_.getNumSubscribers())
+    {
+      if (
+        safety_areas_.count(reply.sensing_data.area_number) &&
+        safety_areas_.at(reply.sensing_data.area_number).count(protocol::EYRAreaType::warning_2))
+      {
+        // Validate incoming ranges against the warning_2 area
+        publishWarningMarkers(
+          reply,
+          safety_areas_.at(reply.sensing_data.area_number).at(protocol::EYRAreaType::warning_2).second);
+      }
+    }
+
     scan_publisher_.publish(msg);
   }
 
@@ -220,6 +260,107 @@ private:
    */
   void updateStatus(const protocol::sensing_data::SensingDataHeader& sensing_data, const bool override_check = false);
 
+  /**
+   * @brief Advertise safety area type publishers
+   * @param[in] publishers - List of publishers to advertise
+   */
+  void advertiseSafetyAreaPublishers();
+
+  /**
+   * @brief Publish Safety Area scans
+   * @param[in] area_number - The lidar safety area number
+   */
+  void publishSafetyArea(const size_t area_number);
+
+  /**
+   * @brief Read Safety areas from lidar
+   */
+  void readSafetyAreas();
+
+  /**
+   * @brief Publish safety area violation markers
+   * @param[in] packet - Incoming packet
+   * @param[in] safety_area - Safety area to validate the ranges against
+   */
+  template <typename T>
+  void publishWarningMarkers(const T& packet, const sensor_msgs::LaserScan& safety_area)
+  {
+    auto getLut = [this](const ScanParameters& scan_params, const T& packet)
+    {
+      LaserScanCachedLookup lut;
+      lut.scan_angle_min = scan_params_.getAngleMinLimit();
+      lut.scan_angle_max = scan_params_.getAngleMaxLimit();
+      lut.scan_angle_increment = scan_params_.getAngleIncrement();
+
+      lut.sin_lookup.reserve(packet.ranges.size());
+      lut.cos_lookup.reserve(packet.ranges.size());
+
+      for (size_t i = 0; i < packet.ranges.size(); ++i)
+      {
+        const float angle = lut.scan_angle_min + static_cast<float>(i) * lut.scan_angle_increment;
+        lut.sin_lookup.emplace_back(::sinf(angle));
+        lut.cos_lookup.emplace_back(::cosf(angle));
+      }
+      return lut;
+    };
+
+    auto getRayMarker = [](const std::string& frame_id, const std::string& ns)
+    {
+      visualization_msgs::Marker marker;
+      marker.header.frame_id = frame_id;
+      marker.type = visualization_msgs::Marker::LINE_LIST;
+      marker.ns = ns;
+      marker.scale.x = 0.001;
+      marker.color.a = 1.0;
+      marker.color.r = 1.0;
+      return marker;
+    };
+
+    if (safety_area.ranges.size() != packet.ranges.size())
+      return;
+
+    // Cache the lookup
+    static auto cached_lookup = getLut(scan_params_, packet);
+    // Get marker
+    auto marker = getRayMarker(params_.frame_id, params_.frame_id);
+
+    for (size_t idx = 0; idx < safety_area.ranges.size(); ++idx)
+    {
+      auto& safety_range = safety_area.ranges[idx];
+      if (std::isnan(safety_range))
+      {
+        // No range for that ray
+        continue;
+      }
+      auto& raw_range = packet.ranges[idx];
+      if (raw_range != 0 && raw_range < 0xFFFC)
+      {
+        auto range = static_cast<float>(raw_range) / 1000.0f;
+        if (range <= safety_range)
+        {
+          geometry_msgs::Point pt;
+          pt.x = 0;
+          pt.y = 0;
+          marker.points.push_back(pt);
+          pt.x = static_cast<double>(range * cached_lookup.cos_lookup[idx]);
+          pt.y = static_cast<double>(range * cached_lookup.sin_lookup[idx]);
+          marker.points.push_back(pt);
+        }
+      }
+    }
+
+    if (!marker.points.empty())
+    {
+      marker.header.stamp = ros::Time::now();
+      marker.action = visualization_msgs::Marker::ADD;
+    }
+    else
+    {
+      marker.action = visualization_msgs::Marker::DELETE;
+    }
+    safety_markers_pub_.publish(marker);
+  }
+
 private:
   /**
    * \defgroup Lidar communication Section
@@ -240,6 +381,11 @@ private:
    * @brief Object to interface with the lidar
    */
   UamDriver lidar_;
+
+  /**
+   * @brief Lidar safety areas
+   */
+  std::map<size_t, SafetyArea> safety_areas_;
 
   /**@}*/
 
@@ -310,6 +456,16 @@ private:
    * @brief Configure Timer
    */
   ros::Timer configure_timer_;
+
+  /**
+   * @brief Safety Area publishers
+   */
+  std::array<ros::Publisher, uam::protocol::EYRAreaType::MAX> safety_area_publishers_;
+
+  /**
+   * @brief Safety area violation markers
+   */
+  ros::Publisher safety_markers_pub_;
 
   /**
    * @brief Dynamic reconfigure server
