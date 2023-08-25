@@ -87,7 +87,7 @@ public:
   /**
    * @brief Flag to log safety area CRC
    */
-  bool log_safety_areas_crc { false };
+  bool log_safety_areas_crc { true };
 
   /**
    * @brief The user defined maximum range of the lidar
