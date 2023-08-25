@@ -377,8 +377,8 @@ void UamROS::readSafetyAreas()
   {
     sensor_msgs::LaserScan msg;
     msg.header.frame_id = params_.frame_id;
-    msg.angle_min = scan_params_.getAngleMin();
-    msg.angle_max = scan_params_.getAngleMax();
+    msg.angle_min = scan_params_.getAngleMinLimit();
+    msg.angle_max = scan_params_.getAngleMaxLimit();
     msg.angle_increment = scan_params_.getAngleIncrement();
     msg.scan_time = scan_params_.getScanPeriod();
     msg.time_increment = scan_params_.getTimeIncrement();

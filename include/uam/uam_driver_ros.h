@@ -281,9 +281,6 @@ private:
       lut.scan_angle_max = scan_params_.getAngleMaxLimit();
       lut.scan_angle_increment = scan_params_.getAngleIncrement();
 
-      lut.sin_lookup.clear();
-      lut.cos_lookup.clear();
-
       lut.sin_lookup.reserve(packet.ranges.size());
       lut.cos_lookup.reserve(packet.ranges.size());
 
