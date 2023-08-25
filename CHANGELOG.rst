@@ -2,8 +2,8 @@
 Changelog for package urg_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.5 (2023-08-25)
+------------------
 * Rst 7977 add safety areas visualization support to uam driver (`#20 <https://github.com/locusrobotics/urg_node/issues/20>`_)
   * Make the params flag true in the beginning to force the same path as in reconfigure
   * reverted last change and moved the set limits to the configure method
