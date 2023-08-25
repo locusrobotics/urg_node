@@ -85,6 +85,11 @@ public:
   unsigned int ip_port { 10940 };
 
   /**
+   * @brief Flag to log safety area CRC
+   */
+  bool log_safety_areas_crc { false };
+
+  /**
    * @brief The user defined maximum range of the lidar
    */
   double max_range { 40.0 };

@@ -51,6 +51,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace uam
@@ -62,6 +63,16 @@ class UamROS
    */
   template <typename T>
   using detected_intensities = decltype(T::intensities);
+
+  /**
+   * @brief Pair of CRC and safety area as laser scan
+   */
+  using ScanWithCRC = std::pair<uint32_t, sensor_msgs::LaserScan>;
+
+  /**
+   * @brief Safety Area Alias
+   */
+  using SafetyArea = std::map<uam::protocol::EYRAreaType, ScanWithCRC>;
 
   /**
    * @brief Laser Scan cached lookup, used to convert to cartesian coordiantes
@@ -212,10 +223,10 @@ private:
         safety_areas_.count(reply.sensing_data.area_number) &&
         safety_areas_.at(reply.sensing_data.area_number).count(protocol::EYRAreaType::warning_2))
       {
-        // Validate incoming ranges agains the warning_2 area
+        // Validate incoming ranges against the warning_2 area
         publishWarningMarkers(
           reply,
-          safety_areas_.at(reply.sensing_data.area_number).at(protocol::EYRAreaType::warning_2));
+          safety_areas_.at(reply.sensing_data.area_number).at(protocol::EYRAreaType::warning_2).second);
       }
     }
 
@@ -374,7 +385,7 @@ private:
   /**
    * @brief Lidar safety areas
    */
-  std::map<size_t, std::map<uam::protocol::EYRAreaType, sensor_msgs::LaserScan>> safety_areas_;
+  std::map<size_t, SafetyArea> safety_areas_;
 
   /**@}*/
 

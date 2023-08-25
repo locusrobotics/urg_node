@@ -145,7 +145,7 @@ void UamROS::publishSafetyArea(const size_t area_number)
     auto message = safety_areas_.at(area_number).find(static_cast<protocol::EYRAreaType>(area_type));
     if (message != safety_areas_.at(area_number).end())
     {
-      safety_area_publishers_[static_cast<protocol::EYRAreaType>(area_type)].publish(message->second);
+      safety_area_publishers_[static_cast<protocol::EYRAreaType>(area_type)].publish(message->second.second);
     }
   }
 }
@@ -373,7 +373,7 @@ void UamROS::readSafetyAreas()
 
   ROS_INFO_STREAM("Going to read Laser Safety areas");
 
-  auto toScan = [this](const protocol::YRCommandReply& yr) -> sensor_msgs::LaserScan
+  auto toSafetyArea = [this](const protocol::YRCommandReply& yr) -> ScanWithCRC
   {
     sensor_msgs::LaserScan msg;
     msg.header.frame_id = params_.frame_id;
@@ -392,7 +392,7 @@ void UamROS::readSafetyAreas()
       std::back_inserter(msg.ranges),
       [](const auto& range)
       { return (range < 0x7FFF) ? static_cast<float>(range) / 1000.0f : std::numeric_limits<float>::quiet_NaN(); });
-    return msg;
+    return std::make_pair(yr.footer.crc, msg);
   };
 
   decltype(safety_areas_) cached_areas;
@@ -409,12 +409,26 @@ void UamROS::readSafetyAreas()
         uam::protocol::c_nr_ranges);
       if (yr_area.has_value())
       {
-        cached_areas[area_number][static_cast<uam::protocol::EYRAreaType>(area_type)] = toScan(*yr_area);
+        cached_areas[area_number][static_cast<uam::protocol::EYRAreaType>(area_type)] = toSafetyArea(*yr_area);
       }
     }
   }
   // We got the complete list of areas, swap
   std::swap(cached_areas, safety_areas_);
   ROS_INFO_STREAM("Done reading Laser Safety areas.");
+  if (params_.log_safety_areas_crc)
+  {
+    std::string area_crc_array = "";
+    for (const auto& [area_number, area] : safety_areas_)
+    {
+      for (const auto& [area_type, safety_area] : area)
+      {
+        area_crc_array += std::to_string(area_number) + "," + std::to_string(static_cast<uint16_t>(area_type)) + "," +
+                          std::to_string(safety_area.first);
+      }
+      area_crc_array += ";";
+    }
+    ROS_INFO_STREAM("Safety area CRC: " << area_crc_array);
+  }
 }
 }  // namespace uam
