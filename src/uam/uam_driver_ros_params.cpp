@@ -75,7 +75,7 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
   nh.getParam("provide_laser_status_service", params.provide_laser_status_service);
   nh.getParam("request_status_service", params.request_status_service);
   nh.getParam("range_offset", params.range_offset);
-
+  nh.getParam("log_safety_areas_crc", params.log_safety_areas_crc);
   return params;
 }
 
