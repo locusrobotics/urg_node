@@ -34,9 +34,9 @@
 
 #include <ros/callback_queue.h>
 #include <uam/uam_driver_ros.h>
-
 #include <urg_node/URGConfig.h>
-
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/point_cloud2_iterator.h>
 #include <urg_node/Status.h>
 
 #include <algorithm>
@@ -44,6 +44,7 @@
 #include <limits>
 #include <mutex>
 #include <string>
+#include <vector>
 #include <utility>
 
 namespace uam
@@ -69,7 +70,10 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   configure_timer_ =
     node_handle_.createTimer(params_.reconfiguration_timeout, &UamROS::configureTimerCallback, this, true, false);
 
-  safety_markers_pub_ = private_node_handle_.advertise<visualization_msgs::Marker>("safety_violation", 10);
+  points_in_area_pub_ =
+    private_node_handle_.advertise<sensor_msgs::PointCloud2>(params_.points_in_safety_area_topic, 10);
+  points_in_area_markers_pub_ =
+    private_node_handle_.advertise<visualization_msgs::Marker>(params_.points_in_safety_area_topic + "_markers", 10);
 
   // Advertise safety area publisher
   advertiseSafetyAreaPublishers();
@@ -318,6 +322,106 @@ bool UamROS::dynamicReconfigureCallback(urg_node::URGConfig& config, int level)
   return true;
 }
 
+void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ranges, const ros::Time& stamp)
+  {
+    auto getLut = [this](const ScanParameters& scan_params)
+    {
+      LaserScanCachedLookup lut;
+      lut.scan_angle_min = scan_params_.getAngleMinLimit();
+      lut.scan_angle_max = scan_params_.getAngleMaxLimit();
+      lut.scan_angle_increment = scan_params_.getAngleIncrement();
+
+      auto number_of_steps = scan_params_.getLastStep() - scan_params_.getFirstStep() + 1;
+      lut.sin_lookup.reserve(number_of_steps);
+      lut.cos_lookup.reserve(number_of_steps);
+
+      for (size_t i = 0; i < number_of_steps; ++i)
+      {
+        const float angle = lut.scan_angle_min + static_cast<float>(i) * lut.scan_angle_increment;
+        lut.sin_lookup.emplace_back(::sinf(angle));
+        lut.cos_lookup.emplace_back(::cosf(angle));
+      }
+      return lut;
+    };
+
+    auto buildCloudStaticFields = [](const std::string& frame_id) -> sensor_msgs::PointCloud2
+    {
+      // Fill metadata
+      sensor_msgs::PointCloud2 cloud_out;
+      cloud_out.header.frame_id = frame_id;
+      cloud_out.height = 1u;
+      cloud_out.is_bigendian = false;
+      cloud_out.is_dense = true;
+
+      // Setup fields
+      auto offset = 0;
+      offset = addPointField(cloud_out, "x", 1, sensor_msgs::PointField::FLOAT32, offset);
+      offset = addPointField(cloud_out, "y", 1, sensor_msgs::PointField::FLOAT32, offset);
+      offset = addPointField(cloud_out, "z", 1, sensor_msgs::PointField::FLOAT32, offset);
+      offset += sizeOfPointField(sensor_msgs::PointField::FLOAT32);
+      cloud_out.point_step = offset;
+      return cloud_out;
+    };
+
+    auto getRayMarker = [](const std::string& frame_id, const std::string& ns)
+    {
+      visualization_msgs::Marker marker;
+      marker.header.frame_id = frame_id;
+      marker.type = visualization_msgs::Marker::LINE_LIST;
+      marker.ns = ns;
+      marker.scale.x = 0.001;
+      marker.color.a = 1.0;
+      marker.color.r = 1.0;
+      return marker;
+    };
+
+    // Compute the Lookup table of sen and cos
+    static LaserScanCachedLookup lut = getLut(scan_params_);
+    // Get the cloud, we can re-use it and clear the points
+    static sensor_msgs::PointCloud2 cloud_out = buildCloudStaticFields(params_.frame_id);
+    cloud_out.header.stamp = stamp;
+    cloud_out.data.clear();
+    sensor_msgs::PointCloud2Modifier modifier(cloud_out);
+    cloud_out.width = ranges.size();
+    modifier.resize(ranges.size());
+
+    // Get the marker
+    auto marker = getRayMarker(params_.frame_id, params_.frame_id);
+    marker.header.stamp = stamp;
+    marker.points.reserve(ranges.size() * 2);
+
+    // Create pntcld2 iterator
+    sensor_msgs::PointCloud2Iterator<float> out_x(cloud_out, "x");
+    // Iterate over the dtz ranges
+    for (const auto& [index, range] : ranges)
+    {
+      // Get x and y for the pair index + range(m)
+      geometry_msgs::Point pt;
+      pt.x = 0;
+      pt.y = 0;
+      marker.points.emplace_back(pt);
+      pt.x = static_cast<double>(range * lut.cos_lookup[index]);
+      pt.y = static_cast<double>(range * lut.sin_lookup[index]);
+      marker.points.emplace_back(pt);
+      out_x[0] = pt.x;
+      out_x[1] = pt.y;
+      out_x[2] = 0.;
+      // Increment Pntcld counter
+      ++out_x;
+    }
+
+    if (!marker.points.empty())
+    {
+      marker.action = visualization_msgs::Marker::ADD;
+    }
+    else
+    {
+      marker.action = visualization_msgs::Marker::DELETE;
+    }
+    points_in_area_markers_pub_.publish(marker);
+    points_in_area_pub_.publish(cloud_out);
+  };
+
 void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensing_data, const bool override_check)
 {
   // We only want to compare a subset of members, so operator overload should not
@@ -392,7 +496,7 @@ void UamROS::readSafetyAreas()
       std::back_inserter(msg.ranges),
       [](const auto& range)
       { return (range < 0x7FFF) ? static_cast<float>(range) / 1000.0f : std::numeric_limits<float>::quiet_NaN(); });
-    return std::make_pair(yr.footer.crc, msg);
+    return std::make_pair(yr.footer.crc, boost::make_shared<const sensor_msgs::LaserScan>(msg));
   };
 
   decltype(safety_areas_) cached_areas;

@@ -76,6 +76,25 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
   nh.getParam("request_status_service", params.request_status_service);
   nh.getParam("range_offset", params.range_offset);
   nh.getParam("log_safety_areas_crc", params.log_safety_areas_crc);
+
+  int reference_area;
+  if (nh.getParam("reference_safety_area_type", reference_area))
+  {
+    if (
+      reference_area < static_cast<int>(protocol::EYRAreaType::protection_1) ||
+      reference_area > static_cast<int>(protocol::EYRAreaType::warning_2))
+    {
+      ROS_WARN_STREAM(
+        "Invalid Reference Area Type Detected, supported options are: "
+        "protection_1 = 0, protection_2 = 1, warning_1 = 2, warning_2 = 3. Detected: "
+        << reference_area);
+    }
+    else
+    {
+      params.reference_safety_area = static_cast<protocol::EYRAreaType>(reference_area);
+    }
+  }
+
   return params;
 }
 
