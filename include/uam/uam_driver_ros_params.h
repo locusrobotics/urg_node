@@ -148,8 +148,8 @@ public:
   std::string points_in_safety_area_topic { "points_in_safety_area" };
 
   /**
-   * @brief If a points area detected within this area, these will be published
-   * on the violating_points topic
+   * @brief If points are detected within this area, these will be published
+   * on the points_in_safety_area topic
    */
   std::optional<uam::protocol::EYRAreaType> reference_safety_area {std::nullopt};
 

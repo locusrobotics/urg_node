@@ -127,7 +127,7 @@ private:
 
   /**
    * @brief Publish points in the configured reference safety area
-   * @param ranges[in] - Pair of scan index and respective range, in meters, of the dtz points
+   * @param ranges[in] - Pair of scan index and respective range, in meters
    * @param stamp[in] - Output message stamps
    */
   void publishPointsInArea(const std::vector<std::pair<size_t, float>>& ranges, const ros::Time& stamp);

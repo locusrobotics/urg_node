@@ -44,6 +44,7 @@
 #include <limits>
 #include <mutex>
 #include <string>
+#include <vector>
 #include <utility>
 
 namespace uam
