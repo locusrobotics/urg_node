@@ -38,6 +38,7 @@
 #include <ros/node_handle.h>
 #include <uam/protocol_types/uam_protocol_types.h>
 
+#include <optional>
 #include <string>
 
 namespace uam
