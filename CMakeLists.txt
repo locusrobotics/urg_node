@@ -46,6 +46,11 @@ add_library(uam_workers
   src/uam/io/tcp_client.cpp
   )
 target_link_libraries(uam_workers ${catkin_LIBRARIES})
+
+add_library(uam_driver
+ src/uam/uam_driver.cpp)
+target_link_libraries(uam_driver uam_workers ${catkin_LIBRARIES})
+
 add_library(urg_c_wrapper src/urg_c_wrapper.cpp)
 target_link_libraries(urg_c_wrapper uam_workers ${catkin_LIBRARIES})
 
@@ -66,15 +71,19 @@ target_link_libraries(getID urg_c_wrapper ${catkin_LIBRARIES})
 add_executable (uam_driver_ros_node 
  src/uam/uam_driver_ros_params.cpp
  src/uam/uam_driver_ros_node.cpp
- src/uam/uam_driver.cpp 
  src/uam/uam_driver_ros.cpp
  )
 add_dependencies(uam_driver_ros_node ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_gencpp)
-target_link_libraries(uam_driver_ros_node uam_workers ${catkin_LIBRARIES})
+target_link_libraries(uam_driver_ros_node uam_driver ${catkin_LIBRARIES})
  
+add_executable (uam_get_configuration_id 
+ src/uam/uam_get_safety_configuration_id.cpp
+ )
+add_dependencies(uam_get_configuration_id ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_gencpp)
+target_link_libraries(uam_get_configuration_id uam_driver ${catkin_LIBRARIES})
 
 ## Mark executables and/or libraries for installation
-install(TARGETS uam_workers urg_c_wrapper urg_node urg_node_driver getID uam_driver_ros_node
+install(TARGETS uam_workers uam_driver urg_c_wrapper urg_node urg_node_driver getID uam_driver_ros_node uam_get_configuration_id
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

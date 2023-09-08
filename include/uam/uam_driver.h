@@ -233,7 +233,7 @@ public:
    * @return The serial number + sensor model + protocol version as single string
    * @throws std::exception - If the send operation fails, or a valid reply is not received
    */
-  std::string getVersionDetails();
+  protocol::VR00CommandReply getVersionDetails();
 
   /**
    * @brief Get Sensor status (using XR command)
