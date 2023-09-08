@@ -4,6 +4,7 @@ project(urg_node)
 find_package(catkin REQUIRED COMPONENTS
   diagnostic_updater dynamic_reconfigure laser_proc message_generation
   nodelet rosconsole roscpp sensor_msgs std_msgs std_srvs tf urg_c
+  json_transport
 )
 
 if(NOT CMAKE_CXX_STANDARD)
