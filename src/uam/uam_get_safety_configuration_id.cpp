@@ -38,6 +38,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
+#include <boost/crc.hpp>
 
 #include <string>
 
@@ -51,9 +52,9 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
   options.add_options()
       ("help,h",
           "produce help message")
-      ("lidar-ip", po::value<std::string>()->default_value("192.168.158.98"),
-          " The IP Address of the lidar server")
-      ("lidar-port", po::value<unsigned int>()->default_value(6543),
+      ("lidar-ip", po::value<std::string>()->required(),
+          " The IP Address of the lidar server in the form of XXX.XXX.XXX.XX")
+      ("lidar-port", po::value<unsigned int>()->default_value(10940),
           "The tcp client port number the client/robot is using to communicate with laser");
   // clang-format on
   po::variables_map args;
@@ -83,10 +84,10 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
   return args;
 }
 
-std::string readSafetyAreasCrcs(uam::UamDriver& lidar)
+std::uint32_t getSafetyAreasCRC32(uam::UamDriver& lidar)
 {
   ROS_INFO_STREAM("Going to read Laser Safety areas");
-  std::string crcs = "";
+  std::string combined_crcs = "";
   for (size_t area_number = 1; area_number <= uam::protocol::c_max_safety_area_index; area_number++)
   {
     for (uint16_t area_type = static_cast<uint16_t>(uam::protocol::EYRAreaType::protection_1);
@@ -100,13 +101,14 @@ std::string readSafetyAreasCrcs(uam::UamDriver& lidar)
         uam::protocol::c_nr_ranges);
       if (yr_area.has_value())
       {
-        crcs.append(std::to_string(yr_area->footer.crc));
+        combined_crcs.append(std::to_string(yr_area->footer.crc));
       }
     }
   }
-  // We got the complete list of areas, swap
-  ROS_INFO_STREAM("Done reading Laser Safety areas.");
-  return crcs;
+
+  boost::crc_32_type crc32;
+  crc32.process_bytes(combined_crcs.data(), combined_crcs.size());
+  return crc32.checksum();
 }
 
 template <typename T, size_t Size>
@@ -129,7 +131,7 @@ int main(int argc, char** argv)
     lidar.connect(args["lidar-ip"].as<std::string>(), args["lidar-port"].as<unsigned int>());
     // Wait for a heartbeat message to be received
     auto version_details = lidar.getVersionDetails();
-    auto safey_areas = readSafetyAreasCrcs(lidar);
+    auto safey_areas_crc32 = getSafetyAreasCRC32(lidar);
 
     // Parse the resulting heartbeat message and populate a JSON document with the results
     auto document = json_transport::json_t::object();
@@ -138,7 +140,7 @@ int main(int argc, char** argv)
       document["serial_number"] = byteArrayToString(version_details.version_details.serial_number);
       document["firmware_version"] = byteArrayToString(version_details.version_details.firmware_version);
       document["configuration_id"] = std::string("N/A");
-      document["safety_areas_crc"] = safey_areas;
+      document["safety_areas_crc32"] = safey_areas_crc32;
     }
     std::cout << document.dump(4) << std::endl;
     return EXIT_SUCCESS;

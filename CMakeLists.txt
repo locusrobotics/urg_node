@@ -27,7 +27,7 @@ generate_messages(
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES urg_c_wrapper urg_node_driver
+  LIBRARIES uam_workers uam_driver urg_c_wrapper urg_node_driver
   CATKIN_DEPENDS dynamic_reconfigure laser_proc message_runtime nodelet rosconsole
   roscpp sensor_msgs std_msgs std_srvs urg_c
   DEPENDS
