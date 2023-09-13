@@ -53,7 +53,7 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
       ("help,h",
           "produce help message")
       ("lidar-ip", po::value<std::string>()->required(),
-          " The IP Address of the lidar server in the form of XXX.XXX.XXX.XX")
+          "The IP Address of the lidar server in the form of XXX.XXX.XXX.XXX")
       ("lidar-port", po::value<unsigned int>()->default_value(10940),
           "The tcp client port number the client/robot is using to communicate with laser");
   // clang-format on
