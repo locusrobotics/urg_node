@@ -295,6 +295,22 @@ private:
    */
   void readSafetyAreas();
 
+  /**
+   * @brief Convert VR reply into single string
+   * @return VR00 reply as string
+   */
+  static inline std::string toString(const protocol::VR00CommandReply& reply)
+  {
+    return std::string(
+      "Firmware_version is: " +
+      std::string(reply.version_details.firmware_version.data(), reply.version_details.firmware_version.size()) +
+      std::string(
+        "\nSensor_model is: " +
+        std::string(reply.version_details.sensor_model.data(), reply.version_details.sensor_model.size())) +
+      std::string(
+        "\nSerial Number is: " +
+        std::string(reply.version_details.serial_number.data(), reply.version_details.serial_number.size())));
+  }
 
 private:
   /**

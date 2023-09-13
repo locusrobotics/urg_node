@@ -29,6 +29,7 @@
   <depend>std_srvs</depend>
   <depend>tf</depend>
   <depend>urg_c</depend>
+  <depend>json_transport</depend>
 
   <exec_depend>message_runtime</exec_depend>
   <exec_depend>xacro</exec_depend>
