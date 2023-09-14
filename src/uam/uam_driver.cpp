@@ -108,23 +108,13 @@ void UamDriver::disconnect()
   client_.disconnect();
 }
 
-std::string UamDriver::getVersionDetails()
+protocol::VR00CommandReply UamDriver::getVersionDetails()
 {
   if (client_.isStopped())
     client_.startAsyncReadTask();
 
   // We do not need to stop lidar cloud to get Version details
-  auto reply = sendCommandWithReply<uam::VR00Worker>(command_timeout_);
-
-  return std::string(
-    "Firmware_version is: " +
-    std::string(reply.version_details.firmware_version.data(), reply.version_details.firmware_version.size()) +
-    std::string(
-      "\nSensor_model is: " +
-      std::string(reply.version_details.sensor_model.data(), reply.version_details.sensor_model.size())) +
-    std::string(
-      "\nSerial Number is: " +
-      std::string(reply.version_details.serial_number.data(), reply.version_details.serial_number.size())));
+  return sendCommandWithReply<uam::VR00Worker>(command_timeout_);
 }
 
 protocol::sensing_data::SensingDataHeader UamDriver::getSensorStatus()

@@ -130,18 +130,34 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
   }
 
   // Open the socket
-  boost::system::error_code error_code;
-  remote_endpoint_.address().to_string();
-  socket_.connect(remote_endpoint_, error_code);
-
-  if (error_code)
   {
-    ROS_ERROR_STREAM("Failed to connect: " << error_code.message());
-    return false;
+    auto connect_future = socket_.async_connect(remote_endpoint_, boost::asio::use_future);
+    if (std::future_status::ready != connect_future.wait_for(std::chrono::seconds(5)))
+    {
+      ROS_ERROR_STREAM("Connect Timed out...");
+      boost::system::error_code error_code;
+      socket_.close(error_code);
+      ROS_ERROR_STREAM_COND(error_code, "Error while closing socket: " << error_code.message());
+      return false;
+    }
+
+    try
+    {
+      connect_future.get();
+    }
+    catch (const boost::system::system_error& error)
+    {
+      ROS_ERROR_STREAM("Failed to connect: " << error.what());
+      return false;
+    }
   }
+
+  // Set connected flag
   connected_ = true;
+
   // Set tcp no delay
   boost::asio::ip::tcp::no_delay option(true);
+  boost::system::error_code error_code;
   socket_.set_option(option, error_code);
   if (error_code)
   {

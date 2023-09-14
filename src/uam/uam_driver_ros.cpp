@@ -274,7 +274,7 @@ bool UamROS::configure()
 
     // Set the reconfigure limits after fetching scan details
     updateReconfigureLimits();
-    auto version_details = lidar_.getVersionDetails();
+    auto version_details = toString(lidar_.getVersionDetails());
     ROS_INFO_STREAM("Sensor details: " << version_details);
 
     // Read laser safety areas
