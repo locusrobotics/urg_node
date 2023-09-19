@@ -125,11 +125,7 @@ std::string getConfigurationId(uam::UamDriver& lidar)
 {
   try
   {
-    auto config = lidar.getConfigurationId();
-    std::string config_id = "";
-    config_id += byteArrayToString(config.id_1);
-    config_id += byteArrayToString(config.id_2);
-    return config_id;
+    return byteArrayToString(lidar.getConfigurationId().id_2);
   }
   catch (const std::exception& e)
   {

@@ -45,7 +45,7 @@
 namespace uam
 {
 /**
- * @brief XR00 command worker
+ * @brief ID00 command worker
  */
 class ID00Worker : public WorkerBase<ID00Worker, 'I', 'D', '0', '0', protocol::ID00CommandReply>
 {
@@ -78,7 +78,7 @@ private:
    * @brief Decode status data using raw buffer
    *
    * @param[in] buffer - Raw byte array
-   * @param[out] sensing_data - Decoded sensing data
+   * @param[out] configuration_id - Decoded configuratio id
    */
   bool decodeConfigurationID(const std::string_view& buffer,
                              protocol::configuration_details::ConfigurationID& configuration_id) const;
