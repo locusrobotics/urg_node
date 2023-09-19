@@ -177,6 +177,24 @@ struct VersionDetails
 
 }  // namespace version_details
 
+namespace configuration_details
+{
+/**
+ * @brief Configuration ID command
+ * Configuration ID1 = ID with date and IP settings
+ * Configuration ID2 = ID wihout data and IP settings
+ */
+#pragma pack(1)
+struct ConfigurationID
+{
+  using ConfigurationIDType = std::array<uint8_t, 8>;
+  ConfigurationIDType id_1;
+  ConfigurationIDType id_2;
+};
+#pragma pack()
+
+}  // namespace configuration_details
+
 /**
  * @brief Sensing Data commands (AR Commands)
  */
@@ -623,6 +641,16 @@ struct XR00CommandReply
   CommandFooter footer;
 };
 #pragma pack()
+
+#pragma pack(1)
+struct ID00CommandReply
+{
+  CommandReplyHeader header;
+  configuration_details::ConfigurationID config_id;
+  CommandFooter footer;
+};
+#pragma pack()
+
 
 /**
  * @brief Host to UAM command struct

@@ -43,6 +43,7 @@
 #include <uam/workers/sensing_data/ar06_worker.h>
 #include <uam/workers/vr00_worker.h>
 #include <uam/workers/xr00_worker.h>
+#include <uam/workers/id00_worker.h>
 #include <uam/workers/yr_worker.h>
 
 #include <string>
@@ -169,6 +170,7 @@ private:
     uam::AR08Worker,
     uam::VR00Worker,
     uam::XR00Worker,
+    uam::ID00Worker,
     uam::YRWorker>
     workers_;
 };

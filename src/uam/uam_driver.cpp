@@ -48,11 +48,13 @@ UamDriver::UamDriver() :
   command_send_timeout_(std::chrono::seconds(5)),
   subscription_mode_(ESubscriptionMode::INVALID)
 {
-  // Register command callback (VR, XR, YR)
+  // Register command callback (VR, XR, ID, YR)
   uam_packet_worker_.registerCallback<VR00Worker>(
     std::bind(&UamDriver::processCommandReply<VR00Worker::Reply>, this, std::placeholders::_1));
   uam_packet_worker_.registerCallback<XR00Worker>(
     std::bind(&UamDriver::processCommandReply<XR00Worker::Reply>, this, std::placeholders::_1));
+  uam_packet_worker_.registerCallback<ID00Worker>(
+    std::bind(&UamDriver::processCommandReply<ID00Worker::Reply>, this, std::placeholders::_1));
   uam_packet_worker_.registerCallback<YRWorker>(
     std::bind(&UamDriver::processCommandReply<YRWorker::Reply>, this, std::placeholders::_1));
   // Register command callback (ARs)
@@ -140,6 +142,19 @@ protocol::sensing_data::SensingDataHeader UamDriver::getSensorStatus()
   status.warning1_state = status_reply.data.warning1_state;
   status.warning2_state = status_reply.data.warning2_state;
   return status;
+}
+
+protocol::configuration_details::ConfigurationID UamDriver::getConfigurationId()
+{
+  if (client_.isStopped())
+    client_.startAsyncReadTask();
+
+  if (isTheSensorStreaming())
+  {
+    this->stopStreaming();
+  }
+
+  return sendCommandWithReply<uam::ID00Worker>(command_timeout_).config_id;
 }
 
 ScanParameters UamDriver::getScanDetails()
