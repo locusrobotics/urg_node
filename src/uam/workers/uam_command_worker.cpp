@@ -106,6 +106,10 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
   {
     processed_successfully = std::get<XR00Worker>(workers_).processByHandler(packet.get<XR00Worker::Reply>(), time);
   }
+  else if (std::get<ID00Worker>(workers_).validateReplyType(packet_type))
+  {
+    processed_successfully = std::get<ID00Worker>(workers_).processByHandler(packet.get<ID00Worker::Reply>(), time);
+  }
   else if (std::get<YRWorker>(workers_).validateReplyType(packet_type))
   {
     processed_successfully = std::get<YRWorker>(workers_).processByHandler(packet.get<YRWorker::Reply>());
