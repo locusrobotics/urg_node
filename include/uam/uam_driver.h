@@ -244,6 +244,17 @@ public:
   protocol::sensing_data::SensingDataHeader getSensorStatus();
 
   /**
+   * @brief Get Sensor Configuration ID (using ID command)
+   *
+   * Configuration ID is a command which might not be available for older firmware
+   * versions.
+   *
+   * @return The sensor configuration id
+   * @throws std::exception - If the send operation fails, or a valid reply is not received
+   */
+  protocol::configuration_details::ConfigurationID getConfigurationId();
+
+  /**
    * @brief Get Scan details
    *
    * @return The scan metadata required to assemble laser scan
@@ -336,6 +347,15 @@ public:
     const uint16_t area_number,
     const uint32_t start_step,
     const uint32_t end_step);
+
+  /**
+   * @brief Set command reply timeout
+   * @param[in] timeout - Timeout in seconds
+   */
+  inline void setCommandReplyTimeout(const double timeout)
+  {
+    command_timeout_ = std::chrono::duration<double>(timeout);
+  }
 
 private:
   /**
