@@ -43,6 +43,7 @@ add_library(uam_workers
   src/uam/workers/sensing_data/ar06_worker.cpp
   src/uam/workers/vr00_worker.cpp
   src/uam/workers/xr00_worker.cpp
+  src/uam/workers/id00_worker.cpp
   src/uam/workers/uam_command_worker.cpp
   src/uam/io/tcp_client.cpp
   )

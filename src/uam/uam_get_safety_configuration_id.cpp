@@ -55,7 +55,9 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
       ("lidar-ip", po::value<std::string>()->required(),
           "The IP Address of the lidar server in the form of XXX.XXX.XXX.XXX")
       ("lidar-port", po::value<unsigned int>()->default_value(10940),
-          "The tcp client port number the client/robot is using to communicate with laser");
+          "The tcp client port number the client/robot is using to communicate with laser")
+      ("timeout", po::value<double>()->default_value(10.0),
+          "Timeout in seconds to wait for sensor reply.");
   // clang-format on
   po::variables_map args;
   po::store(po::parse_command_line(argc, argv, options), args);
@@ -114,9 +116,21 @@ std::uint32_t getSafetyAreasCRC32(uam::UamDriver& lidar)
 template <typename T, size_t Size>
 std::string byteArrayToString(const std::array<T, Size>& array)
 {
-  auto output_str = std::string(array.data(), Size);
+  auto output_str = std::string(array.begin(), array.end());
   output_str.erase(std::remove_if(output_str.begin(), output_str.end(), ::isspace), output_str.end());
   return output_str;
+}
+
+std::string getConfigurationId(uam::UamDriver& lidar)
+{
+  try
+  {
+    return byteArrayToString(lidar.getConfigurationId().id_2);
+  }
+  catch (const std::exception& e)
+  {
+    return std::string("");
+  }
 }
 
 int main(int argc, char** argv)
@@ -129,8 +143,10 @@ int main(int argc, char** argv)
   {
     auto lidar = uam::UamDriver();
     lidar.connect(args["lidar-ip"].as<std::string>(), args["lidar-port"].as<unsigned int>());
+    lidar.setCommandReplyTimeout(args["timeout"].as<double>());
     // Wait for a heartbeat message to be received
     auto version_details = lidar.getVersionDetails();
+    auto configuration_id = getConfigurationId(lidar);
     auto safey_areas_crc32 = getSafetyAreasCRC32(lidar);
 
     // Parse the resulting heartbeat message and populate a JSON document with the results
@@ -139,7 +155,7 @@ int main(int argc, char** argv)
       document["model_number"] = byteArrayToString(version_details.version_details.sensor_model);
       document["serial_number"] = byteArrayToString(version_details.version_details.serial_number);
       document["firmware_version"] = byteArrayToString(version_details.version_details.firmware_version);
-      document["configuration_id"] = std::string("N/A");
+      document["configuration_id"] = configuration_id;
       document["safety_areas_crc32"] = safey_areas_crc32;
     }
     std::cout << document.dump(4) << std::endl;

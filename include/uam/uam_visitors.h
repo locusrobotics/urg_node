@@ -251,6 +251,22 @@ public:
   VISITOR_MEMBER_IMPL_VERSION_DETAILS(serial_number);
 };
 
+class ConfigurationIdVisitor
+{
+public:
+  /**
+   * @brief Constructor if visitors receive raw buffer
+   * @param initial_offset
+   */
+  explicit ConfigurationIdVisitor(const size_t initial_offset) : id_1(initial_offset), id_2(initial_offset) {}
+
+#define VISITOR_MEMBER_IMPL_CONFIGURATION_DETAILS(field) \
+  VISITOR_MEMBER(protocol::configuration_details::ConfigurationID, field)
+
+  VISITOR_MEMBER_IMPL_CONFIGURATION_DETAILS(id_1);
+  VISITOR_MEMBER_IMPL_CONFIGURATION_DETAILS(id_2);
+};
+
 // The following asserts are just here to confirm that nothing was broken from this update
 static_assert(protocol::c_sensing_data_start_idx == 11);
 static_assert(sizeof(protocol::AR00CommandReply) == 4379);

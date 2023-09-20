@@ -68,6 +68,7 @@ class ShapeShifterPacket
     AR06CommandReply,
     XR00CommandReply,
     VR00CommandReply,
+    ID00CommandReply,
     YRCommandReply>;
 
   /**
@@ -84,6 +85,7 @@ class ShapeShifterPacket
     AR06CommandReply ar06_reply;
     XR00CommandReply xr00_reply;
     VR00CommandReply vr00_reply;
+    ID00CommandReply id_reply;
     YRCommandReply yr_reply;
     std::array<char, getMaxSizeTuple<SupportedTypes>()> raw_buffer;
   } buffer;  // NOLINT
@@ -180,6 +182,12 @@ inline const XR00CommandReply& ShapeShifterPacket::getImplementation() const
 }
 
 template <>
+inline const ID00CommandReply& ShapeShifterPacket::getImplementation() const
+{
+  return buffer.id_reply;
+}
+
+template <>
 inline const YRCommandReply& ShapeShifterPacket::getImplementation() const
 {
   return buffer.yr_reply;
@@ -225,6 +233,12 @@ template <>
 inline XR00CommandReply& ShapeShifterPacket::getImplementationRef()
 {
   return buffer.xr00_reply;
+}
+
+template <>
+inline ID00CommandReply& ShapeShifterPacket::getImplementationRef()
+{
+  return buffer.id_reply;
 }
 
 template <>
