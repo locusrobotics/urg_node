@@ -1,0 +1,2 @@
+Status master
+Status[] slaves

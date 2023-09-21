@@ -37,7 +37,7 @@
 #include <diagnostic_msgs/DiagnosticStatus.h>
 #include <string>
 #include <tf/tf.h>  // tf header for resolving tf prefix
-#include <urg_node/Status.h>
+#include <urg_node_msgs/Status.h>
 
 namespace urg_node
 {
@@ -94,7 +94,7 @@ void UrgNode::initSetup()
   }
 
   status_service_ = nh_.advertiseService("update_laser_status", &UrgNode::statusCallback, this);
-  status_pub_ = nh_.advertise<urg_node::Status>("laser_status", 1, true);
+  status_pub_ = nh_.advertise<urg_node_msgs::Status>("laser_status", 1, true);
 
   diagnostic_updater_.reset(new diagnostic_updater::Updater());
   diagnostic_updater_->add("Hardware Status", this, &UrgNode::populateDiagnosticsStatus);
@@ -128,7 +128,7 @@ bool UrgNode::updateStatus()
     {
       if (urg_->getAR00Status(device_status_.detailed_status))
       {
-        urg_node::Status msg;
+        urg_node_msgs::Status msg;
         msg.operating_mode = device_status_.detailed_status.operating_mode;
         msg.error_status = device_status_.detailed_status.error_state;
         msg.error_code = device_status_.detailed_status.error_code;

@@ -33,7 +33,7 @@
  *********************************************************************/
 
 #include <ros/ros.h>
-#include <urg_node/MasterSlaveStatus.h>
+#include <urg_node_msgs/MasterSlaveStatus.h>
 
 #include <string>
 #include <vector>
@@ -97,7 +97,7 @@ public:
     }
 
     ros::NodeHandle nh;
-    output_status_publisher_ = nh.advertise<urg_node::MasterSlaveStatus>("lidar_sensors_status", 10, true);
+    output_status_publisher_ = nh.advertise<urg_node_msgs::MasterSlaveStatus>("lidar_sensors_status", 10, true);
 
     // Resize output message lidar slave vector
     output_status_.slaves.resize(params_.slave_lidar_topics.size());
@@ -106,7 +106,7 @@ public:
     for (size_t slave_idx = 0; slave_idx < params_.slave_lidar_topics.size(); slave_idx++)
     {
       const auto& topic = params_.slave_lidar_topics.at(slave_idx);
-      status_subscribers_.push_back(nh.subscribe<urg_node::Status>(
+      status_subscribers_.push_back(nh.subscribe<urg_node_msgs::Status>(
         topic,
         1,
         boost::bind(
@@ -117,7 +117,7 @@ public:
     }
 
     // Master subscriber
-    status_subscribers_.push_back(nh.subscribe<urg_node::Status>(
+    status_subscribers_.push_back(nh.subscribe<urg_node_msgs::Status>(
       params_.master_topic,
       1,
       boost::bind(
@@ -143,7 +143,7 @@ private:
    * @param[in] status - Incoming status
    * @param[in] last_status - Last staus
    */
-  void statusCallback(const urg_node::StatusConstPtr& status, urg_node::Status& last_status)
+  void statusCallback(const urg_node_msgs::StatusConstPtr& status, urg_node_msgs::Status& last_status)
   {
     bool should_publish = params_.publish_on_change ? *status != last_status : true;
     last_status = *status;
@@ -164,7 +164,7 @@ private:
   /**
    * @brief Ouptut combined status
    */
-  urg_node::MasterSlaveStatus output_status_;
+  urg_node_msgs::MasterSlaveStatus output_status_;
 
   /**
    * @brief Output combined status publisher
