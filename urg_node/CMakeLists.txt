@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.0.2)
 project(urg_node)
 
 find_package(catkin REQUIRED COMPONENTS
-  diagnostic_updater dynamic_reconfigure laser_proc message_generation
+  diagnostic_updater dynamic_reconfigure laser_proc
   nodelet rosconsole roscpp sensor_msgs std_msgs std_srvs tf urg_c
   json_transport
+  urg_node_msgs
 )
 
 if(NOT CMAKE_CXX_STANDARD)
@@ -17,18 +18,10 @@ set(CMAKE_CXX_EXTENSIONS ON)
 # Dynamic reconfigure support
 generate_dynamic_reconfigure_options(cfg/URG.cfg)
 
-add_message_files(FILES
-  Status.msg
-)
-
-generate_messages(
-  DEPENDENCIES std_msgs
-)
-
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES uam_workers uam_driver urg_c_wrapper urg_node_driver
-  CATKIN_DEPENDS dynamic_reconfigure laser_proc message_runtime nodelet rosconsole
+  CATKIN_DEPENDS dynamic_reconfigure laser_proc nodelet rosconsole
   roscpp sensor_msgs std_msgs std_srvs urg_c
   DEPENDS
 )
@@ -58,7 +51,7 @@ target_link_libraries(urg_c_wrapper uam_workers ${catkin_LIBRARIES})
 
 # Declare the cpp as a lib also
 add_library(urg_node_driver src/urg_node_driver.cpp)
-add_dependencies(urg_node_driver ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_gencpp)
+add_dependencies(urg_node_driver ${PROJECT_NAME}_gencfg)
 target_link_libraries(urg_node_driver urg_c_wrapper ${catkin_LIBRARIES})
 
 
@@ -75,17 +68,27 @@ add_executable (uam_driver_ros_node
  src/uam/uam_driver_ros_node.cpp
  src/uam/uam_driver_ros.cpp
  )
-add_dependencies(uam_driver_ros_node ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_gencpp)
+add_dependencies(uam_driver_ros_node ${PROJECT_NAME}_gencfg )
 target_link_libraries(uam_driver_ros_node uam_driver ${catkin_LIBRARIES})
  
 add_executable (uam_get_configuration_id 
  src/uam/uam_get_safety_configuration_id.cpp
  )
-add_dependencies(uam_get_configuration_id ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_gencpp)
+add_dependencies(uam_get_configuration_id ${PROJECT_NAME}_gencfg)
 target_link_libraries(uam_get_configuration_id uam_driver ${catkin_LIBRARIES})
 
+
+add_executable (uam_status_aggregator_node 
+ src/uam/uam_status_aggregator_node.cpp
+ )
+target_link_libraries(uam_status_aggregator_node ${catkin_LIBRARIES})
+
+
+
+
 ## Mark executables and/or libraries for installation
-install(TARGETS uam_workers uam_driver urg_c_wrapper urg_node urg_node_driver getID uam_driver_ros_node uam_get_configuration_id
+install(TARGETS uam_workers uam_driver urg_c_wrapper urg_node urg_node_driver getID 
+                uam_driver_ros_node uam_get_configuration_id uam_status_aggregator_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
