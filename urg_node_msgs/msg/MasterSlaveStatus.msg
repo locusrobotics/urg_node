@@ -1,2 +1,0 @@
-Status master
-Status[] slaves

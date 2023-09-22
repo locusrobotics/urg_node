@@ -78,18 +78,17 @@ add_dependencies(uam_get_configuration_id ${PROJECT_NAME}_gencfg)
 target_link_libraries(uam_get_configuration_id uam_driver ${catkin_LIBRARIES})
 
 
-add_executable (uam_master_slave_reporter_node 
- src/uam/uam_master_slave_reporter_node.cpp
+add_executable (uam_status_aggregator_node 
+ src/uam/uam_status_aggregator_node.cpp
  )
-add_dependencies(uam_master_slave_reporter_node ${PROJECT_NAME}_gencfg)
-target_link_libraries(uam_master_slave_reporter_node ${catkin_LIBRARIES})
+target_link_libraries(uam_status_aggregator_node ${catkin_LIBRARIES})
 
 
 
 
 ## Mark executables and/or libraries for installation
 install(TARGETS uam_workers uam_driver urg_c_wrapper urg_node urg_node_driver getID 
-                uam_driver_ros_node uam_get_configuration_id uam_master_slave_reporter_node
+                uam_driver_ros_node uam_get_configuration_id uam_status_aggregator_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

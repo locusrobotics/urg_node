@@ -11,7 +11,7 @@ add_message_files(
     msg
   FILES
   Status.msg
-  MasterSlaveStatus.msg
+  StatusArray.msg
 )
 
 generate_messages(

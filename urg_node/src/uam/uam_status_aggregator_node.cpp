@@ -33,7 +33,7 @@
  *********************************************************************/
 
 #include <ros/ros.h>
-#include <urg_node_msgs/MasterSlaveStatus.h>
+#include <urg_node_msgs/StatusArray.h>
 
 #include <string>
 #include <vector>
@@ -41,34 +41,32 @@
 namespace uam
 {
 /**
- * @brief Master Slave Status reporter params
+ * @brief Status aggregator params
  */
-struct MasterSlaveReporterParams
+struct StatusAggregatorParams
 {
-  static MasterSlaveReporterParams loadFromROS(const ros::NodeHandle& nh)
+  static StatusAggregatorParams loadFromROS(const ros::NodeHandle& nh)
   {
-    MasterSlaveReporterParams params;
-    nh.param("slave_lidar_status_topics", params.slave_lidar_topics, params.slave_lidar_topics);
-    nh.param("master_lidar_status_topic", params.master_topic, params.master_topic);
+    StatusAggregatorParams params;
+    nh.param("status_topics", params.status_topics, params.status_topics);
     nh.param("publish_on_change", params.publish_on_change, params.publish_on_change);
     return params;
   }
-  std::vector<std::string> slave_lidar_topics {};
-  std::string master_topic { "" };
+  std::vector<std::string> status_topics {};
   bool publish_on_change { false };
 };
 
 /**
- * @brief Master Slave Status reporter
+ * @brief Status aggregator
  */
-class MasterSlaveRerporter
+class StatusAggregator
 {
 public:
   /**
    * @brief Constructor
    * @param[in] params - Configuration parameters
    */
-  explicit MasterSlaveRerporter(const MasterSlaveReporterParams& params) : params_(params)
+  explicit StatusAggregator(const StatusAggregatorParams& params) : params_(params)
   {
     auto isTopicNameInvalid = [](const std::string& topic_name) -> bool
     {
@@ -79,52 +77,39 @@ public:
         error = "Cannot have empty topic names";
         name_valid = false;
       }
-      ROS_WARN_STREAM_COND(
-        !name_valid,
-        "Invalid topic name detected: " << error);
+      ROS_WARN_STREAM_COND(!name_valid, "Invalid topic name detected: " << error);
       return !name_valid;
     };
 
     // Check for invalid topics
-    params_.slave_lidar_topics.erase(
-      std::remove_if(params_.slave_lidar_topics.begin(), params_.slave_lidar_topics.end(), isTopicNameInvalid),
-      params_.slave_lidar_topics.end());
+    params_.status_topics.erase(
+      std::remove_if(params_.status_topics.begin(), params_.status_topics.end(), isTopicNameInvalid),
+      params_.status_topics.end());
 
-    if (isTopicNameInvalid(params_.master_topic) || params_.slave_lidar_topics.empty())
+    if (params_.status_topics.empty())
     {
-      ROS_ERROR_STREAM("Master topic and/or slave topic(s) not found.");
+      ROS_ERROR_STREAM("No valid status topic(s) found.");
       return;
     }
 
     ros::NodeHandle nh;
-    output_status_publisher_ = nh.advertise<urg_node_msgs::MasterSlaveStatus>("lidar_sensors_status", 10, true);
+    output_status_publisher_ = nh.advertise<urg_node_msgs::StatusArray>("lidar_sensors_status", 10, true);
 
-    // Resize output message lidar slave vector
-    output_status_.slaves.resize(params_.slave_lidar_topics.size());
+    output_status_.status.resize(params_.status_topics.size());
 
-    // Slave subscribers
-    for (size_t slave_idx = 0; slave_idx < params_.slave_lidar_topics.size(); slave_idx++)
+    // Setup subscriber
+    for (size_t topic_idx = 0; topic_idx < params_.status_topics.size(); topic_idx++)
     {
-      const auto& topic = params_.slave_lidar_topics.at(slave_idx);
+      const auto& topic = params_.status_topics.at(topic_idx);
       status_subscribers_.push_back(nh.subscribe<urg_node_msgs::Status>(
         topic,
         1,
         boost::bind(
-          &MasterSlaveRerporter::statusCallback,
+          &StatusAggregator::statusCallback,
           this,
           boost::placeholders::_1,
-          std::ref(output_status_.slaves[slave_idx]))));
+          std::ref(output_status_.status[topic_idx]))));
     }
-
-    // Master subscriber
-    status_subscribers_.push_back(nh.subscribe<urg_node_msgs::Status>(
-      params_.master_topic,
-      1,
-      boost::bind(
-        &MasterSlaveRerporter::statusCallback,
-        this,
-        boost::placeholders::_1,
-        std::ref(output_status_.master))));
     configured_ = true;
   }
 
@@ -159,12 +144,12 @@ private:
   /**
    * @brief Node parameters
    */
-  MasterSlaveReporterParams params_;
+  StatusAggregatorParams params_;
 
   /**
    * @brief Ouptut combined status
    */
-  urg_node_msgs::MasterSlaveStatus output_status_;
+  urg_node_msgs::StatusArray output_status_;
 
   /**
    * @brief Output combined status publisher
@@ -181,7 +166,7 @@ private:
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "uam_master_slave_status_reporter");
-  uam::MasterSlaveRerporter node(uam::MasterSlaveReporterParams::loadFromROS(ros::NodeHandle("~")));
+  ros::init(argc, argv, "uam_status_aggregator_node");
+  uam::StatusAggregator node(uam::StatusAggregatorParams::loadFromROS(ros::NodeHandle("~")));
   node.run();
 }
