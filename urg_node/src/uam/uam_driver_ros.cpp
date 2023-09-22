@@ -37,7 +37,7 @@
 #include <urg_node/URGConfig.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
-#include <urg_node/Status.h>
+#include <urg_node_msgs/Status.h>
 
 #include <algorithm>
 #include <atomic>
@@ -60,9 +60,9 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   params_changed_(false)
 {
   scan_publisher_ = node_handle_.advertise<sensor_msgs::LaserScan>(params.scan_topic, 1);
-  status_on_request_publisher_ = node_handle_.advertise<urg_node::Status>(params.status_topic, 1, true);
+  status_on_request_publisher_ = node_handle_.advertise<urg_node_msgs::Status>(params.status_topic, 1, true);
   status_on_update_publisher_ =
-    node_handle_.advertise<urg_node::Status>(status_on_request_publisher_.getTopic() + "_update", 1, true);
+    node_handle_.advertise<urg_node_msgs::Status>(status_on_request_publisher_.getTopic() + "_update", 1, true);
   if (params_.provide_laser_status_service)
     request_status_service_ =
       node_handle_.advertiseService(params.request_status_service, &UamROS::statusCallback, this);
@@ -444,7 +444,7 @@ void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensi
   if (on_request_status || on_update_status)
   {
     last_received_status_ = sensing_data;
-    urg_node::Status msg;
+    urg_node_msgs::Status msg;
     msg.operating_mode = sensing_data.operating_mode;
     msg.error_status = sensing_data.error_state;
     msg.error_code = sensing_data.error_code;

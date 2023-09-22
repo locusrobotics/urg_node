@@ -20,7 +20,6 @@
   <depend>diagnostic_updater</depend>
   <depend>dynamic_reconfigure</depend>
   <depend>laser_proc</depend>
-  <depend>message_generation</depend>
   <depend>nodelet</depend>
   <depend>rosconsole</depend>
   <depend>roscpp</depend>
@@ -29,6 +28,7 @@
   <depend>std_srvs</depend>
   <depend>tf</depend>
   <depend>urg_c</depend>
+  <depend>urg_node_msgs</depend>
   <depend>json_transport</depend>
 
   <exec_depend>message_runtime</exec_depend>

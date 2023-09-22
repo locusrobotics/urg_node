@@ -41,7 +41,7 @@
 #include <boost/system/error_code.hpp>
 
 #include <sensor_msgs/LaserScan.h>
-#include <urg_node/Status.h>
+#include <urg_node_msgs/Status.h>
 
 #include <uam/scan_params.h>
 #include <uam/io/tcp_client.h>
