@@ -42,14 +42,14 @@ namespace uam
 template <typename Tuple, size_t Index0>
 constexpr size_t getMaxSize()
 {
-  return sizeof(std::tuple_element<Index0, Tuple>);
+  return sizeof(std::tuple_element_t<Index0, Tuple>);
 }
 
 template <typename Tuple, size_t Index0, size_t Index1, size_t... TypeN>
 constexpr size_t getMaxSize()
 {
   return (
-    sizeof(std::tuple_element<Index0, Tuple>) >= sizeof(std::tuple_element<Index1, Tuple>) ?
+    sizeof(std::tuple_element_t<Index0, Tuple>) >= sizeof(std::tuple_element_t<Index1, Tuple>) ?
       getMaxSize<Tuple, Index0, TypeN...>() :
       getMaxSize<Tuple, Index1, TypeN...>());
 }
