@@ -239,6 +239,15 @@ Changelog for package urg_node
 * Tailor: Updating Jenkinsfile
 * Contributors: Carlos Mendes, locus-services
 
+Forthcoming
+-----------
+* Fix tuple element fn (#31)
+* Added Master Slave Reporter (#29)
+  * Added m/s reporter
+  * Created a new pkg
+  * PR feedback: remove master slave and keep array of status
+* Contributors: Carlos Mendes
+
 0.5.0 (2020-10-02)
 ------------------
 * Tailor: Updating Jenkinsfile
