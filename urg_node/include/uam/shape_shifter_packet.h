@@ -42,7 +42,6 @@
 #include <array>
 #include <tuple>
 #include <utility>
-#include <variant>
 
 namespace uam
 {
@@ -94,6 +93,7 @@ class ShapeShifterPacket
    * @brief Validate union size against expected size
    */
   static_assert(sizeof(AR01CommandReply) == sizeof(UBufferType), "Invalid Union Size!");
+  static_assert(sizeof(AR01CommandReply) == getMaxSizeTuple<SupportedTypes>(), "Invalid Union Size!");
 
 public:
   /**
