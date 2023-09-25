@@ -2,8 +2,8 @@
 Changelog for package urg_node_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.7.0 (2023-09-25)
+------------------
 * Added Master Slave Reporter (#29)
   * Added m/s reporter
   * Created a new pkg

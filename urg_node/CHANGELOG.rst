@@ -239,8 +239,8 @@ Changelog for package urg_node
 * Tailor: Updating Jenkinsfile
 * Contributors: Carlos Mendes, locus-services
 
-Forthcoming
------------
+0.7.0 (2023-09-25)
+------------------
 * Fix tuple element fn (#31)
 * Added Master Slave Reporter (#29)
   * Added m/s reporter
