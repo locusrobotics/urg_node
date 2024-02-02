@@ -248,6 +248,17 @@ Changelog for package urg_node
   * PR feedback: remove master slave and keep array of status
 * Contributors: Carlos Mendes
 
+Forthcoming
+-----------
+* 0.7.0
+* Update changelogs
+* Fix tuple element fn (#31) (#32)
+* Added Master Slave Reporter (#29) (#30)
+  * Added m/s reporter
+  * Created a new pkg
+  * PR feedback: remove master slave and keep array of status
+* Contributors: Carlos Mendes, Gary Servin
+
 0.5.0 (2020-10-02)
 ------------------
 * Tailor: Updating Jenkinsfile
