@@ -168,49 +168,7 @@ public:
    *
    * @return Reply if successful received, std::nullopt otherwise
    */
-  scip_protocol::PPReply sendPPCommandWithReply(const std::chrono::duration<double>& timeout = std::chrono::seconds(2))
-  {
-    if (!client_.isConnected())
-    {
-      throw std::runtime_error("Cannot send command to lidar while disconnected.");
-    }
-
-    if (!client_.asyncSend(scip_pp_worker_.getCommand(), command_send_timeout_))
-    {
-      throw std::runtime_error("Cannot send command to lidar.");
-    }
-
-    // Prepare some state variables to be populated processCommandReply()
-    {
-      std::lock_guard<std::mutex> temp_lock(pending_command_mutex_);
-      pending_command_reply_ready_ = false;
-    }
-
-    // async read instruction with handler
-    client_.asyncReadLine<PPWorker::RawReply>(
-      [this](const PPWorker::RawReply& raw_reply)
-      {
-        auto reply = scip_pp_worker_.process(raw_reply);
-        if (reply)
-        {
-          std::lock_guard<std::mutex> lock(pending_command_mutex_);
-          // Save the reply message in a state variable and signal that it is ready
-          pending_scip_reply_ = *reply;
-          pending_command_reply_ready_ = true;
-          pending_command_signal_.notify_one();
-        }
-      });  // NOLINT
-
-    std::unique_lock<std::mutex> lock(pending_command_mutex_);
-    if (pending_command_signal_.wait_for(lock, timeout, [this] { return pending_command_reply_ready_; }))
-    {
-      return pending_scip_reply_;
-    }
-    else
-    {
-      throw std::runtime_error("Timed out waiting for scip response from the lidar.");
-    }
-  }
+  scip_protocol::PPReply sendPPCommandWithReply(const std::chrono::duration<double>& timeout = std::chrono::seconds(2));
 
   /**
    * @brief Process Command Reply and notify sender
