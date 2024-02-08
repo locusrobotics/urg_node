@@ -64,8 +64,6 @@ enum PPReplyLineIndex : size_t
  */
 struct PPReply
 {
-  std::string ack;
-  std::string status;
   int min_distance;
   int max_distance;
   int angular_resolution;

@@ -168,8 +168,8 @@ public:
    *
    * @param[in] handler - Async read handler
    */
-  template <typename TReply, typename Handler>
-  void asyncReadLine(Handler handler)
+  template <typename TReply>
+  void asyncReadLine(std::function<void(const TReply&)> handler)
   {
     if (!stopped_)
     {
@@ -181,7 +181,7 @@ public:
     boost::asio::async_read_until(
       socket_,
       readline_buffer_,
-      '\n',
+      "\n\n",
       [&](const boost::system::error_code& result_error, std::size_t result_n)
       {
         if (result_error || result_n == 0)
