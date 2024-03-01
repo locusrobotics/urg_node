@@ -248,6 +248,11 @@ Changelog for package urg_node
   * PR feedback: remove master slave and keep array of status
 * Contributors: Carlos Mendes
 
+Forthcoming
+-----------
+* Wait for the complete scip reply (#34) (#35)
+* Contributors: Carlos Mendes
+
 0.8.0 (2024-02-02)
 ------------------
 * 0.7.0
