@@ -179,11 +179,9 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
   }
   if (should_reset_lidar && !lidar_restarting_)
   {
-     
     lidar_restarting_ = true;
     // Adding an extra publish here to ensure that nodes that are subscribed to this topic
     // are aware that the lidar is about to be restarted
-    //bool message to publish:
     std_msgs::Bool msg;
     msg.data = lidar_restarting_;
     lidar_restarting_publisher_.publish(msg);
@@ -206,8 +204,8 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
 
 bool UamROS::lidarHardReset()
 {
-  try{
-    // Create new ConfigCmd message
+  try
+  {
     lidar_power_msg_.header.stamp = ros::Time::now();
     lidar_power_msg_.gp_param = 0;
     gp_cmd_publisher_.publish(lidar_power_msg_);
