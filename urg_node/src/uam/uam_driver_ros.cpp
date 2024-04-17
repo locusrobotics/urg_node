@@ -179,6 +179,7 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
   }
   if (should_reset_lidar && !lidar_restarting_)
   {
+    ROS_WARN_STREAM("Trying to restart the lidar.");
     lidar_restarting_ = true;
     // Adding an extra publish here to ensure that nodes that are subscribed to this topic
     // are aware that the lidar is about to be restarted
