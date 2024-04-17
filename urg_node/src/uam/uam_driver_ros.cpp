@@ -194,6 +194,11 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
     }
     lidar_restarting_ = false;
   }
+  else
+  {
+    // If nothing is wrong, just publish the lidar status
+    updateStatus(last_received_status_, false);
+  }
   std_msgs::Bool msg;
   msg.data = lidar_restarting_;
   lidar_restarting_publisher_.publish(msg);
