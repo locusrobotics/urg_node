@@ -44,6 +44,7 @@
 #include <urg_node/URGConfig.h>
 #include <uam/type_traits.h>
 #include <visualization_msgs/Marker.h>
+#include <vector_msgs/ConfigCmd.h>
 
 #include <atomic>
 #include <limits>
@@ -266,6 +267,13 @@ private:
   void triggerReconfigure();
 
   /**
+   * @brief Lidar hard reset
+   *
+   * @return true if successfully reset
+   */
+  bool lidarHardReset();
+
+  /**
    * @brief Update Reconfigure limits (as in urg_node_driver)
    */
   void updateReconfigureLimits();
@@ -451,6 +459,28 @@ private:
    * Publishes lidar status on update
    */
   ros::Publisher status_on_update_publisher_;
+
+  /**
+   * 
+   * @brief GP Command Publisher (for lidar restart)
+   */
+  ros::Publisher gp_cmd_publisher_;
+
+  /**
+  * 
+  * @brief Lidar Power Request Message
+  */
+  vector_msgs::ConfigCmd lidar_power_msg_;
+
+  /**
+   * @brief Lidar restarting flag
+   */
+  bool lidar_restarting_;
+
+  /**
+   * @brief Lidar restarting publisher
+   */
+  ros::Publisher lidar_restarting_publisher_;
 
   /**
    * @brief Status Service

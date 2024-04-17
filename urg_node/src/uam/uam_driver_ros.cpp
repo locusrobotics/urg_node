@@ -38,6 +38,8 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <urg_node_msgs/Status.h>
+#include <vector_msgs/ConfigCmd.h>
+#include <std_msgs/Bool.h>
 
 #include <algorithm>
 #include <atomic>
@@ -59,6 +61,12 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   publish_status_requested_(false),
   params_changed_(false)
 {
+  gp_cmd_publisher_ = node_handle_.advertise<vector_msgs::ConfigCmd>("gp_command", 1);
+  lidar_power_msg_.header.stamp = ros::Time::now();
+  lidar_power_msg_.header.seq = 0;
+  lidar_power_msg_.gp_cmd = "GENERAL_PURPOSE_CMD_SET_LASER_POWER";
+  lidar_restarting_ = false;
+  lidar_restarting_publisher_ = node_handle_.advertise<std_msgs::Bool>("lidars_restarting", 1);
   scan_publisher_ = node_handle_.advertise<sensor_msgs::LaserScan>(params.scan_topic, 1);
   status_on_request_publisher_ = node_handle_.advertise<urg_node_msgs::Status>(params.status_topic, 1, true);
   status_on_update_publisher_ =
@@ -168,7 +176,50 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
                                                                 << "). Resetting the lidar.");
     should_reset_lidar = true;
     ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reconnect to lidar.");
-    triggerReconfigure();
+  }
+  if (should_reset_lidar && !lidar_restarting_)
+  {
+     
+    lidar_restarting_ = true;
+    // Adding an extra publish here to ensure that nodes that are subscribed to this topic
+    // are aware that the lidar is about to be restarted
+    //bool message to publish:
+    std_msgs::Bool msg;
+    msg.data = lidar_restarting_;
+    lidar_restarting_publisher_.publish(msg);
+    if (lidarHardReset())
+    {
+      ROS_WARN_STREAM("Lidar reset successful. Reconfiguring the lidar.");
+      triggerReconfigure();
+    }
+    lidar_restarting_ = false;
+  }
+  std_msgs::Bool msg;
+  msg.data = lidar_restarting_;
+  lidar_restarting_publisher_.publish(msg);
+}
+
+bool UamROS::lidarHardReset()
+{
+  try{
+    // Create new ConfigCmd message
+    lidar_power_msg_.header.stamp = ros::Time::now();
+    lidar_power_msg_.gp_param = 0;
+    gp_cmd_publisher_.publish(lidar_power_msg_);
+    lidar_power_msg_.header.seq = lidar_power_msg_.header.seq + 1;
+
+    ros::Duration(3.0).sleep();
+
+    lidar_power_msg_.header.stamp = ros::Time::now();
+    lidar_power_msg_.gp_param = 1;
+    gp_cmd_publisher_.publish(lidar_power_msg_);
+    lidar_power_msg_.header.seq = lidar_power_msg_.header.seq + 1;
+    return true;
+  }
+  catch (const std::exception& e)
+  {
+    ROS_ERROR_STREAM("Error while restarting the lidar: " << e.what());
+    return false;
   }
 }
 
