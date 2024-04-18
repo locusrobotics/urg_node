@@ -179,14 +179,14 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
   }
   if (!configured_ && configure_attempts_ > 0)
   {
-    ROS_WARN_STREAM("Lidar is not connected. Trying to reconnect to lidar.");
+    ROS_WARN_STREAM("Lidar is not connected. Trying to restart to lidar.");
     should_reset_lidar = true;
     if (lidarHardReset())
     {
-      ROS_WARN_STREAM("Lidar reset successful. Reconfiguring the lidar.");
+      ROS_INFO_STREAM("Lidar restart successful.");
     }
     else{
-      ROS_WARN_STREAM("Lidar reset failed. Trying to reconnect to lidar.");
+      ROS_ERROR_STREAM("Lidar restart failed.");
     
     }
   }
