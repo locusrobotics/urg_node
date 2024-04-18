@@ -484,7 +484,7 @@ private:
   /**
    * @brief Last restart time
    *
-   * Used to track the restart time of the lidar to 
+   * Used to track the restart time of the lidar
    */  
   ros::Time last_restart_time_;
 

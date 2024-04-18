@@ -136,8 +136,6 @@ public:
    * @brief If no scan sectors have been received after this many seconds, reconnect to the lidar
    */
 
-  ros::Duration restart_timeout { 10.0 };
-
   /**
    * @brief The topic name where LaserScan messages will be published
    */
