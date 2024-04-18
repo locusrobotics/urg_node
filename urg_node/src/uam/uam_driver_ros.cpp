@@ -294,7 +294,8 @@ void UamROS::configureTimerCallback(const ros::TimerEvent& event)
   if (!configured_ && !configure())
   {
     // Configuration failed. Restart the timer to try again.
-    configure_timer_.start();
+    ROS_ERROR_STREAM("Failed to configure the lidar. Retrying in " << params_.reconfiguration_timeout.toSec()
+                                                                     << " seconds.");
   }
 }
 
