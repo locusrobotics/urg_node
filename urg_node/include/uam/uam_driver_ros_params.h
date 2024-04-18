@@ -159,6 +159,11 @@ public:
   ros::Duration lidar_power_cycle_interval { 30 };
 
   /**
+   * @brief Number of configure attempts before attempting hard reset
+   */
+  int configure_attempts { 3 };
+
+  /**
    * @brief If points are detected within this area, these will be published
    * on the points_in_safety_area topic
    */
