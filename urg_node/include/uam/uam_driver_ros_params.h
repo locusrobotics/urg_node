@@ -133,10 +133,6 @@ public:
   ros::Duration scan_timeout { 5.0 };
 
   /**
-   * @brief If no scan sectors have been received after this many seconds, reconnect to the lidar
-   */
-
-  /**
    * @brief The topic name where LaserScan messages will be published
    */
   std::string scan_topic { "scan" };
