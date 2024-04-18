@@ -176,7 +176,7 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
                                                                 << "). Resetting the lidar.");
     // Log the elapsed time since the last scan sector message and scan_timeout *2 
     ROS_INFO_STREAM("Elapsed time since last scan sector message: " << elapsed_time.toSec() << " seconds.");
-    ROS_INFO_STREAM("Scan timeout: " << params_.scan_timeout << " seconds.");
+    ROS_INFO_STREAM("Scan timeout: " << params_.scan_timeout * 2 << " seconds.");
     if (elapsed_time > params_.scan_timeout * 2)
     {
       should_reset_lidar = true;
