@@ -185,9 +185,9 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
     {
       ROS_INFO_STREAM("Lidar restart successful.");
     }
-    else{
+    else
+    {
       ROS_ERROR_STREAM("Lidar restart failed.");
-    
     }
   }
   triggerReconfigure();
