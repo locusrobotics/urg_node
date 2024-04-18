@@ -190,7 +190,7 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
     
     }
   }
-  triggerReconfigure()
+  triggerReconfigure();
 }
 
 bool UamROS::lidarHardReset()
