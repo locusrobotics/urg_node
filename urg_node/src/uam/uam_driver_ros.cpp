@@ -174,12 +174,7 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
       "No scan sector messages have been received in the last " << std::setprecision(3) << elapsed_time.toSec()
                                                                 << " seconds (since " << scan_stamp_
                                                                 << "). Resetting the lidar.");
-    // log configure attempts
-    if (configure_attempts_ > 2)
-    {
       should_reset_lidar = true;
-    }
-
     ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reconnect to lidar.");
   }
   if (should_reset_lidar)
@@ -187,10 +182,10 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
     ROS_WARN_STREAM("Trying to restart the lidar.");
     if (lidarHardReset())
     {
-      ROS_WARN_STREAM("Lidar reset successful.");
+      ROS_WARN_STREAM("Lidar reset successful. Reconfiguring the lidar.");
     }
   }
-  triggerReconfigure();
+  triggerReconfigure()
 }
 
 bool UamROS::lidarHardReset()
