@@ -80,9 +80,6 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   lidar_hard_reset_client_ = node_handle_.serviceClient<std_srvs::Trigger>(params_.lidar_hard_reset_service);
   lidar_hard_reset_client_.waitForExistence();
 
-  last_restart_time_ = ros::Time::now();
-  lidar_power_cycle_interval_ = params_.lidar_power_cycle_interval;
-
   // Advertise safety area publisher
   advertiseSafetyAreaPublishers();
 
@@ -174,28 +171,24 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
       "No scan sector messages have been received in the last " << std::setprecision(3) << elapsed_time.toSec()
                                                                 << " seconds (since " << scan_stamp_
                                                                 << "). Resetting the lidar.");
-    triggerReconfigure();
     ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reconnect to lidar.");
-  }
-  if (!configured_ && configure_attempts_ > 0)
-  {
-    ROS_WARN_STREAM("Lidar is not connected. Trying to restart to lidar.");
     should_reset_lidar = true;
-    if (lidarHardReset())
-    {
-      ROS_INFO_STREAM("Lidar restart successful. Configuring the lidar.");
-      triggerReconfigure();
-    }
-    else
-    {
-      ROS_ERROR_STREAM("Lidar restart failed.");
-    }
+  }
+
+  if (should_reset_lidar)
+  {
+    ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reset lidar.");
+    auto lidar_reset_done = lidarHardReset();
+    ROS_WARN_STREAM_COND(!lidar_reset_done, "Lidar reset skipped. Check logs! Only reconfigure will be performed.");
+    triggerReconfigure();
   }
 }
 
 bool UamROS::lidarHardReset()
 {
-  if (ros::Time::now() - last_restart_time_ > lidar_power_cycle_interval_)
+  if (
+    !last_restart_time_.has_value() ||
+    ros::Time::now() - last_restart_time_.value() > params_.lidar_power_cycle_interval)
   {
     try
     {
@@ -358,6 +351,14 @@ bool UamROS::configure()
     ROS_ERROR_STREAM("Error while configuring the lidar: " << e.what());
     lidar_.disconnect();
     configure_attempts_++;
+    if (configure_attempts_ > params_.configure_attempts)
+    {
+      ROS_WARN_STREAM("Could not configure lidar after " << configure_attempts_ << " attempts. Triggering hard reset");
+      if (lidarHardReset())
+      {
+        configure_attempts_ = 0;
+      }
+    }
     configured_ = false;
   }
   return configured_;

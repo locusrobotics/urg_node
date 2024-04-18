@@ -446,11 +446,6 @@ private:
   ros::Publisher scan_publisher_;
 
   /**
-    * @brief Minimum time between lidar power cycles
-  */
-  ros::Duration lidar_power_cycle_interval_;
-
-  /**
    * @brief Status Publisher
    * 
    * Publishes lidar status on request
@@ -486,7 +481,7 @@ private:
    *
    * Used to track the restart time of the lidar
    */  
-  ros::Time last_restart_time_;
+  std::optional<ros::Time> last_restart_time_;
 
   /**
    * @brief Last received sensing data status

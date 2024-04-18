@@ -95,6 +95,8 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
     }
   }
 
+  nh.param("configure_attempts", params.configure_attempts, params.configure_attempts);
+
   return params;
 }
 
