@@ -174,10 +174,7 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
       "No scan sector messages have been received in the last " << std::setprecision(3) << elapsed_time.toSec()
                                                                 << " seconds (since " << scan_stamp_
                                                                 << "). Resetting the lidar.");
-    // Log the elapsed time since the last scan sector message and scan_timeout *2 
-    ROS_INFO_STREAM("Elapsed time since last scan sector message: " << elapsed_time.toSec() << " seconds.");
-    ROS_INFO_STREAM("Scan timeout: " << params_.scan_timeout * 2 << " seconds.");
-    if (elapsed_time > params_.scan_timeout * 2)
+    if (elapsed_time > params_.restart_timeout)
     {
       should_reset_lidar = true;
     }
@@ -295,7 +292,7 @@ void UamROS::configureTimerCallback(const ros::TimerEvent& event)
   if (!configured_ && !configure())
   {
     // Configuration failed. Restart the timer to try again.
-    ROS_ERROR_STREAM("Failed to configure the lidar.");
+    configure_timer_.start();
   }
 }
 
