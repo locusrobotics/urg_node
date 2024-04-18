@@ -175,15 +175,11 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
                                                                 << " seconds (since " << scan_stamp_
                                                                 << "). Resetting the lidar.");
     // log configure attempts
-    ROS_INFO_STREAM("Configure attempts: " << configure_attempts_);
     if (configure_attempts_ > 2)
     {
       should_reset_lidar = true;
     }
-    else{
-      triggerReconfigure();
-    }
-    
+
     ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reconnect to lidar.");
   }
   if (should_reset_lidar)
@@ -191,10 +187,10 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
     ROS_WARN_STREAM("Trying to restart the lidar.");
     if (lidarHardReset())
     {
-      ROS_WARN_STREAM("Lidar reset successful. Reconfiguring the lidar.");
-      triggerReconfigure();
+      ROS_WARN_STREAM("Lidar reset successful.");
     }
   }
+  triggerReconfigure();
 }
 
 bool UamROS::lidarHardReset()
@@ -294,8 +290,7 @@ void UamROS::configureTimerCallback(const ros::TimerEvent& event)
   if (!configured_ && !configure())
   {
     // Configuration failed. Restart the timer to try again.
-    ROS_ERROR_STREAM("Failed to configure the lidar. Retrying in " << params_.reconfiguration_timeout.toSec()
-                                                                     << " seconds.");
+    configure_timer_.start();
   }
 }
 
