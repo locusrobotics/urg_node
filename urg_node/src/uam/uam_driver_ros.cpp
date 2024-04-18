@@ -177,12 +177,17 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
       should_reset_lidar = true;
     ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reconnect to lidar.");
   }
-  if (should_reset_lidar)
+  if (!configured_ && configure_attempts_ > 0)
   {
-    ROS_WARN_STREAM("Trying to restart the lidar.");
+    ROS_WARN_STREAM("Lidar is not connected. Trying to reconnect to lidar.");
+    should_reset_lidar = true;
     if (lidarHardReset())
     {
       ROS_WARN_STREAM("Lidar reset successful. Reconfiguring the lidar.");
+    }
+    else{
+      ROS_WARN_STREAM("Lidar reset failed. Trying to reconnect to lidar.");
+    
     }
   }
   triggerReconfigure()
