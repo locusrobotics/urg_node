@@ -6,7 +6,6 @@ find_package(catkin REQUIRED COMPONENTS
   nodelet rosconsole roscpp sensor_msgs std_msgs std_srvs tf urg_c
   json_transport
   urg_node_msgs
-  vector_msgs
 )
 
 if(NOT CMAKE_CXX_STANDARD)

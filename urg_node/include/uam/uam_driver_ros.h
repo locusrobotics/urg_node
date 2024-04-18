@@ -44,7 +44,6 @@
 #include <urg_node/URGConfig.h>
 #include <uam/type_traits.h>
 #include <visualization_msgs/Marker.h>
-#include <vector_msgs/ConfigCmd.h>
 
 #include <atomic>
 #include <limits>
@@ -447,6 +446,11 @@ private:
   ros::Publisher scan_publisher_;
 
   /**
+    * @brief Minimum time between lidar power cycles
+  */
+  ros::Duration lidar_power_cycle_interval_;
+
+  /**
    * @brief Status Publisher
    * 
    * Publishes lidar status on request
@@ -461,23 +465,6 @@ private:
   ros::Publisher status_on_update_publisher_;
 
   /**
-   * 
-   * @brief GP Command Publisher (for lidar restart)
-   */
-  ros::Publisher gp_cmd_publisher_;
-
-  /**
-  * 
-  * @brief Lidar Power Request Message
-  */
-  vector_msgs::ConfigCmd lidar_power_msg_;
-
-  /**
-   * @brief Lidar restarting flag
-   */
-  bool lidar_restarting_;
-
-  /**
    * @brief Lidar restarting publisher
    */
   ros::Publisher lidar_restarting_publisher_;
@@ -486,6 +473,20 @@ private:
    * @brief Status Service
    */
   ros::ServiceServer request_status_service_;
+
+  /**
+   * @brief Lidar hard reset service client
+   *
+   * Used to cycle the lidar power
+  */
+  ros::ServiceClient lidar_hard_reset_client_;
+
+  /**
+   * @brief Last restart time
+   *
+   * Used to track the restart time of the lidar to 
+   */  
+  ros::Time last_restart_time_;
 
   /**
    * @brief Last received sensing data status
