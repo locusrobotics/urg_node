@@ -151,7 +151,7 @@ public:
   /**
    * @brief The service name to request the lidar to power cycle
    */
-  std::string lidar_hard_reset_service { "set_restarting_lasers_flag" };
+  std::string lidar_hard_reset_service { "restart_lidars" };
 
   /**
     * @brief The minimum time between lidar power cycles
