@@ -40,7 +40,6 @@
 #include <urg_node_msgs/Status.h>
 #include <std_msgs/Bool.h>
 #include <std_srvs/Trigger.h>
-#include <std_srvs/SetBool.h>
 
 #include <algorithm>
 #include <atomic>
@@ -78,7 +77,7 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   points_in_area_markers_pub_ =
     private_node_handle_.advertise<visualization_msgs::Marker>(params_.points_in_safety_area_topic + "_markers", 10);
 
-  lidar_hard_reset_client_ = node_handle_.serviceClient<std_srvs::SetBool>(params_.lidar_hard_reset_service);
+  lidar_hard_reset_client_ = node_handle_.serviceClient<std_srvs::Trigger>(params_.lidar_hard_reset_service);
   lidar_hard_reset_client_.waitForExistence();
 
   // Advertise safety area publisher
@@ -194,8 +193,7 @@ bool UamROS::lidarHardReset()
     try
     {
       last_restart_time_ = ros::Time::now();
-      std_srvs::SetBool srv;
-      srv.request.data = true;
+      std_srvs::Trigger srv;
       if (lidar_hard_reset_client_.call(srv))
       {
         if (srv.response.success)
