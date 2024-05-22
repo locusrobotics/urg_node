@@ -149,6 +149,21 @@ public:
   std::string points_in_safety_area_topic { "points_in_safety_area" };
 
   /**
+   * @brief The service name to request the lidar to power cycle
+   */
+  std::string lidar_hard_reset_service { "restart_lidars" };
+
+  /**
+    * @brief The minimum time between lidar power cycles
+  */
+  ros::Duration lidar_power_cycle_interval { 30 };
+
+  /**
+   * @brief Number of configure attempts before attempting hard reset
+   */
+  int configure_attempts { 3 };
+
+  /**
    * @brief If points are detected within this area, these will be published
    * on the points_in_safety_area topic
    */

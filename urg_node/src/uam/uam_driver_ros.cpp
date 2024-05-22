@@ -38,6 +38,8 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <urg_node_msgs/Status.h>
+#include <std_msgs/Bool.h>
+#include <std_srvs/Trigger.h>
 
 #include <algorithm>
 #include <atomic>
@@ -74,6 +76,9 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
     private_node_handle_.advertise<sensor_msgs::PointCloud2>(params_.points_in_safety_area_topic, 10);
   points_in_area_markers_pub_ =
     private_node_handle_.advertise<visualization_msgs::Marker>(params_.points_in_safety_area_topic + "_markers", 10);
+
+  lidar_hard_reset_client_ = node_handle_.serviceClient<std_srvs::Trigger>(params_.lidar_hard_reset_service);
+  lidar_hard_reset_client_.waitForExistence();
 
   // Advertise safety area publisher
   advertiseSafetyAreaPublishers();
@@ -166,9 +171,58 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
       "No scan sector messages have been received in the last " << std::setprecision(3) << elapsed_time.toSec()
                                                                 << " seconds (since " << scan_stamp_
                                                                 << "). Resetting the lidar.");
-    should_reset_lidar = true;
     ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reconnect to lidar.");
+    should_reset_lidar = true;
+  }
+
+  if (should_reset_lidar)
+  {
+    ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reset lidar.");
+    auto lidar_reset_done = lidarHardReset();
+    ROS_WARN_STREAM_COND(!lidar_reset_done, "Lidar reset skipped. Check logs! Only reconfigure will be performed.");
     triggerReconfigure();
+  }
+}
+
+bool UamROS::lidarHardReset()
+{
+  if (
+    !last_restart_time_.has_value() ||
+    ros::Time::now() - last_restart_time_.value() > params_.lidar_power_cycle_interval)
+  {
+    try
+    {
+      last_restart_time_ = ros::Time::now();
+      std_srvs::Trigger srv;
+      if (lidar_hard_reset_client_.call(srv))
+      {
+        if (srv.response.success)
+        {
+          ROS_WARN_STREAM("Lidar reset successful.");
+          return true;
+        }
+        else
+        {
+          ROS_ERROR_STREAM("Lidar reset failed: " << srv.response.message);
+          return false;
+        }
+      }
+      else
+      {
+        ROS_ERROR_STREAM("Failed to call lidar reset service.");
+        return false;
+      }
+    }
+    catch (const std::exception& e)
+    {
+      ROS_ERROR_STREAM("Error while restarting the lidar: " << e.what());
+      return false;
+    }
+  }
+  else
+  {
+    ROS_WARN_STREAM("Lidar was restarted too recently. Skipping lidar restart.");
+    return false;
   }
 }
 
@@ -297,6 +351,14 @@ bool UamROS::configure()
     ROS_ERROR_STREAM("Error while configuring the lidar: " << e.what());
     lidar_.disconnect();
     configure_attempts_++;
+    if (configure_attempts_ > params_.configure_attempts)
+    {
+      ROS_WARN_STREAM("Could not configure lidar after " << configure_attempts_ << " attempts. Triggering hard reset");
+      if (lidarHardReset())
+      {
+        configure_attempts_ = 0;
+      }
+    }
     configured_ = false;
   }
   return configured_;

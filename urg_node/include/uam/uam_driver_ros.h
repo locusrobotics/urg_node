@@ -266,6 +266,13 @@ private:
   void triggerReconfigure();
 
   /**
+   * @brief Lidar hard reset
+   *
+   * @return true if successfully reset
+   */
+  bool lidarHardReset();
+
+  /**
    * @brief Update Reconfigure limits (as in urg_node_driver)
    */
   void updateReconfigureLimits();
@@ -453,9 +460,28 @@ private:
   ros::Publisher status_on_update_publisher_;
 
   /**
+   * @brief Lidar restarting publisher
+   */
+  ros::Publisher lidar_restarting_publisher_;
+
+  /**
    * @brief Status Service
    */
   ros::ServiceServer request_status_service_;
+
+  /**
+   * @brief Lidar hard reset service client
+   *
+   * Used to cycle the lidar power
+  */
+  ros::ServiceClient lidar_hard_reset_client_;
+
+  /**
+   * @brief Last restart time
+   *
+   * Used to track the restart time of the lidar
+   */  
+  std::optional<ros::Time> last_restart_time_;
 
   /**
    * @brief Last received sensing data status
