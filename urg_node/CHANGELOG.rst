@@ -248,6 +248,12 @@ Changelog for package urg_node
   * PR feedback: remove master slave and keep array of status
 * Contributors: Carlos Mendes
 
+Forthcoming
+-----------
+* RST-9755 Move service calls to power cycle lidars to the uam_node (#37)
+* Wait for the complete scip reply (#34)
+* Contributors: Carlos Mendes, Sushant Raj
+
 0.8.0 (2024-02-02)
 ------------------
 * 0.7.0
