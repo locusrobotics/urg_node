@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>urg_node_msgs</name>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
   <description>Message used by urg_node pkg</description>
   <maintainer email="cribeiromendes@locusrobotics.com">Carlos Mendes</maintainer>
   <license>BSD</license>
