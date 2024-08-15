@@ -8,6 +8,8 @@ find_package(catkin REQUIRED COMPONENTS
   urg_node_msgs
 )
 
+find_package(cpp-statsd-client REQUIRED)
+
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 20)
 endif()
@@ -54,6 +56,8 @@ add_library(urg_node_driver src/urg_node_driver.cpp)
 add_dependencies(urg_node_driver ${PROJECT_NAME}_gencfg)
 target_link_libraries(urg_node_driver urg_c_wrapper ${catkin_LIBRARIES})
 
+add_executable(hokuyo_metrics src/hokuyo_metrics.cpp)
+target_link_libraries(hokuyo_metrics ${catkin_LIBRARIES})
 
 ## Declare a cpp executable
 add_executable(urg_node src/urg_node.cpp)
@@ -113,6 +117,10 @@ install(
 catkin_install_python(PROGRAMS
    scripts/set_urg_ip.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(TARGETS hokuyo_metrics
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 install(DIRECTORY urdf meshes launch

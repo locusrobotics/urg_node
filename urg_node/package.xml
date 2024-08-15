@@ -17,6 +17,7 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
+  <depend>cpp-statsd-client</depend>
   <depend>diagnostic_updater</depend>
   <depend>dynamic_reconfigure</depend>
   <depend>laser_proc</depend>

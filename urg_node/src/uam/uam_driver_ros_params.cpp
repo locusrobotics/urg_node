@@ -71,6 +71,7 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
     params.reconfiguration_timeout = ros::Duration(reconfig_timeout);
   }
   nh.getParam("topic", params.scan_topic);
+  nh.getParam("restart_counter_topic", params.restart_counter_topic);
 
   nh.getParam("provide_laser_status_service", params.provide_laser_status_service);
   nh.getParam("request_status_service", params.request_status_service);

@@ -446,6 +446,11 @@ private:
   ros::Publisher scan_publisher_;
 
   /**
+   * @brief Lidar Hard Restart Counter Increment Publisher
+   */
+  ros::Publisher restart_counter_increment_publisher_;
+
+  /**
    * @brief Status Publisher
    * 
    * Publishes lidar status on request

@@ -39,6 +39,7 @@
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <urg_node_msgs/Status.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/Empty.h>
 #include <std_srvs/Trigger.h>
 
 #include <algorithm>
@@ -62,6 +63,7 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   params_changed_(false)
 {
   scan_publisher_ = node_handle_.advertise<sensor_msgs::LaserScan>(params.scan_topic, 1);
+  restart_counter_increment_publisher_ = node_handle_.advertise<std_msgs::Empty>(params.restart_counter_topic, 1);
   status_on_request_publisher_ = node_handle_.advertise<urg_node_msgs::Status>(params.status_topic, 1, true);
   status_on_update_publisher_ =
     node_handle_.advertise<urg_node_msgs::Status>(status_on_request_publisher_.getTopic() + "_update", 1, true);
@@ -198,6 +200,7 @@ bool UamROS::lidarHardReset()
       {
         if (srv.response.success)
         {
+          restart_counter_increment_publisher_.publish(std_msgs::Empty());
           ROS_WARN_STREAM("Lidar reset successful.");
           return true;
         }

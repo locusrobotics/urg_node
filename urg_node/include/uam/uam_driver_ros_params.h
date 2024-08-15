@@ -149,6 +149,12 @@ public:
   std::string points_in_safety_area_topic { "points_in_safety_area" };
 
   /**
+   * @brief The topic name where the restart counter increments will be published
+   * as std_msgs::Empty
+   */
+  std::string restart_counter_topic { "restart_counter" };
+
+  /**
    * @brief The service name to request the lidar to power cycle
    */
   std::string lidar_hard_reset_service { "restart_lidars" };
