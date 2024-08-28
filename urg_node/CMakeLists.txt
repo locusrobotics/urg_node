@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   nodelet rosconsole roscpp sensor_msgs std_msgs std_srvs tf urg_c
   json_transport
   urg_node_msgs
+  visualization_msgs
 )
 
 if(NOT CMAKE_CXX_STANDARD)
@@ -22,7 +23,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES uam_workers uam_driver urg_c_wrapper urg_node_driver
   CATKIN_DEPENDS dynamic_reconfigure laser_proc nodelet rosconsole
-  roscpp sensor_msgs std_msgs std_srvs urg_c
+  roscpp sensor_msgs std_msgs std_srvs urg_c visualization_msgs
   DEPENDS
 )
 
