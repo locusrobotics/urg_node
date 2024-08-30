@@ -20,6 +20,8 @@ namespace urg_node
 
   void HokuyoMetrics::publishMetrics(const std_msgs::Empty::ConstPtr &msg)
   {
+    // ros log info indicating that the lidar has been restarted
+    ROS_INFO("Publishing lidar power cycle metrics. Incrementing counter.");
     stats_.increment("lidar_power_cycles");
   }
 
