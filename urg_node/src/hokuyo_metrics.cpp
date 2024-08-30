@@ -16,6 +16,7 @@ namespace urg_node
     auto restart_topic =
         locus_cpp::findAndLoadParam(nhs.nh_private, "lidar_restart_topic", std::string("restart_counter"));
     restart_event_sub_ = nhs.nh.subscribe(restart_topic, 1, &HokuyoMetrics::publishMetrics, this);
+    ROS_INFO("HokuyoMetrics initialized.");
   }
 
   void HokuyoMetrics::publishMetrics(const std_msgs::Empty::ConstPtr &msg)
