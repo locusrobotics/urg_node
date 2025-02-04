@@ -248,6 +248,9 @@ Changelog for package urg_node
   * PR feedback: remove master slave and keep array of status
 * Contributors: Carlos Mendes
 
+Forthcoming
+-----------
+
 0.10.0 (2024-09-16)
 -------------------
 * RST-10935 Fix missing visualization_msgs dependency (#38)
