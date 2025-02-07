@@ -6,7 +6,7 @@ uint16 area_number
 # If the laser is reporting an error or not.
 bool error_status
 # The error code the laser is reporting.
-uint16 error_code
+uint32 error_code
 # Does the laser report that it is locked out.
 bool lockout_status
 # For the OSSD and warning states.
