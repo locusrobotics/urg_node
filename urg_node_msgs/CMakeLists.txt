@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.5.0)
 project(urg_node_msgs)
 
 find_package(catkin REQUIRED COMPONENTS
