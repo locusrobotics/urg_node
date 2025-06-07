@@ -248,6 +248,11 @@ Changelog for package urg_node
   * PR feedback: remove master slave and keep array of status
 * Contributors: Carlos Mendes
 
+Forthcoming
+-----------
+* update cmake version to 3.5 (#40)
+* Contributors: André Antunes
+
 0.11.0 (2025-02-04)
 -------------------
 

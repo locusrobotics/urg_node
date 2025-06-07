@@ -10,6 +10,12 @@ Changelog for package urg_node_msgs
   * PR feedback: remove master slave and keep array of status
 * Contributors: Carlos Mendes
 
+Forthcoming
+-----------
+* update cmake version to 3.5 (#40)
+* error code -> uint32 (#39)
+* Contributors: André Antunes, Josh Friesen
+
 0.11.0 (2025-02-04)
 -------------------
 
