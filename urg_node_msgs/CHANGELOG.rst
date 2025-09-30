@@ -10,8 +10,8 @@ Changelog for package urg_node_msgs
   * PR feedback: remove master slave and keep array of status
 * Contributors: Carlos Mendes
 
-Forthcoming
------------
+0.13.0 (2025-09-30)
+-------------------
 
 0.12.0 (2025-06-06)
 -------------------
