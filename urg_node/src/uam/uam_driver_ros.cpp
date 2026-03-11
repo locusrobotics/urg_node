@@ -168,16 +168,10 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
   if (configured_ && elapsed_time > params_.scan_timeout)
   {
     ROS_WARN_STREAM(
-      "No scan sector messages have been received in the last " << std::setprecision(3) << elapsed_time.toSec()
-                                                                << " seconds (since " << scan_stamp_
-                                                                << "). Resetting the lidar.");
-    ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reconnect to lidar.");
-    should_reset_lidar = true;
-  }
+      "No scan sector messages have been received from Hokuyo lidar ("
+      << params_.ip_address << ") in the last " << std::setprecision(3) << elapsed_time.toSec() << " seconds (since "
+      << scan_stamp_ << "). Resetting the lidar.");
 
-  if (should_reset_lidar)
-  {
-    ROS_WARN_STREAM("Scan sector watchdog found an issue. Trying to reset lidar.");
     auto lidar_reset_done = lidarHardReset();
     ROS_WARN_STREAM_COND(!lidar_reset_done, "Lidar reset skipped. Check logs! Only reconfigure will be performed.");
     triggerReconfigure();
