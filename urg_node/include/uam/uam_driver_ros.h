@@ -234,13 +234,14 @@ private:
       }
     }
 
-    if (finite_ranges_count == 0) {
+    if (finite_ranges_count == 0)
+    {
       // This driver/lidar combination will periodically boot up and publish all nan ranges for a moment.
-      // If this happens after a lidar power cycle (when the rest of the system is initilized), it breaks the
-      // laser filtering pipeline. The likleyhood of nominally receiving all nan readings in our usecase is so
+      // If this happens after a lidar power cycle (when the rest of the system is initialized), it breaks the
+      // laser filtering pipeline. The likelihood of nominally receiving all nan readings in our use case is so
       // infinitesimally small we can just skip publishing in this case.
-      ROS_WARN_STREAM_THROTTLE(5.0, "All ranges are infinite, skipping scan publish!");
-      // We return early to avoid publishing mis-leading scans or area information.
+      ROS_WARN_STREAM_THROTTLE(5.0, "All ranges are NaN/invalid, skipping scan publish!");
+      // We return early to avoid publishing misleading scans or area information.
       return;
     }
 
