@@ -35,6 +35,7 @@
 
 #include <diagnostic_msgs/AddDiagnostics.h>
 #include <diagnostic_msgs/DiagnosticStatus.h>
+#include <cmath>
 #include <string>
 #include <tf/tf.h>  // tf header for resolving tf prefix
 #include <urg_node_msgs/Status.h>
@@ -573,6 +574,13 @@ void UrgNode::scanThread()
       continue;  // Return to top of main loop
     }
 
+    int startup_scans_to_discard = 0;
+    const double scan_period = urg_->getScanPeriod();
+    if (scan_period > 0.0)
+    {
+      startup_scans_to_discard = static_cast<int>(std::ceil(0.5 / scan_period));
+    }
+
     while (!close_scan_)
     {
       // Don't allow external access during grabbing the scan.
@@ -584,6 +592,11 @@ void UrgNode::scanThread()
           const sensor_msgs::MultiEchoLaserScanPtr msg(new sensor_msgs::MultiEchoLaserScan());
           if (urg_->grabScan(msg))
           {
+            if (startup_scans_to_discard > 0)
+            {
+              startup_scans_to_discard--;
+              continue;
+            }
             echoes_pub_.publish(msg);
             echoes_freq_->tick();
           }
@@ -599,6 +612,11 @@ void UrgNode::scanThread()
           const sensor_msgs::LaserScanPtr msg(new sensor_msgs::LaserScan());
           if (urg_->grabScan(msg))
           {
+            if (startup_scans_to_discard > 0)
+            {
+              startup_scans_to_discard--;
+              continue;
+            }
             laser_pub_.publish(msg);
             laser_freq_->tick();
           }
