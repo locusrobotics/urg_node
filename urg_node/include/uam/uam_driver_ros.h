@@ -204,6 +204,7 @@ private:
         nullptr;
 
     std::vector<std::pair<size_t, float>> ranges_in_safety_area;
+    bool any_finite_ranges = false;
 
     for (size_t idx = 0; idx < reply.ranges.size(); idx++)
     {
@@ -217,6 +218,10 @@ private:
       if (within_fov)
       {
         msg.ranges.push_back(range_m);
+        if (!std::isnan(range_m))
+        {
+          any_finite_ranges = true;
+        }
       }
 
       if (safety_area != nullptr && !std::isnan(range_m))
@@ -227,6 +232,17 @@ private:
           ranges_in_safety_area.push_back(std::make_pair(idx, range_m));
         }
       }
+    }
+
+    if (!any_finite_ranges)
+    {
+      // This driver/lidar combination will periodically boot up and publish all nan ranges for a moment.
+      // If this happens after a lidar power cycle (when the rest of the system is initialized), it breaks the
+      // laser filtering pipeline. The likelihood of nominally receiving all nan readings in our use case is so
+      // infinitesimally small we can just skip publishing in this case.
+      ROS_WARN_STREAM_THROTTLE(5.0, "All ranges are NaN/invalid, skipping scan publish!");
+      // We return early to avoid publishing misleading scans or area information.
+      return;
     }
 
     if constexpr (is_detected<detected_intensities, T>::value)
