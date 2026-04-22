@@ -204,7 +204,7 @@ private:
         nullptr;
 
     std::vector<std::pair<size_t, float>> ranges_in_safety_area;
-    size_t finite_ranges_count = 0;
+    bool any_finite_ranges = false;
 
     for (size_t idx = 0; idx < reply.ranges.size(); idx++)
     {
@@ -220,7 +220,7 @@ private:
         msg.ranges.push_back(range_m);
         if (!std::isnan(range_m))
         {
-          finite_ranges_count++;
+          any_finite_ranges = true;
         }
       }
 
@@ -234,7 +234,7 @@ private:
       }
     }
 
-    if (finite_ranges_count == 0)
+    if (!any_finite_ranges)
     {
       // This driver/lidar combination will periodically boot up and publish all nan ranges for a moment.
       // If this happens after a lidar power cycle (when the rest of the system is initialized), it breaks the
