@@ -164,6 +164,11 @@ public:
   int configure_attempts { 3 };
 
   /**
+   * @brief Drop scan data for this long after each startup/reconnect, in seconds
+   */
+  double discard_startup_data_s { 0.0 };
+
+  /**
    * @brief If points are detected within this area, these will be published
    * on the points_in_safety_area topic
    */

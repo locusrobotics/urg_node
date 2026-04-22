@@ -336,6 +336,16 @@ bool UamROS::configure()
     {
       std::lock_guard<std::mutex> lock(watchdog_mutex_);
       configured_stamp_ = ros::Time::now();
+      if (params_.discard_startup_data_s > 0.0)
+      {
+        discard_data_until_ = configured_stamp_ + ros::Duration(params_.discard_startup_data_s);
+        ROS_WARN_STREAM(
+          "Discarding UAM scan data for " << params_.discard_startup_data_s << " seconds after startup/reconnect.");
+      }
+      else
+      {
+        discard_data_until_ = ros::Time(0);
+      }
     }
     configure_attempts_ = 0;
     configured_ = true;
