@@ -376,6 +376,7 @@ bool UamROS::dynamicReconfigureCallback(urg_node::URGConfig& config, int level)
     config.angle_min = params_.angle_min;
     config.time_offset = params_.time_offset.toSec();
     config.range_offset = params_.range_offset;
+    config.discard_startup_data_s = params_.discard_startup_data_s;
     return true;
   }
 
@@ -384,6 +385,7 @@ bool UamROS::dynamicReconfigureCallback(urg_node::URGConfig& config, int level)
   params_.angle_min = config.angle_min;
   params_.time_offset = ros::Duration(config.time_offset);
   params_.range_offset = config.range_offset;
+  params_.discard_startup_data_s = config.discard_startup_data_s;
   params_changed_ = true;
   return true;
 }
