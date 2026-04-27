@@ -149,10 +149,7 @@ private:
     }
     if (discard_scan)
     {
-      ROS_WARN_STREAM_THROTTLE(
-        5.0,
-        "Discarding UAM scan data during startup/reconnect warmup for " << params_.discard_startup_data_s
-                                                                          << " seconds.");
+      // we already log about this somewhere else
       return;
     }
     ros::Duration time_offset;
