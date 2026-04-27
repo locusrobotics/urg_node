@@ -418,7 +418,7 @@ private:
   ros::Time configured_stamp_;
 
   /**
-   * @brief Drop outgoing scan data until this wall time
+   * @brief Drop outgoing scan data until this ROS time
    */
   ros::Time discard_data_until_;
 
