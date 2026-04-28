@@ -141,9 +141,16 @@ private:
   template <typename T>
   void scanCallback(const T& reply, const ros::Time& wall_time)
   {
+    bool discard_scan = false;
     {
       std::lock_guard<std::mutex> lock(watchdog_mutex_);
       scan_stamp_ = ros::Time::now();
+      discard_scan = !discard_data_until_.isZero() && scan_stamp_ < discard_data_until_;
+    }
+    if (discard_scan)
+    {
+      // we already log about this somewhere else
+      return;
     }
     ros::Duration time_offset;
     double range_offset = 0;
@@ -409,6 +416,11 @@ private:
    * @brief The last time the lidar was configured
    */
   ros::Time configured_stamp_;
+
+  /**
+   * @brief Drop outgoing scan data until this ROS time
+   */
+  ros::Time discard_data_until_;
 
   /**@}*/
 

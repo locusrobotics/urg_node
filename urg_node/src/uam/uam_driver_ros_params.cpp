@@ -76,6 +76,7 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
   nh.getParam("request_status_service", params.request_status_service);
   nh.getParam("range_offset", params.range_offset);
   nh.getParam("log_safety_areas_crc", params.log_safety_areas_crc);
+  nh.getParam("discard_startup_data_s", params.discard_startup_data_s);
 
   int reference_area;
   if (nh.getParam("reference_safety_area_type", reference_area))

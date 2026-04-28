@@ -331,12 +331,24 @@ bool UamROS::configure()
     // Update laser status
     updateStatus(lidar_.getSensorStatus(), true);
 
-    // Start streaming
-    lidar_.startStreaming(params_.use_intensity, params_.use_multi_echo);
+    // Set discard deadline before starting streaming to ensure no startup packets slip through
     {
       std::lock_guard<std::mutex> lock(watchdog_mutex_);
       configured_stamp_ = ros::Time::now();
+      if (params_.discard_startup_data_s > 0.0)
+      {
+        discard_data_until_ = configured_stamp_ + ros::Duration(params_.discard_startup_data_s);
+        ROS_WARN_STREAM(
+          "Discarding UAM scan data for " << params_.discard_startup_data_s << " seconds after startup/reconnect.");
+      }
+      else
+      {
+        discard_data_until_ = ros::Time(0);
+      }
     }
+
+    // Start streaming
+    lidar_.startStreaming(params_.use_intensity, params_.use_multi_echo);
     configure_attempts_ = 0;
     configured_ = true;
   }
@@ -366,6 +378,7 @@ bool UamROS::dynamicReconfigureCallback(urg_node::URGConfig& config, int level)
     config.angle_min = params_.angle_min;
     config.time_offset = params_.time_offset.toSec();
     config.range_offset = params_.range_offset;
+    config.discard_startup_data_s = params_.discard_startup_data_s;
     return true;
   }
 
@@ -374,6 +387,12 @@ bool UamROS::dynamicReconfigureCallback(urg_node::URGConfig& config, int level)
   params_.angle_min = config.angle_min;
   params_.time_offset = ros::Duration(config.time_offset);
   params_.range_offset = config.range_offset;
+  if (params_.discard_startup_data_s != config.discard_startup_data_s)
+  {
+    std::lock_guard<std::mutex> watchdog_lock(watchdog_mutex_);
+    discard_data_until_ = ros::Time::now() + ros::Duration(config.discard_startup_data_s);
+  }
+  params_.discard_startup_data_s = config.discard_startup_data_s;
   params_changed_ = true;
   return true;
 }
