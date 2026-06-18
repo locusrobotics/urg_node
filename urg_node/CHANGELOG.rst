@@ -248,8 +248,8 @@ Changelog for package urg_node
   * PR feedback: remove master slave and keep array of status
 * Contributors: Carlos Mendes
 
-Forthcoming
------------
+0.15.0 (2026-06-18)
+-------------------
 * added in deadband on startup for uam driver (#44)
   * added in deadband on startup for uam driver
   * dynamic reconfigure
