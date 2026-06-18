@@ -248,6 +248,32 @@ Changelog for package urg_node
   * PR feedback: remove master slave and keep array of status
 * Contributors: Carlos Mendes
 
+Forthcoming
+-----------
+* added in deadband on startup for uam driver (#44)
+  * added in deadband on startup for uam driver
+  * dynamic reconfigure
+  Co-authored-by: Copilot <copilot@github.com>
+  * reduced logging
+  * Address review feedback: fix discard_data_until\_ initialization order, dynamic reconfigure handling, docstring, and formatting
+  Agent-Logs-Url: https://github.com/locusrobotics/urg_node/sessions/a468ffa5-46f0-4218-bc44-62e6268024ea
+  Co-authored-by: osullivan-locus <247229666+osullivan-locus@users.noreply.github.com>
+  ---------
+  Co-authored-by: Copilot <copilot@github.com>
+  Co-authored-by: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>
+  Co-authored-by: osullivan-locus <247229666+osullivan-locus@users.noreply.github.com>
+* added fix for all-nan messages on boot (#42)
+  * added fix for all-nan messages on boot
+  * Address PR review wording feedback for all-NaN handling
+  Agent-Logs-Url: https://github.com/locusrobotics/urg_node/sessions/24f32d67-3459-4b69-a1ff-8e9d5c03ffd7
+  Co-authored-by: osullivan-locus <247229666+osullivan-locus@users.noreply.github.com>
+  * PR comments
+  ---------
+  Co-authored-by: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>
+  Co-authored-by: osullivan-locus <247229666+osullivan-locus@users.noreply.github.com>
+* RST-14989-disambiguate-lidar-watchdog-logging-messages
+* Contributors: Owen Sullivan
+
 0.14.0 (2026-03-03)
 -------------------
 
