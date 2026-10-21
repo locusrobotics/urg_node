@@ -41,11 +41,19 @@
 #include <boost/system/error_code.hpp>
 
 #include <ros/init.h>
+#include <ros/time.h>
 #include <uam/shape_shifter_packet.h>
 #include <uam/uam_visitors.h>
 
+#include <atomic>
+#include <condition_variable>
+#include <cstddef>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
+#include <utility>
 
 namespace uam
 {
@@ -133,6 +141,9 @@ public:
       ROS_WARN_STREAM(
         "Failed sending command " << command << " : "
                                   << (status == std::future_status::timeout ? "timeout" : "deferred"));
+      // The pending send cannot be cancelled individually; a half-sent command must not
+      // interleave with later writes, so drop the connection.
+      disconnect();
       return false;
     }
     return (send_length.get() == command.size());
@@ -177,12 +188,13 @@ public:
       return;
     }
 
-    // Start the asynchronous operation.
+    // Start the asynchronous operation. The handler must be captured by value as the
+    // completion handler outlives this function scope.
     boost::asio::async_read_until(
       socket_,
       readline_buffer_,
       "\n\n",
-      [&](const boost::system::error_code& result_error, std::size_t result_n)
+      [this, handler](const boost::system::error_code& result_error, std::size_t result_n)
       {
         if (result_error || result_n == 0)
         {
@@ -227,8 +239,42 @@ private:
    *
    * @param[in] error_code - Error Code
    * @param[in] bytes_transferred - Number of bytes written into the buffer
+   * @param[in] packet_offset - Number of header bytes already present in the buffer before this read
    */
-  void handleReceive(const boost::system::error_code& error_code, size_t bytes_transferred);
+  void handleReceive(const boost::system::error_code& error_code, size_t bytes_transferred, size_t packet_offset);
+
+  /**
+   * @brief Resynchronize the stream after losing packet framing
+   *
+   * Hunts for the next STX byte in the header bytes already read, shifts any
+   * candidate frame start to the front of the buffer and resumes the header read.
+   */
+  void resyncStream();
+
+  /**
+   * @brief Copy the completed packet in receive_buffer_ into the processing queue
+   *
+   * @param[in] stamp - Packet reception stamp
+   */
+  void enqueuePacket(const ros::Time& stamp);
+
+  /**
+   * @brief Start the packet processing thread if it is not already running
+   */
+  void startProcessingThread();
+
+  /**
+   * @brief Signal the packet processing thread to terminate and join it
+   */
+  void stopProcessingThread();
+
+  /**
+   * @brief Processing thread main loop
+   *
+   * Invokes the packet callback outside the io thread so the socket is drained
+   * while packets are being decoded and published.
+   */
+  void processingLoop();
 
   /**
    * @brief Receive handler for Async read
@@ -312,6 +358,41 @@ private:
    * @brief State of the async read task
    */
   std::atomic_bool stopped_;
+
+  /**
+   * @brief Maximum number of packets waiting for processing before the oldest is dropped
+   */
+  static constexpr size_t c_max_queued_packets = 10;
+
+  /**
+   * @brief Requested kernel receive buffer (SO_RCVBUF) size in bytes
+   */
+  static constexpr int c_receive_buffer_size = 1024 * 1024;
+
+  /**
+   * @brief Thread that runs the packet callback so the io thread can keep reading
+   */
+  std::thread processing_thread_;
+
+  /**
+   * @brief Protects packet_queue_ and processing_shutdown_
+   */
+  std::mutex queue_mutex_;
+
+  /**
+   * @brief Signals the processing thread that work is available or shutdown was requested
+   */
+  std::condition_variable queue_signal_;
+
+  /**
+   * @brief Packets waiting to be processed
+   */
+  std::deque<std::pair<protocol::ShapeShifterPacket, ros::Time>> packet_queue_;
+
+  /**
+   * @brief Flag requesting processing thread termination
+   */
+  bool processing_shutdown_ { false };
 };
 
 }  // namespace uam

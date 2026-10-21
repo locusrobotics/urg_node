@@ -447,7 +447,7 @@ protected:
     uint32_t expected_crc;
     if (is_size_valid)
       footer_visitor_.crc.get(buffer, expected_crc);
-    else if (buffer.size() - 1 - sizeof(protocol::CommandFooter))
+    else if (buffer.size() < sizeof(protocol::CommandReplyHeader::stx) + sizeof(protocol::CommandFooter))
     {
       ROS_ERROR_STREAM("Invalid packet size, cannot get crc!");
       return false;

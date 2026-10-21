@@ -41,8 +41,11 @@
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 
+#include <algorithm>
+#include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace uam
 {
@@ -105,6 +108,7 @@ void TcpClient::disconnect()
     // Clear async read flag
     stopped_ = true;
   }
+  stopProcessingThread();
 }
 
 bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
@@ -129,7 +133,27 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
     remote_endpoint_ = boost::asio::ip::tcp::endpoint(remote_address, remote_port);
   }
 
-  // Open the socket
+  // Open the socket and enlarge the kernel receive buffer before connecting so the
+  // kernel can absorb bursts while packets are being processed.
+  {
+    boost::system::error_code error_code;
+    // Discard any stale socket left open by a previously failed connect attempt
+    if (socket_.is_open())
+    {
+      socket_.close(error_code);
+      ROS_WARN_STREAM_COND(error_code, "Failed to close stale socket: " << error_code.message());
+    }
+    socket_.open(remote_endpoint_.protocol(), error_code);
+    if (error_code)
+    {
+      ROS_ERROR_STREAM("Failed to open socket: " << error_code.message());
+      return false;
+    }
+    socket_.set_option(boost::asio::socket_base::receive_buffer_size(c_receive_buffer_size), error_code);
+    ROS_WARN_STREAM_COND(error_code, "Failed to set receive buffer size: " << error_code.message());
+  }
+
+  // Connect the socket
   {
     auto connect_future = socket_.async_connect(remote_endpoint_, boost::asio::use_future);
     if (std::future_status::ready != connect_future.wait_for(std::chrono::seconds(5)))
@@ -180,7 +204,73 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
     ROS_ERROR_STREAM("Error getting receive buffer size: " << strerror(errno));
   }
 
+  startProcessingThread();
+
   return true;
+}
+
+void TcpClient::startProcessingThread()
+{
+  if (processing_thread_.joinable())
+  {
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    processing_shutdown_ = false;
+    packet_queue_.clear();
+  }
+  processing_thread_ = std::thread([this]() { this->processingLoop(); });
+}
+
+void TcpClient::stopProcessingThread()
+{
+  if (!processing_thread_.joinable())
+  {
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    processing_shutdown_ = true;
+  }
+  queue_signal_.notify_all();
+  processing_thread_.join();
+  std::lock_guard<std::mutex> lock(queue_mutex_);
+  packet_queue_.clear();
+}
+
+void TcpClient::processingLoop()
+{
+  while (true)
+  {
+    std::pair<protocol::ShapeShifterPacket, ros::Time> item;
+    {
+      std::unique_lock<std::mutex> lock(queue_mutex_);
+      queue_signal_.wait(lock, [this] { return processing_shutdown_ || !packet_queue_.empty(); });
+      if (processing_shutdown_)
+      {
+        return;
+      }
+      item = packet_queue_.front();
+      packet_queue_.pop_front();
+    }
+    if (callback_)
+    {
+      callback_(item.first, item.second);
+    }
+  }
+}
+
+void TcpClient::enqueuePacket(const ros::Time& stamp)
+{
+  std::lock_guard<std::mutex> lock(queue_mutex_);
+  if (packet_queue_.size() >= c_max_queued_packets)
+  {
+    ROS_WARN_STREAM_THROTTLE(1.0, "Packet processing queue is full, dropping oldest packet!");
+    packet_queue_.pop_front();
+  }
+  packet_queue_.emplace_back(receive_buffer_, stamp);
+  queue_signal_.notify_one();
 }
 
 void TcpClient::asyncReadData(const size_t packet_offset)
@@ -191,18 +281,42 @@ void TcpClient::asyncReadData(const size_t packet_offset)
     return;
   }
 
-  // Try read  with the minimum reply size
+  // Read the remainder of the fixed-size reply header, keeping any bytes salvaged by resyncStream()
   boost::asio::async_read(
     socket_,
     boost::asio::buffer(
       receive_buffer_.getRawPacket().data() + packet_offset,
       sizeof(protocol::CommandReplyHeader) - packet_offset),
-    boost::asio::transfer_exactly(sizeof(protocol::CommandReplyHeader)),
+    boost::asio::transfer_exactly(sizeof(protocol::CommandReplyHeader) - packet_offset),
     boost::bind(
       &TcpClient::handleReceive,
       this,
       boost::asio::placeholders::error,
-      boost::asio::placeholders::bytes_transferred));
+      boost::asio::placeholders::bytes_transferred,
+      packet_offset));
+}
+
+void TcpClient::resyncStream()
+{
+  constexpr size_t header_size = sizeof(protocol::CommandReplyHeader);
+  auto& raw = receive_buffer_.getRawPacket();
+
+  // Hunt for a candidate frame start past the current (invalid) one
+  const auto begin = raw.data() + 1;
+  const auto end = raw.data() + header_size;
+  const auto stx_it = std::find(begin, end, static_cast<char>(protocol::STX_ID));
+
+  if (stx_it == end)
+  {
+    // No candidate in the buffered bytes, discard them and read a fresh header
+    asyncReadData();
+    return;
+  }
+
+  // Shift the candidate frame start to the front and read the missing header bytes
+  const size_t salvaged_bytes = static_cast<size_t>(end - stx_it);
+  std::memmove(raw.data(), stx_it, salvaged_bytes);
+  asyncReadData(salvaged_bytes);
 }
 
 void TcpClient::handlePacket(
@@ -228,16 +342,31 @@ void TcpClient::handlePacket(
   }
   else
   {
-    callback_(receive_buffer_, stamp);
+    const size_t total_size = sizeof(protocol::CommandReplyHeader) + missing_read;
+    const char etx = receive_buffer_.getRawPacket()[total_size - 1];
+    if (etx != static_cast<char>(protocol::ETX_ID))
+    {
+      // Framing is off even though the header looked plausible; the header hunt in
+      // handleReceive() will re-align the stream on the next read.
+      ROS_WARN_STREAM_THROTTLE(1.0, "Packet is missing the ETX terminator, dropping it.");
+    }
+    else
+    {
+      // Hand the packet to the processing thread so the socket keeps being drained
+      enqueuePacket(stamp);
+    }
   }
   // Resume async read
   asyncReadData();
 }
 
-void TcpClient::handleReceive(const boost::system::error_code& error_code, size_t bytes_transferred)
+void TcpClient::handleReceive(
+  const boost::system::error_code& error_code,
+  size_t bytes_transferred,
+  size_t packet_offset)
 {
-  // Grab a packet received time as soon as possible
-  size_t packet_offset = 0;
+  constexpr size_t header_size = sizeof(protocol::CommandReplyHeader);
+  const size_t expected_read = header_size - packet_offset;
 
   if (error_code)
   {
@@ -247,56 +376,52 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
     {
       ROS_ERROR_STREAM("Error receiving lidar message. " << error_code.message());
     }
+    asyncReadData();
+    return;
   }
-  else if (sizeof(protocol::CommandReplyHeader) != bytes_transferred)
+
+  if (expected_read != bytes_transferred)
   {
     ROS_WARN_STREAM(
-      "Failed to read: " << error_code.message() << " Received " << bytes_transferred << "bytes\n"
-                         << "Expected " << sizeof(protocol::CommandReplyHeader) << " bytes");
+      "Failed to read header. Received " << bytes_transferred << " bytes\n"
+                                         << "Expected " << expected_read << " bytes");
+    asyncReadData();
+    return;
   }
-  else
+
+  const auto& header = receive_buffer_.get<protocol::CommandReplyHeader>();
+
+  // Validate framing before trusting any header field
+  bool valid_header = header.stx == protocol::STX_ID;
+  valid_header = valid_header && (filter_callback_ ? filter_callback_(header.header) : true);
+
+  auto expected_total_size = header.cmd_size;
+  valid_header = valid_header && decodeField(expected_total_size) &&
+                 expected_total_size >= sizeof(protocol::EmptyCommandReply) &&
+                 expected_total_size <= sizeof(protocol::AR01CommandReply);
+
+  if (!valid_header)
   {
-    // All the packets are expected to contain a header. We read those bytes
-    // and then we call the read to read the rest
-    bool should_try_complete_read =
-      filter_callback_ ? filter_callback_(receive_buffer_.get<protocol::CommandReplyHeader>().header) : true;
-
-    if (should_try_complete_read)
-    {
-      auto stamp = ros::Time::now();
-      auto expected_total_size = receive_buffer_.get<protocol::CommandReplyHeader>().cmd_size;
-      auto valid_expected_size =
-        decodeField(expected_total_size) && expected_total_size <= sizeof(protocol::AR01CommandReply);
-
-      if (valid_expected_size)
-      {
-        // Add an async read task to read the rest of the packet
-        boost::system::error_code new_error_code;
-        auto missing_read = expected_total_size - bytes_transferred;
-        boost::asio::async_read(
-          socket_,
-          boost::asio::buffer(receive_buffer_.getRawPacket().data() + bytes_transferred, missing_read),
-          boost::asio::transfer_exactly(missing_read),
-          boost::bind(
-            &TcpClient::handlePacket,
-            this,
-            boost::asio::placeholders::error,
-            boost::asio::placeholders::bytes_transferred,
-            missing_read,
-            stamp));
-        return;
-      }
-      else
-      {
-        ROS_WARN_STREAM("Error in the expected size!");
-      }
-    }
-    else
-    {
-      ROS_WARN_STREAM("Packet was received but could not make sense of it, skipping it.");
-    }
+    ROS_WARN_STREAM_THROTTLE(1.0, "Invalid packet header, resynchronizing stream.");
+    resyncStream();
+    return;
   }
-  asyncReadData(packet_offset);
+
+  // Grab a packet received time as soon as possible
+  auto stamp = ros::Time::now();
+  // Add an async read task to read the rest of the packet
+  const size_t missing_read = expected_total_size - header_size;
+  boost::asio::async_read(
+    socket_,
+    boost::asio::buffer(receive_buffer_.getRawPacket().data() + header_size, missing_read),
+    boost::asio::transfer_exactly(missing_read),
+    boost::bind(
+      &TcpClient::handlePacket,
+      this,
+      boost::asio::placeholders::error,
+      boost::asio::placeholders::bytes_transferred,
+      missing_read,
+      stamp));
 }
 
 }  // namespace uam
