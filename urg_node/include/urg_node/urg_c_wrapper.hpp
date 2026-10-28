@@ -39,14 +39,16 @@
 #include <vector>
 #include <string>
 
-#include <sensor_msgs/LaserScan.h>
-#include <sensor_msgs/MultiEchoLaserScan.h>
+#include <rclcpp/rclcpp.hpp>
+
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <sensor_msgs/msg/multi_echo_laser_scan.hpp>
 
 #include <urg_c/urg_sensor.h>
 #include <urg_c/urg_utils.h>
 #include <uam/workers/sensing_data/ar00_worker.hpp>
 
-#include <locus_cpp/ros_util.h>
+#include <locus_cpp/ros_util.hpp>
 
 
 
@@ -70,15 +72,38 @@ public:
   float angle;
 };
 
+/**
+ * @brief Connection parameters for a network-attached (Ethernet) device.
+ */
+struct EthernetConnection
+{
+  std::string ip_address;
+  int ip_port;
+};
+
+/**
+ * @brief Connection parameters for a serial-attached device.
+ */
+struct SerialConnection
+{
+  std::string serial_port;
+  int serial_baud;
+};
+
 class URGCWrapper
 {
 public:
   using URGStatus = uam::protocol::sensing_data::SensingDataHeader;
-  URGCWrapper(const std::string& ip_address, const int ip_port,
-      bool& using_intensity, bool& using_multiecho, bool synchronize_time);
 
-  URGCWrapper(const int serial_baud, const std::string& serial_port,
-      bool& using_intensity, bool& using_multiecho, bool synchronize_time);
+  URGCWrapper(
+    const EthernetConnection& connection,
+    bool& using_intensity, bool& using_multiecho, bool synchronize_time,
+    const rclcpp::Logger& logger = rclcpp::get_logger("urg_c_wrapper"));
+
+  URGCWrapper(
+    const SerialConnection& connection,
+    bool& using_intensity, bool& using_multiecho, bool synchronize_time,
+    const rclcpp::Logger& logger = rclcpp::get_logger("urg_c_wrapper"));
 
   ~URGCWrapper();
 
@@ -126,9 +151,9 @@ public:
 
   std::string getDeviceID();
 
-  ros::Duration getComputedLatency() const;
+  rclcpp::Duration getComputedLatency() const;
 
-  ros::Duration getUserTimeOffset() const;
+  rclcpp::Duration getUserTimeOffset() const;
 
   std::string getSensorStatus();
 
@@ -144,11 +169,11 @@ public:
 
   void setSkip(int skip);
 
-  ros::Duration computeLatency(size_t num_measurements);
+  rclcpp::Duration computeLatency(size_t num_measurements);
 
-  bool grabScan(const sensor_msgs::LaserScanPtr& msg);
+  bool grabScan(sensor_msgs::msg::LaserScan& msg);
 
-  bool grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg);
+  bool grabScan(sensor_msgs::msg::MultiEchoLaserScan& msg);
 
   bool getAR00Status(URGStatus& status);
 
@@ -161,19 +186,19 @@ private:
 
   bool isMultiEchoSupported();
 
-  ros::Duration getAngularTimeOffset() const;
+  rclcpp::Duration getAngularTimeOffset() const;
 
-  ros::Duration getNativeClockOffset(size_t num_measurements);
+  rclcpp::Duration getNativeClockOffset(size_t num_measurements);
 
-  ros::Duration getTimeStampOffset(size_t num_measurements);
+  rclcpp::Duration getTimeStampOffset(size_t num_measurements);
 
   /**
    * @brief Get synchronized time stamp using hardware clock
    * @param time_stamp The current hardware time stamp.
    * @param system_time_stamp The current system time stamp.
-   * @returns ros::Time stamp representing synchronized time
+   * @returns rclcpp::Time stamp representing synchronized time
    */
-  ros::Time getSynchronizedTime(long time_stamp, long long system_time_stamp); // NOLINT
+  rclcpp::Time getSynchronizedTime(long time_stamp, long long system_time_stamp); // NOLINT
 
   /**
    * @brief Set the Hokuyo URG-04LX from SCIP 1.1 mode to SCIP 2.0 mode.
@@ -214,8 +239,8 @@ private:
   int skip_;
   float range_offset_;
 
-  ros::Duration system_latency_;
-  ros::Duration user_latency_;
+  rclcpp::Duration system_latency_;
+  rclcpp::Duration user_latency_;
 
   // used for clock synchronziation
   bool synchronize_time_;
@@ -230,7 +255,8 @@ private:
   std::string serial_port_;
   int serial_baud_;
 
-  locus_cpp::Logger logger_ { "URGCWrapper" };
+  /// Logger object used for debug info
+  locus_cpp::Logger logger_;
 };
 }  // namespace urg_node
 

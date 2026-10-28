@@ -35,14 +35,14 @@
 #ifndef UAM_WORKERS_UAM_WORKER_BASE_H
 #define UAM_WORKERS_UAM_WORKER_BASE_H
 
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include <uam/protocol_types/uam_protocol_types.hpp>
 #include <uam/uam_error_codes.hpp>
 #include <uam/uam_visitors.hpp>
 
 #include <boost/crc.hpp>
 
-#include <locus_cpp/ros_util.h>
+#include <locus_cpp/ros_util.hpp>
 
 #include <iomanip>
 #include <optional>
@@ -115,7 +115,7 @@ public:
   /**
    * @brief Packet callback type
    */
-  using PacketEventCallback = std::function<void(const Reply, const ros::Time&)>;
+  using PacketEventCallback = std::function<void(const Reply, const rclcpp::Time&)>;
 
   /**
    * @brief Return encoded request
@@ -285,7 +285,7 @@ public:
    *
    * @return true if message successfully decoded false otherwise
    */
-  bool processReply(const std::optional<Reply>& reply, const ros::Time& time) const
+  bool processReply(const std::optional<Reply>& reply, const rclcpp::Time& time) const
   {
     if (!reply.has_value())
     {
@@ -308,7 +308,7 @@ public:
    *
    * @return true if message was successfully process, false otherwise
    */
-  bool processByHandler(const std::string& buffer, const ros::Time& time) const
+  bool processByHandler(const std::string& buffer, const rclcpp::Time& time) const
   {
     return processReply(process(buffer), time);
   }
@@ -319,7 +319,7 @@ public:
    * @param[in] raw_reply - Raw structure
    * @return true if message successfully decoded false otherwise
    */
-  bool processByHandler(const Reply& raw_reply, const ros::Time& time) const
+  bool processByHandler(const Reply& raw_reply, const rclcpp::Time& time) const
   {
     return processReply(process(raw_reply), time);
   }
@@ -646,7 +646,7 @@ protected:
   /**
    * @brief Logger instance
    */
-  locus_cpp::Logger logger_ { "WorkerBase" };
+  locus_cpp::Logger logger_ { rclcpp::get_logger("WorkerBase") };
 };
 
 }  // namespace uam
