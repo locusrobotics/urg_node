@@ -31,35 +31,42 @@
  * Author: Chad Rockey, Mike O'Driscoll
  */
 
-#include "ros/ros.h"
 #include <urg_node/urg_c_wrapper.hpp>
+
+#include <cmath>
 #include <limits>
 #include <string>
 #include <vector>
+
 #include <boost/crc.hpp>
+#include <boost/shared_array.hpp>
 
 namespace urg_node
 {
 
-URGCWrapper::URGCWrapper(const std::string& ip_address, const int ip_port,
-    bool& using_intensity, bool& using_multiecho, bool synchronize_time)
+URGCWrapper::URGCWrapper(
+  const EthernetConnection& connection,
+  bool& using_intensity, bool& using_multiecho, bool synchronize_time,
+  const rclcpp::Logger& logger)
+: system_latency_(0, 0),
+  user_latency_(0, 0),
+  logger_(logger)
 {
   // Store for comprehensive diagnostics
-  ip_address_ = ip_address;
-  ip_port_ = ip_port;
+  ip_address_ = connection.ip_address;
+  ip_port_ = connection.ip_port;
   serial_port_ = "";
   serial_baud_ = 0;
 
-
-  long baudrate_or_port = (long)ip_port;  // NOLINT
-  const char *device = ip_address.c_str();
+  long baudrate_or_port = (long)connection.ip_port;  // NOLINT
+  const char *device = connection.ip_address.c_str();
 
   int result = urg_open(&urg_, URG_ETHERNET, device, baudrate_or_port);
   if (result < 0)
   {
     std::stringstream ss;
     ss << "Could not open network Hokuyo:\n";
-    ss << ip_address << ":" << ip_port << "\n";
+    ss << connection.ip_address << ":" << connection.ip_port << "\n";
     ss << urg_error(&urg_);
     throw std::runtime_error(ss.str());
   }
@@ -67,24 +74,29 @@ URGCWrapper::URGCWrapper(const std::string& ip_address, const int ip_port,
   initialize(using_intensity, using_multiecho, synchronize_time);
 }
 
-URGCWrapper::URGCWrapper(const int serial_baud, const std::string& serial_port,
-    bool& using_intensity, bool& using_multiecho, bool synchronize_time)
+URGCWrapper::URGCWrapper(
+  const SerialConnection& connection,
+  bool& using_intensity, bool& using_multiecho, bool synchronize_time,
+  const rclcpp::Logger& logger)
+: system_latency_(0, 0),
+  user_latency_(0, 0),
+  logger_(logger)
 {
   // Store for comprehensive diagnostics
-  serial_baud_ = serial_baud;
-  serial_port_ = serial_port;
+  serial_baud_ = connection.serial_baud;
+  serial_port_ = connection.serial_port;
   ip_address_ = "";
   ip_port_ = 0;
 
-  long baudrate_or_port = (long)serial_baud;  // NOLINT
-  const char *device = serial_port.c_str();
+  long baudrate_or_port = (long)connection.serial_baud;  // NOLINT
+  const char *device = connection.serial_port.c_str();
 
   int result = urg_open(&urg_, URG_SERIAL, device, baudrate_or_port);
   if (result < 0)
   {
     std::stringstream ss;
     ss << "Could not open serial Hokuyo:\n";
-    ss << serial_port << " @ " << serial_baud << "\n";
+    ss << connection.serial_port << " @ " << connection.serial_baud << "\n";
     ss << urg_error(&urg_);
     stop();
     urg_close(&urg_);
@@ -204,16 +216,16 @@ URGCWrapper::~URGCWrapper()
   urg_close(&urg_);
 }
 
-bool URGCWrapper::grabScan(const sensor_msgs::LaserScanPtr& msg)
+bool URGCWrapper::grabScan(sensor_msgs::msg::LaserScan& msg)
 {
-  msg->header.frame_id = frame_id_;
-  msg->angle_min = getAngleMin();
-  msg->angle_max = getAngleMax();
-  msg->angle_increment = getAngleIncrement();
-  msg->scan_time = getScanPeriod();
-  msg->time_increment = getTimeIncrement();
-  msg->range_min = getRangeMin();
-  msg->range_max = getRangeMax();
+  msg.header.frame_id = frame_id_;
+  msg.angle_min = getAngleMin();
+  msg.angle_max = getAngleMax();
+  msg.angle_increment = getAngleIncrement();
+  msg.scan_time = getScanPeriod();
+  msg.time_increment = getTimeIncrement();
+  msg.range_min = getRangeMin();
+  msg.range_max = getRangeMax();
 
   // Grab scan
   int num_beams = 0;
@@ -234,55 +246,56 @@ bool URGCWrapper::grabScan(const sensor_msgs::LaserScanPtr& msg)
   }
 
   // Fill scan
+  rclcpp::Time stamp;
   if (synchronize_time_)
   {
-    msg->header.stamp = getSynchronizedTime(time_stamp, system_time_stamp);
+    stamp = getSynchronizedTime(time_stamp, system_time_stamp);
   }
   else
   {
-    msg->header.stamp.fromNSec((uint64_t)system_time_stamp);
+    stamp = rclcpp::Time(static_cast<int64_t>(system_time_stamp), RCL_ROS_TIME);
   }
-  msg->header.stamp = msg->header.stamp + system_latency_ + user_latency_ + getAngularTimeOffset();
-  msg->ranges.resize(num_beams);
+  msg.header.stamp = stamp + system_latency_ + user_latency_ + getAngularTimeOffset();
+  msg.ranges.resize(num_beams);
   if (use_intensity_)
   {
-    msg->intensities.resize(num_beams);
+    msg.intensities.resize(num_beams);
   }
 
   for (int i = 0; i < num_beams; i++)
   {
     if (data_[(i) + 0] != 0)
     {
-      msg->ranges[i] = range_offset_ + static_cast<float>(data_[i]) / 1000.0f;
+      msg.ranges[i] = range_offset_ + static_cast<float>(data_[i]) / 1000.0f;
       if (use_intensity_)
       {
-        msg->intensities[i] = intensity_[i];
+        msg.intensities[i] = intensity_[i];
       }
     }
     else
     {
-      msg->ranges[i] = std::numeric_limits<float>::quiet_NaN();
+      msg.ranges[i] = std::numeric_limits<float>::quiet_NaN();
       continue;
     }
   }
   return true;
 }
 
-bool URGCWrapper::grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg)
+bool URGCWrapper::grabScan(sensor_msgs::msg::MultiEchoLaserScan& msg)
 {
-  msg->header.frame_id = frame_id_;
-  msg->angle_min = getAngleMin();
-  msg->angle_max = getAngleMax();
-  msg->angle_increment = getAngleIncrement();
-  msg->scan_time = getScanPeriod();
-  msg->time_increment = getTimeIncrement();
-  msg->range_min = getRangeMin();
-  msg->range_max = getRangeMax();
+  msg.header.frame_id = frame_id_;
+  msg.angle_min = getAngleMin();
+  msg.angle_max = getAngleMax();
+  msg.angle_increment = getAngleIncrement();
+  msg.scan_time = getScanPeriod();
+  msg.time_increment = getTimeIncrement();
+  msg.range_min = getRangeMin();
+  msg.range_max = getRangeMax();
 
   // Grab scan
   int num_beams = 0;
   long time_stamp = 0;  // NOLINT
-  unsigned long long system_time_stamp;  // NOLINT
+  unsigned long long system_time_stamp = 0;  // NOLINT
 
   if (use_intensity_)
   {
@@ -298,24 +311,32 @@ bool URGCWrapper::grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg)
   }
 
   // Fill scan (uses vector.reserve wherever possible to avoid initalization and unecessary memory expansion)
-  msg->header.stamp.fromNSec((uint64_t)system_time_stamp);
-  msg->header.stamp = msg->header.stamp + system_latency_ + user_latency_ + getAngularTimeOffset();
-  msg->ranges.reserve(num_beams);
+  rclcpp::Time stamp;
+  if (synchronize_time_)
+  {
+    stamp = getSynchronizedTime(time_stamp, system_time_stamp);
+  }
+  else
+  {
+    stamp = rclcpp::Time(static_cast<int64_t>(system_time_stamp), RCL_ROS_TIME);
+  }
+  msg.header.stamp = stamp + system_latency_ + user_latency_ + getAngularTimeOffset();
+  msg.ranges.reserve(num_beams);
   if (use_intensity_)
   {
-    msg->intensities.reserve(num_beams);
+    msg.intensities.reserve(num_beams);
   }
 
-  for (size_t i = 0; i < num_beams; i++)
+  for (int i = 0; i < num_beams; i++)
   {
-    sensor_msgs::LaserEcho range_echo;
+    sensor_msgs::msg::LaserEcho range_echo;
     range_echo.echoes.reserve(URG_MAX_ECHO);
-    sensor_msgs::LaserEcho intensity_echo;
+    sensor_msgs::msg::LaserEcho intensity_echo;
     if (use_intensity_)
     {
       intensity_echo.echoes.reserve(URG_MAX_ECHO);
     }
-    for (size_t j = 0; j < URG_MAX_ECHO; j++)
+    for (int j = 0; j < URG_MAX_ECHO; j++)
     {
       if (data_[(URG_MAX_ECHO * i) + j] != 0)
       {
@@ -330,10 +351,10 @@ bool URGCWrapper::grabScan(const sensor_msgs::MultiEchoLaserScanPtr& msg)
         break;
       }
     }
-    msg->ranges.push_back(range_echo);
+    msg.ranges.push_back(range_echo);
     if (use_intensity_)
     {
-      msg->intensities.push_back(intensity_echo);
+      msg.intensities.push_back(intensity_echo);
     }
   }
 
@@ -352,7 +373,7 @@ bool URGCWrapper::getAR00Status(URGStatus& status)
 
   if (!reply.has_value())
   {
-    ROS_WARN_STREAM("Failed to decode incoming AR00 reply.");
+    RCLCPP_WARN_STREAM(logger_, "Failed to decode incoming AR00 reply.");
     return false;
   }
   status = reply->sensing_data;
@@ -371,7 +392,7 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
   // Get the response
   std::string response = sendCommand(str_cmd);
 
-  ROS_DEBUG_STREAM("Full response: " << response);
+  RCLCPP_DEBUG_STREAM(logger_, "Full response: " << response);
 
   // Strip STX and ETX before calculating the CRC.
   response.erase(0, 1);
@@ -390,7 +411,7 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
 
   if (checksum_result != crc)
   {
-    ROS_WARN("Received bad frame, incorrect checksum");
+    RCLCPP_WARN(logger_, "Received bad frame, incorrect checksum");
     return false;
   }
 
@@ -398,13 +419,13 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
   // Grab the status
   uint16_t status = 0;
   ss.clear();
-  ROS_DEBUG_STREAM("Status " << response.substr(8, 2));
+  RCLCPP_DEBUG_STREAM(logger_, "Status " << response.substr(8, 2));
   ss << response.substr(8, 2);  // Status is 8th position 2 chars.
   ss >> std::hex >> status;
 
   if (status != 0)
   {
-    ROS_WARN("Received bad status");
+    RCLCPP_WARN(logger_, "Received bad status");
     return false;
   }
 
@@ -434,7 +455,7 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
     ss.clear();
     ss << msg.substr(offset_pos + 8, 4);  // "Step" is offset 8 from beginning 4 chars long.
     ss >> std::hex >> step;
-    ROS_DEBUG_STREAM(i << " Area: " << area << " Distance: " << distance << " Step: " << step);
+    RCLCPP_DEBUG_STREAM(logger_, i << " Area: " << area << " Distance: " << distance << " Step: " << step);
 
     UrgDetectionReport r;
     r.area = area;
@@ -456,7 +477,7 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
       // are empty.
       if (iter - 1 == reports.begin())
       {
-        ROS_WARN("All reports are empty, no detections available.");
+        RCLCPP_WARN(logger_, "All reports are empty, no detections available.");
         report.status = status;
         return false;
       }
@@ -494,7 +515,7 @@ bool URGCWrapper::setToSCIP2()
   if (n > 0 && strcmp(buffer, "SCIP2.0") == 0
     && urg_open(&urg_, URG_SERIAL, serial_port_.c_str(), (long)serial_baud_) >= 0)  // NOLINT
   {
-    ROS_DEBUG_STREAM("Set sensor to SCIP 2.0.");
+    RCLCPP_DEBUG_STREAM(logger_, "Set sensor to SCIP 2.0.");
     return true;
   }
   return false;
@@ -525,7 +546,7 @@ std::string URGCWrapper::sendCommand(std::string cmd)
 
   if (s_bytes < 0)
   {
-    ROS_ERROR_STREAM("Failed to send command.");
+    RCLCPP_ERROR_STREAM(logger_, "Failed to send command.");
     return result;
   }
 
@@ -536,13 +557,13 @@ std::string URGCWrapper::sendCommand(std::string cmd)
   // Read in the header, make sure we get all 5 bytes expcted
   char recvb[5] = {0};
   ssize_t expected_read = 5;
-  while (total_read_len < expected_read)
+  while (total_read_len < static_cast<size_t>(expected_read))
   {
     read_len = read(sock, recvb + total_read_len, expected_read - total_read_len);  // READ STX
     total_read_len += read_len;
     if (read_len <= 0)
     {
-      ROS_ERROR("Read socket failed: %s", strerror(errno));
+      RCLCPP_ERROR(logger_, "Read socket failed: %s", strerror(errno));
       result.clear();
       return result;
     }
@@ -553,7 +574,7 @@ std::string URGCWrapper::sendCommand(std::string cmd)
   std::stringstream ss;
   ss << recv_header.substr(1, 4);
   ss >> std::hex >> expected_read;
-  ROS_DEBUG_STREAM("Read len " << expected_read);
+  RCLCPP_DEBUG_STREAM(logger_, "Read len " << expected_read);
 
   // Already read len of 5, take that out.
   uint32_t arr_size = expected_read - 5;
@@ -561,12 +582,12 @@ std::string URGCWrapper::sendCommand(std::string cmd)
   // based on the currently known messages on the hokuyo documentations
   if (arr_size > 10000)
   {
-    ROS_ERROR("Buffer creation bounds exceeded, shouldn't allocate: %u bytes", arr_size);
+    RCLCPP_ERROR(logger_, "Buffer creation bounds exceeded, shouldn't allocate: %u bytes", arr_size);
     result.clear();
     return result;
   }
 
-  ROS_DEBUG_STREAM("Creating buffer read of arr_Size: " << arr_size);
+  RCLCPP_DEBUG_STREAM(logger_, "Creating buffer read of arr_Size: " << arr_size);
   // Create buffer space for read.
   boost::shared_array<char> data;
   data.reset(new char[arr_size]);
@@ -576,15 +597,15 @@ std::string URGCWrapper::sendCommand(std::string cmd)
   read_len = 0;
   expected_read = arr_size;
 
-  ROS_DEBUG_STREAM("Expected body size: " << expected_read);
-  while (total_read_len < expected_read)
+  RCLCPP_DEBUG_STREAM(logger_, "Expected body size: " << expected_read);
+  while (total_read_len < static_cast<size_t>(expected_read))
   {
     read_len = read(sock, data.get()+total_read_len, expected_read - total_read_len);
     total_read_len += read_len;
-    ROS_DEBUG_STREAM("Read in after header " << read_len);
+    RCLCPP_DEBUG_STREAM(logger_, "Read in after header " << read_len);
     if (read_len <= 0)
     {
-      ROS_ERROR("Read socket failed: %s", strerror(errno));
+      RCLCPP_ERROR(logger_, "Read socket failed: %s", strerror(errno));
       result.clear();
       return result;
     }
@@ -724,12 +745,12 @@ std::string URGCWrapper::getDeviceID()
   return std::string(urg_sensor_serial_id(&urg_));
 }
 
-ros::Duration URGCWrapper::getComputedLatency() const
+rclcpp::Duration URGCWrapper::getComputedLatency() const
 {
   return system_latency_;
 }
 
-ros::Duration URGCWrapper::getUserTimeOffset() const
+rclcpp::Duration URGCWrapper::getUserTimeOffset() const
 {
   return user_latency_;
 }
@@ -751,7 +772,7 @@ void URGCWrapper::setFrameId(const std::string& frame_id)
 
 void URGCWrapper::setUserLatency(const double latency)
 {
-  user_latency_.fromSec(latency);
+  user_latency_ = rclcpp::Duration::from_seconds(latency);
 }
 
 // Must be called before urg_start
@@ -847,7 +868,7 @@ bool URGCWrapper::isMultiEchoSupported()
   return true;
 }
 
-ros::Duration URGCWrapper::getAngularTimeOffset() const
+rclcpp::Duration URGCWrapper::getAngularTimeOffset() const
 {
   // Adjust value for Hokuyo's timestamps
   // Hokuyo's timestamps start from the rear center of the device (at Pi according to ROS standards)
@@ -860,25 +881,25 @@ ros::Duration URGCWrapper::getAngularTimeOffset() const
   {
     circle_fraction = (getAngleMin() + 3.141592) / (2.0 * 3.141592);
   }
-  return ros::Duration(circle_fraction * getScanPeriod());
+  return rclcpp::Duration::from_seconds(circle_fraction * getScanPeriod());
 }
 
-ros::Duration URGCWrapper::computeLatency(size_t num_measurements)
+rclcpp::Duration URGCWrapper::computeLatency(size_t num_measurements)
 {
-  system_latency_.fromNSec(0);
+  system_latency_ = rclcpp::Duration(0, 0);
 
-  ros::Duration start_offset = getNativeClockOffset(1);
-  ros::Duration previous_offset;
+  rclcpp::Duration start_offset = getNativeClockOffset(1);
+  rclcpp::Duration previous_offset(0, 0);
 
-  std::vector<ros::Duration> time_offsets(num_measurements);
+  std::vector<rclcpp::Duration> time_offsets(num_measurements, rclcpp::Duration(0, 0));
   for (size_t i = 0; i < num_measurements; i++)
   {
-    ros::Duration scan_offset = getTimeStampOffset(1);
-    ros::Duration post_offset = getNativeClockOffset(1);
-    ros::Duration adjusted_scan_offset = scan_offset - start_offset;
-    ros::Duration adjusted_post_offset = post_offset - start_offset;
-    ros::Duration average_offset;
-    average_offset.fromSec((adjusted_post_offset.toSec() + previous_offset.toSec()) / 2.0);
+    rclcpp::Duration scan_offset = getTimeStampOffset(1);
+    rclcpp::Duration post_offset = getNativeClockOffset(1);
+    rclcpp::Duration adjusted_scan_offset = scan_offset - start_offset;
+    rclcpp::Duration adjusted_post_offset = post_offset - start_offset;
+    rclcpp::Duration average_offset = rclcpp::Duration::from_seconds(
+      (adjusted_post_offset.seconds() + previous_offset.seconds()) / 2.0);
 
     time_offsets[i] = adjusted_scan_offset - average_offset;
 
@@ -887,13 +908,15 @@ ros::Duration URGCWrapper::computeLatency(size_t num_measurements)
 
   // Get median value
   // Sort vector using nth_element (partially sorts up to the median index)
-  std::nth_element(time_offsets.begin(), time_offsets.begin() + time_offsets.size() / 2, time_offsets.end());
+  std::nth_element(
+    time_offsets.begin(), time_offsets.begin() + time_offsets.size() / 2, time_offsets.end(),
+    [](const rclcpp::Duration& a, const rclcpp::Duration& b) { return a.nanoseconds() < b.nanoseconds(); });
   system_latency_ = time_offsets[time_offsets.size() / 2];
   // Angular time offset makes the output comparable to that of hokuyo_node
   return system_latency_ + getAngularTimeOffset();
 }
 
-ros::Duration URGCWrapper::getNativeClockOffset(size_t num_measurements)
+rclcpp::Duration URGCWrapper::getNativeClockOffset(size_t num_measurements)
 {
   if (started_)
   {
@@ -909,15 +932,16 @@ ros::Duration URGCWrapper::getNativeClockOffset(size_t num_measurements)
     throw std::runtime_error(ss.str());
   }
 
-  std::vector<ros::Duration> time_offsets(num_measurements);
+  rclcpp::Clock ros_clock(RCL_ROS_TIME);
+  std::vector<rclcpp::Duration> time_offsets(num_measurements, rclcpp::Duration(0, 0));
   for (size_t i = 0; i < num_measurements; i++)
   {
-    ros::Time request_time = ros::Time::now();
-    ros::Time laser_time;
-    laser_time.fromNSec(1e6 * (uint64_t)urg_time_stamp(&urg_));  // 1e6 * milliseconds = nanoseconds
-    ros::Time response_time = ros::Time::now();
-    ros::Time average_time;
-    average_time.fromSec((response_time.toSec() + request_time.toSec()) / 2.0);
+    rclcpp::Time request_time = ros_clock.now();
+    rclcpp::Time laser_time(
+      static_cast<int64_t>(1e6 * (uint64_t)urg_time_stamp(&urg_)), RCL_ROS_TIME);  // 1e6 * ms = ns
+    rclcpp::Time response_time = ros_clock.now();
+    rclcpp::Time average_time(
+      static_cast<int64_t>((response_time.nanoseconds() + request_time.nanoseconds()) / 2), RCL_ROS_TIME);
     time_offsets[i] = laser_time - average_time;
   }
 
@@ -926,15 +950,17 @@ ros::Duration URGCWrapper::getNativeClockOffset(size_t num_measurements)
     std::stringstream ss;
     ss << "Cannot stop time stamp mode.";
     throw std::runtime_error(ss.str());
-  };
+  }
 
   // Return median value
   // Sort vector using nth_element (partially sorts up to the median index)
-  std::nth_element(time_offsets.begin(), time_offsets.begin() + time_offsets.size() / 2, time_offsets.end());
+  std::nth_element(
+    time_offsets.begin(), time_offsets.begin() + time_offsets.size() / 2, time_offsets.end(),
+    [](const rclcpp::Duration& a, const rclcpp::Duration& b) { return a.nanoseconds() < b.nanoseconds(); });
   return time_offsets[time_offsets.size() / 2];
 }
 
-ros::Duration URGCWrapper::getTimeStampOffset(size_t num_measurements)
+rclcpp::Duration URGCWrapper::getTimeStampOffset(size_t num_measurements)
 {
   if (started_)
   {
@@ -945,7 +971,7 @@ ros::Duration URGCWrapper::getTimeStampOffset(size_t num_measurements)
 
   start();
 
-  std::vector<ros::Duration> time_offsets(num_measurements);
+  std::vector<rclcpp::Duration> time_offsets(num_measurements, rclcpp::Duration(0, 0));
   for (size_t i = 0; i < num_measurements; i++)
   {
     long time_stamp;  // NOLINT
@@ -976,10 +1002,8 @@ ros::Duration URGCWrapper::getTimeStampOffset(size_t num_measurements)
       throw std::runtime_error(ss.str());
     }
 
-    ros::Time laser_timestamp;
-    laser_timestamp.fromNSec(1e6 * (uint64_t)time_stamp);
-    ros::Time system_time;
-    system_time.fromNSec((uint64_t)system_time_stamp);
+    rclcpp::Time laser_timestamp(static_cast<int64_t>(1e6 * (uint64_t)time_stamp), RCL_ROS_TIME);
+    rclcpp::Time system_time(static_cast<int64_t>(system_time_stamp), RCL_ROS_TIME);
 
     time_offsets[i] = laser_timestamp - system_time;
   }
@@ -988,15 +1012,16 @@ ros::Duration URGCWrapper::getTimeStampOffset(size_t num_measurements)
 
   // Return median value
   // Sort vector using nth_element (partially sorts up to the median index)
-  std::nth_element(time_offsets.begin(), time_offsets.begin() + time_offsets.size() / 2, time_offsets.end());
+  std::nth_element(
+    time_offsets.begin(), time_offsets.begin() + time_offsets.size() / 2, time_offsets.end(),
+    [](const rclcpp::Duration& a, const rclcpp::Duration& b) { return a.nanoseconds() < b.nanoseconds(); });
   return time_offsets[time_offsets.size() / 2];
 }
 
-ros::Time URGCWrapper::getSynchronizedTime(long time_stamp, long long system_time_stamp)  // NOLINT
+rclcpp::Time URGCWrapper::getSynchronizedTime(long time_stamp, long long system_time_stamp)  // NOLINT
 {
-  ros::Time stamp, system_time;
-  system_time.fromNSec((uint64_t)system_time_stamp);
-  stamp = system_time;
+  rclcpp::Time system_time(static_cast<int64_t>(system_time_stamp), RCL_ROS_TIME);
+  rclcpp::Time stamp = system_time;
 
   const uint32_t t1 = static_cast<uint32_t>(time_stamp);
   const uint32_t t0 = static_cast<uint32_t>(last_hardware_time_stamp_);
@@ -1004,7 +1029,7 @@ ros::Time URGCWrapper::getSynchronizedTime(long time_stamp, long long system_tim
   const uint32_t mask = 0x00ffffff;
   double delta = static_cast<double>(mask&(t1-t0))/1000.0;
   hardware_clock_ += delta;
-  double cur_adj = stamp.toSec() - hardware_clock_;
+  double cur_adj = stamp.seconds() - hardware_clock_;
   if (adj_count_ > 0)
   {
     hardware_clock_adj_ = adj_alpha_*cur_adj+(1.0-adj_alpha_)*hardware_clock_adj_;
@@ -1018,19 +1043,19 @@ ros::Time URGCWrapper::getSynchronizedTime(long time_stamp, long long system_tim
   last_hardware_time_stamp_ = time_stamp;
 
   // Once hardware clock is synchronized, use it. Otherwise just return the
-  // input system_time_stamp as ros::Time.
+  // input system_time_stamp as rclcpp::Time.
   if (adj_count_ > 100)
   {
-    stamp.fromSec(hardware_clock_+hardware_clock_adj_);
+    stamp = rclcpp::Time(static_cast<int64_t>((hardware_clock_+hardware_clock_adj_) * 1e9), RCL_ROS_TIME);
     // If the time error is large a clock warp has occurred.
     // Reset the EMA and use the system time.
-    if (fabs((stamp-system_time).toSec()) > 0.1)
+    if (fabs((stamp-system_time).seconds()) > 0.1)
     {
         adj_count_ = 0;
         hardware_clock_ = 0.0;
         last_hardware_time_stamp_ = 0;
         stamp = system_time;
-        ROS_INFO("%s: detected clock warp, reset EMA", __func__);
+        RCLCPP_INFO(logger_, "%s: detected clock warp, reset EMA", __func__);
     }
   }
   return stamp;

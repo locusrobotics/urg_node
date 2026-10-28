@@ -36,25 +36,32 @@
 #define URG_NODE_URG_NODE_DRIVER_H
 
 #include <atomic>
+#include <memory>
+#include <mutex>
 #include <string>
-#include <ros/ros.h>
-#include <dynamic_reconfigure/server.h>
-#include <laser_proc/LaserTransport.h>
-#include <diagnostic_updater/diagnostic_updater.h>
-#include <diagnostic_updater/publisher.h>
-#include <urg_node/URGConfig.h>
-#include <std_srvs/Trigger.h>
-#include <bondcpp/bond.h>
+#include <thread>
+#include <vector>
+
+#include <diagnostic_updater/diagnostic_updater.hpp>
+#include <diagnostic_updater/publisher.hpp>
+#include <laser_proc/laser_publisher.hpp>
+
+#include <rcl_interfaces/msg/set_parameters_result.hpp>
+#include <rclcpp/rclcpp.hpp>
+
+#include <std_srvs/srv/trigger.hpp>
+
+#include <urg_node_msgs/msg/status.hpp>
 
 #include "urg_node/urg_c_wrapper.hpp"
 
 namespace urg_node
 {
-class UrgNode
+class UrgNode : public rclcpp::Node
 {
 public:
-  UrgNode();
-  UrgNode(ros::NodeHandle nh, ros::NodeHandle private_nh);
+  explicit UrgNode(const rclcpp::NodeOptions & node_options = rclcpp::NodeOptions());
+
   ~UrgNode();
 
   /**
@@ -72,30 +79,28 @@ public:
 private:
   void initSetup();
   bool connect();
-  bool reconfigure_callback(urg_node::URGConfig& config, int level);
-  void update_reconfigure_limits();
+  rcl_interfaces::msg::SetParametersResult paramChangeCallback(
+    const std::vector<rclcpp::Parameter>& parameters);
   void calibrate_time_offset();
-  void addDiagnostics();
   void updateDiagnostics();
   void populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrapper &stat);
   void scanThread();
   bool sensorStatusOk(const std::string& status) const;
-  bool statusCallback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  void statusCallback(
+    const std::shared_ptr<rmw_request_id_t> request_header,
+    const std_srvs::srv::Trigger::Request::SharedPtr req,
+    const std_srvs::srv::Trigger::Response::SharedPtr res);
 
-  ros::NodeHandle nh_;
-  ros::NodeHandle pnh_;
+  std::thread run_thread_;
+  std::thread diagnostics_thread_;
+  std::thread scan_thread_;
 
-  boost::thread diagnostics_thread_;
-  boost::thread scan_thread_;
+  std::unique_ptr<urg_node::URGCWrapper> urg_;
+  diagnostic_updater::Updater diagnostic_updater_;
+  std::unique_ptr<diagnostic_updater::HeaderlessTopicDiagnostic> laser_freq_;
+  std::unique_ptr<diagnostic_updater::HeaderlessTopicDiagnostic> echoes_freq_;
 
-  boost::shared_ptr<bond::Bond> bond_ = nullptr;
-  boost::shared_ptr<urg_node::URGCWrapper> urg_;
-  boost::shared_ptr<dynamic_reconfigure::Server<urg_node::URGConfig> > srv_;  ///< Dynamic reconfigure server
-  boost::shared_ptr<diagnostic_updater::Updater> diagnostic_updater_;
-  boost::shared_ptr<diagnostic_updater::HeaderlessTopicDiagnostic> laser_freq_;
-  boost::shared_ptr<diagnostic_updater::HeaderlessTopicDiagnostic> echoes_freq_;
-
-  boost::mutex lidar_mutex_;
+  std::mutex lidar_mutex_;
 
   /**
    * @brief Detailed device status,
@@ -133,13 +138,31 @@ private:
   double diagnostics_window_time_;
   bool detailed_status_;
 
+  /** The laser output frame_id. */
+  std::string frame_id_;
+  /** A manually calibrated offset (in seconds) added to the timestamp before publication. */
+  double time_offset_;
+  /** Adjustment, in meters, for ranges returned at all angles. */
+  float range_offset_;
+  /** Controls the angle of the first range measurement, in radians. */
+  double angle_min_;
+  /** Controls the angle of the last range measurement, in radians. */
+  double angle_max_;
+  /** Number of adjacent range measurements to cluster into a single reading. */
+  int cluster_;
+  /** Number of input messages to skip between each output message. */
+  int skip_;
+
   std::atomic_bool service_yield_;
 
-  ros::Publisher laser_pub_;
-  laser_proc::LaserPublisher echoes_pub_;
-  ros::Publisher status_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr laser_pub_;
+  std::unique_ptr<laser_proc::LaserPublisher> echoes_pub_;
+  rclcpp::Publisher<urg_node_msgs::msg::Status>::SharedPtr status_pub_;
 
-  ros::ServiceServer status_service_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr status_service_;
+
+  // Need to hold reference to callback, or it gets deregistered
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameters_callback_handle_;
 };
 
 }  // namespace urg_node

@@ -33,11 +33,10 @@
 
 #include "urg_node/urg_node_driver.hpp"
 
-#include <diagnostic_msgs/AddDiagnostics.h>
-#include <diagnostic_msgs/DiagnosticStatus.h>
+#include <memory>
+#include <sstream>
 #include <string>
-#include <tf/tf.h>  // tf header for resolving tf prefix
-#include <urg_node_msgs/Status.h>
+#include <vector>
 
 namespace urg_node
 {
@@ -45,63 +44,102 @@ namespace urg_node
 // Useful typedefs
 typedef diagnostic_updater::FrequencyStatusParam FrequencyStatusParam;
 
-UrgNode::UrgNode(ros::NodeHandle nh, ros::NodeHandle private_nh) :
-  nh_(nh),
-  pnh_(private_nh)
-{
-  initSetup();
-}
-
-UrgNode::UrgNode():
-  nh_(),
-  pnh_("~")
+UrgNode::UrgNode(const rclcpp::NodeOptions & node_options)
+: Node("urg_node", node_options),
+  diagnostic_updater_(this),
+  error_count_(0),
+  freq_min_(0.0),
+  close_diagnostics_(true),
+  close_scan_(true),
+  ip_port_(10940),
+  ip_address_(""),
+  serial_port_("/dev/ttyACM0"),
+  serial_baud_(115200),
+  calibrate_time_(false),
+  synchronize_time_(false),
+  publish_intensity_(true),
+  publish_multiecho_(false),
+  error_limit_(4),
+  diagnostics_tolerance_(0.05),
+  diagnostics_window_time_(5.0),
+  detailed_status_(false),
+  frame_id_("laser"),
+  time_offset_(0.0),
+  range_offset_(0.0f),
+  angle_min_(-3.141592),
+  angle_max_(3.141592),
+  cluster_(1),
+  skip_(0),
+  service_yield_(false)
 {
   initSetup();
 }
 
 void UrgNode::initSetup()
 {
-  close_diagnostics_ = true;
-  close_scan_ = true;
-  service_yield_ = false;
-
   device_status_.detailed_status.error_code = 0;
   device_status_.detailed_status.lockout_state = false;
 
-  // Initialize node and nodehandles
+  // Declare parameters so we can change these later. Dynamic reconfiguration
+  // (changing values at runtime through `ros2 param set`) is not implemented
+  // yet; values are read once here and applied when connecting to the laser.
+  ip_address_ = this->declare_parameter<std::string>("ip_address", ip_address_);
+  ip_port_ = this->declare_parameter<int>("ip_port", ip_port_);
+  serial_port_ = this->declare_parameter<std::string>("serial_port", serial_port_);
+  serial_baud_ = this->declare_parameter<int>("serial_baud", serial_baud_);
+  calibrate_time_ = this->declare_parameter<bool>("calibrate_time", calibrate_time_);
+  synchronize_time_ = this->declare_parameter<bool>("synchronize_time", synchronize_time_);
+  publish_intensity_ = this->declare_parameter<bool>("publish_intensity", publish_intensity_);
+  publish_multiecho_ = this->declare_parameter<bool>("publish_multiecho", publish_multiecho_);
+  error_limit_ = this->declare_parameter<int>("error_limit", error_limit_);
+  diagnostics_tolerance_ = this->declare_parameter<double>(
+    "diagnostics_tolerance", diagnostics_tolerance_);
+  diagnostics_window_time_ = this->declare_parameter<double>(
+    "diagnostics_window_time", diagnostics_window_time_);
+  detailed_status_ = this->declare_parameter<bool>("get_detailed_status", detailed_status_);
+  frame_id_ = this->declare_parameter<std::string>("frame_id", frame_id_);
+  time_offset_ = this->declare_parameter<double>("time_offset", time_offset_);
+  range_offset_ = static_cast<float>(
+    this->declare_parameter<double>("range_offset", static_cast<double>(range_offset_)));
+  angle_min_ = this->declare_parameter<double>("angle_min", angle_min_);
+  angle_max_ = this->declare_parameter<double>("angle_max", angle_max_);
+  cluster_ = this->declare_parameter<int>("cluster", cluster_);
+  skip_ = this->declare_parameter<int>("skip", skip_);
 
-  // Get parameters so we can change these later.
-  pnh_.param<std::string>("ip_address", ip_address_, "");
-  pnh_.param<int>("ip_port", ip_port_, 10940);
-  pnh_.param<std::string>("serial_port", serial_port_, "/dev/ttyACM0");
-  pnh_.param<int>("serial_baud", serial_baud_, 115200);
-  pnh_.param<bool>("calibrate_time", calibrate_time_, false);
-  pnh_.param<bool>("synchronize_time", synchronize_time_, false);
-  pnh_.param<bool>("publish_intensity", publish_intensity_, true);
-  pnh_.param<bool>("publish_multiecho", publish_multiecho_, false);
-  pnh_.param<int>("error_limit", error_limit_, 4);
-  pnh_.param<double>("diagnostics_tolerance", diagnostics_tolerance_, 0.05);
-  pnh_.param<double>("diagnostics_window_time", diagnostics_window_time_, 5.0);
-  pnh_.param<bool>("get_detailed_status", detailed_status_, false);
   // Set up publishers and diagnostics updaters, we only need one
   if (publish_multiecho_)
   {
-    echoes_pub_ = laser_proc::LaserTransport::advertiseLaser(nh_, 20);
+    echoes_pub_ = std::make_unique<laser_proc::LaserPublisher>(this->get_node_topics_interface(), 20);
   }
   else
   {
-    laser_pub_ = nh_.advertise<sensor_msgs::LaserScan>("scan", 20);
+    laser_pub_ = this->create_publisher<sensor_msgs::msg::LaserScan>("scan", 20);
   }
 
-  status_service_ = nh_.advertiseService("update_laser_status", &UrgNode::statusCallback, this);
-  status_pub_ = nh_.advertise<urg_node_msgs::Status>("laser_status", 1, true);
+  status_service_ = this->create_service<std_srvs::srv::Trigger>(
+    "update_laser_status",
+    std::bind(
+      &UrgNode::statusCallback, this,
+      std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-  diagnostic_updater_.reset(new diagnostic_updater::Updater());
-  diagnostic_updater_->add("Hardware Status", this, &UrgNode::populateDiagnosticsStatus);
+  status_pub_ = this->create_publisher<urg_node_msgs::msg::Status>("laser_status", 1);
+
+  diagnostic_updater_.add("Hardware Status", this, &UrgNode::populateDiagnosticsStatus);
+
+  parameters_callback_handle_ = this->add_on_set_parameters_callback(
+    std::bind(&UrgNode::paramChangeCallback, this, std::placeholders::_1));
+
+  // Put this in a separate thread since connecting might take a while, and a
+  // Node's constructor must return promptly (e.g. when loaded as a component).
+  run_thread_ = std::thread(std::bind(&UrgNode::run, this));
 }
 
 UrgNode::~UrgNode()
 {
+  if (run_thread_.joinable())
+  {
+    run_thread_.join();
+  }
   if (diagnostics_thread_.joinable())
   {
     // Clean up our diagnostics thread.
@@ -119,7 +157,7 @@ bool UrgNode::updateStatus()
 {
   bool result = false;
   service_yield_ = true;
-  boost::mutex::scoped_lock lock(lidar_mutex_);
+  std::unique_lock<std::mutex> lock(lidar_mutex_);
 
   if (urg_)
   {
@@ -128,7 +166,7 @@ bool UrgNode::updateStatus()
     {
       if (urg_->getAR00Status(device_status_.detailed_status))
       {
-        urg_node_msgs::Status msg;
+        urg_node_msgs::msg::Status msg;
         msg.operating_mode = device_status_.detailed_status.operating_mode;
         msg.error_status = device_status_.detailed_status.error_state;
         msg.error_code = device_status_.detailed_status.error_code;
@@ -150,215 +188,150 @@ bool UrgNode::updateStatus()
         // }
         // else
         // {
-        //   ROS_WARN("Failed to get detection report.");
+        //   RCLCPP_WARN(this->get_logger(), "Failed to get detection report.");
         // }
 
         // Publish the status on the latched topic for inspection.
-        status_pub_.publish(msg);
+        status_pub_->publish(msg);
         result = true;
       }
       else
       {
-        ROS_WARN("Failed to retrieve status");
+        RCLCPP_WARN(this->get_logger(), "Failed to retrieve status");
       }
     }
   }
   return result;
 }
 
-bool UrgNode::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
+void UrgNode::statusCallback(
+  const std::shared_ptr<rmw_request_id_t> request_header,
+  const std_srvs::srv::Trigger::Request::SharedPtr req,
+  const std_srvs::srv::Trigger::Response::SharedPtr res)
 {
-  ROS_INFO("Got update lidar status callback");
-  res.success = false;
-  res.message = "Laser not ready";
+  (void) request_header;
+  (void) req;
+
+  RCLCPP_INFO(this->get_logger(), "Got update lidar status callback");
+  res->success = false;
+  res->message = "Laser not ready";
 
   if (updateStatus())
   {
-    res.message = "Status retrieved";
-    res.success = true;
+    res->message = "Status retrieved";
+    res->success = true;
   }
   else
   {
-    res.message = "Failed to update status";
-    res.success = false;
+    res->message = "Failed to update status";
+    res->success = false;
   }
-
-  return true;
 }
 
-bool UrgNode::reconfigure_callback(urg_node::URGConfig& config, int level)
+rcl_interfaces::msg::SetParametersResult UrgNode::paramChangeCallback(
+  const std::vector<rclcpp::Parameter>& parameters)
 {
-  if (!urg_)
-  {
-    ROS_ERROR("Reconfigure failed, not ready");
-    return false;
-  }
+  // Dynamic reconfiguration is not implemented yet (see initSetup() comment);
+  // this only validates that a requested change is well-formed. A follow-up
+  // change will make these parameters truly dynamic.
+  auto result = rcl_interfaces::msg::SetParametersResult();
+  result.successful = true;
 
-  if (level < 0)  // First call, initialize, laser not yet started
-  {
-    urg_->setAngleLimitsAndCluster(config.angle_min, config.angle_max, config.cluster);
-    urg_->setSkip(config.skip);
-  }
-  else if (level > 0)  // Must stop
-  {
-    urg_->stop();
-    ROS_INFO("Stopped data due to reconfigure.");
+  std::stringstream reason;
 
-    // Change values that required stopping
-    urg_->setAngleLimitsAndCluster(config.angle_min, config.angle_max, config.cluster);
-    urg_->setSkip(config.skip);
+  for (const auto& parameter : parameters)
+  {
+    const rclcpp::ParameterType type = parameter.get_type();
+    const std::string& name = parameter.get_name();
 
-    try
+    if (name == "frame_id" || name == "ip_address" || name == "serial_port")
     {
-      urg_->start();
-      ROS_INFO("Streaming data after reconfigure.");
+      if (type != rclcpp::ParameterType::PARAMETER_STRING)
+      {
+        reason << "The parameter " << name << " must be a string.\n";
+        result.successful = false;
+      }
     }
-    catch (std::runtime_error& e)
+    else if (name == "ip_port" || name == "serial_baud" || name == "error_limit")
     {
-      ROS_FATAL("%s", e.what());
-      ros::Duration(1.0).sleep();
-      ros::shutdown();
-      return false;
+      if (type != rclcpp::ParameterType::PARAMETER_INTEGER)
+      {
+        reason << "The parameter " << name << " must be an integer.\n";
+        result.successful = false;
+      }
+    }
+    else if (name == "calibrate_time" || name == "synchronize_time" ||
+      name == "publish_intensity" || name == "publish_multiecho" || name == "get_detailed_status")
+    {
+      if (type != rclcpp::ParameterType::PARAMETER_BOOL)
+      {
+        reason << "The parameter " << name << " must be a bool.\n";
+        result.successful = false;
+      }
+    }
+    else if (name == "diagnostics_tolerance" || name == "diagnostics_window_time" ||
+      name == "time_offset" || name == "range_offset" || name == "angle_min" || name == "angle_max")
+    {
+      if (type != rclcpp::ParameterType::PARAMETER_DOUBLE && type != rclcpp::ParameterType::PARAMETER_INTEGER)
+      {
+        reason << "The parameter " << name << " must be a double.\n";
+        result.successful = false;
+      }
+    }
+    else if (name == "cluster")
+    {
+      if (type != rclcpp::ParameterType::PARAMETER_INTEGER ||
+        parameter.as_int() < 1 || parameter.as_int() > 99)
+      {
+        reason << "The parameter " << name << " must be an integer between 1 and 99.\n";
+        result.successful = false;
+      }
+    }
+    else if (name == "skip")
+    {
+      if (type != rclcpp::ParameterType::PARAMETER_INTEGER ||
+        parameter.as_int() < 0 || parameter.as_int() > 9)
+      {
+        reason << "The parameter " << name << " must be an integer between 0 and 9.\n";
+        result.successful = false;
+      }
     }
   }
-
-  // The publish frequency changes based on the number of skipped scans.
-  // Update accordingly here.
-  freq_min_ = 1.0 / (urg_->getScanPeriod() * (config.skip + 1));
-
-  std::string frame_id = tf::resolve(config.tf_prefix, config.frame_id);
-  urg_->setFrameId(frame_id);
-  urg_->setUserLatency(config.time_offset);
-  urg_->setRangeOffset(config.range_offset);
-
-  return true;
-}
-
-void UrgNode::update_reconfigure_limits()
-{
-  if (!urg_ || !srv_)
-  {
-    ROS_DEBUG_THROTTLE(10, "Unable to update reconfigure limits. Not Ready.");
-    return;
-  }
-
-  urg_node::URGConfig min, max;
-  srv_->getConfigMin(min);
-  srv_->getConfigMax(max);
-
-  min.angle_min = urg_->getAngleMinLimit();
-  min.angle_max = min.angle_min;
-  max.angle_max = urg_->getAngleMaxLimit();
-  max.angle_min = max.angle_max;
-
-  srv_->setConfigMin(min);
-  srv_->setConfigMax(max);
+  result.reason = reason.str();
+  return result;
 }
 
 void UrgNode::calibrate_time_offset()
 {
-  boost::mutex::scoped_lock lock(lidar_mutex_);
+  std::unique_lock<std::mutex> lock(lidar_mutex_);
   if (!urg_)
   {
-    ROS_DEBUG_THROTTLE(10, "Unable to calibrate time offset. Not Ready.");
+    RCLCPP_DEBUG(this->get_logger(), "Unable to calibrate time offset. Not Ready.");
     return;
   }
   try
   {
     // Don't let outside interruption effect lidar offset.
-    ROS_INFO("Starting calibration. This will take a few seconds.");
-    ROS_WARN("Time calibration is still experimental.");
-    ros::Duration latency = urg_->computeLatency(10);
-    ROS_INFO("Calibration finished. Latency is: %.4f.", latency.toSec());
+    RCLCPP_INFO(this->get_logger(), "Starting calibration. This will take a few seconds.");
+    RCLCPP_WARN(this->get_logger(), "Time calibration is still experimental.");
+    rclcpp::Duration latency = urg_->computeLatency(10);
+    RCLCPP_INFO(this->get_logger(), "Calibration finished. Latency is: %.4f.", latency.seconds());
   }
-  catch (std::runtime_error& e)
+  catch (const std::runtime_error& e)
   {
-    ROS_FATAL("Could not calibrate time offset: %s", e.what());
-    ros::Duration(1.0).sleep();
-    ros::shutdown();
+    RCLCPP_FATAL(this->get_logger(), "Could not calibrate time offset: %s", e.what());
+    rclcpp::sleep_for(std::chrono::seconds(1));
+    rclcpp::shutdown();
   }
-}
-
-// Add diagnostic analyzers to the diagnostic aggregator
-void UrgNode::addDiagnostics()
-{
-  std::string node_namespace = ros::this_node::getNamespace();
-  std::string node_prefix = "";
-  std::string node_name = ros::this_node::getName().substr(1);
-  std::string node_path;
-  std::string node_id = node_name;
-
-  // Create "Fake" Namespace for Diagnostics
-  if (node_namespace == "/")
-  {
-    node_namespace = ros::this_node::getName();
-    node_prefix = ros::this_node::getName() + "/";
-  }
-
-  // Sanitize Node ID
-  size_t pos = node_id.find("/");
-  while (pos != std::string::npos)
-  {
-    node_id.replace(pos, 1, "_");
-    pos = node_id.find("/");
-  }
-
-  // Sanitize Node Path
-  node_path = node_id;
-  pos = node_path.find("_");
-  while (pos != std::string::npos)
-  {
-    node_path.replace(pos, 1, " ");
-    pos = node_path.find("_");
-  }
-
-  // GroupAnalyzer Parameters
-  if (!ros::param::has(node_prefix + "analyzers/hokuyo/path"))
-  {
-    ros::param::set(node_prefix + "analyzers/hokuyo/path", "Hokuyo");
-    ros::param::set(node_prefix + "analyzers/hokuyo/type", "diagnostic_aggregator/AnalyzerGroup");
-  }
-
-  // Analyzer Parameters
-  std::string analyzerPath = node_prefix + "analyzers/hokuyo/analyzers/" + node_id;
-  if (!ros::param::has(analyzerPath + "/path"))
-  {
-    ros::param::set(analyzerPath + "/path", node_path);
-    ros::param::set(analyzerPath + "/type", "diagnostic_aggregator/GenericAnalyzer");
-    ros::param::set(analyzerPath + "/startswith", node_name);
-    ros::param::set(analyzerPath + "/remove_prefix", node_name);
-  }
-
-  // Bond to Diagnostics Aggregator
-  if (bond_ == nullptr)
-  {
-    bond_ = boost::shared_ptr<bond::Bond>(new bond::Bond("/diagnostics_agg/bond" + node_namespace, node_namespace));
-  }
-  else if (!bond_->isBroken())
-  {
-    return;
-  }
-  bond_->setConnectTimeout(120);
-
-  // Call AddDiagnostics Service
-  diagnostic_msgs::AddDiagnostics srv;
-  srv.request.load_namespace = node_namespace;
-  if (!ros::service::waitForService("/diagnostics_agg/add_diagnostics", 1000))
-  {
-    return;
-  }
-  bond_->start();
-  ros::service::call("/diagnostics_agg/add_diagnostics", srv);
 }
 
 // Diagnostics update task to be run in a thread.
 void UrgNode::updateDiagnostics()
 {
-  addDiagnostics();
   while (!close_diagnostics_)
   {
-    diagnostic_updater_->update();
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+    diagnostic_updater_.force_update();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 }
 
@@ -367,7 +340,7 @@ void UrgNode::populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrap
 {
   if (!urg_)
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Not Connected");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Not Connected");
     return;
   }
 
@@ -384,26 +357,26 @@ void UrgNode::populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrap
 
   if (!urg_->isStarted())
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Not Connected: " + device_status_.status_str);
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Not Connected: " + device_status_.status_str);
   }
   else if (!sensorStatusOk(device_status_.status_str))
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Abnormal status: " + device_status_.status_str);
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Abnormal status: " + device_status_.status_str);
   }
   else if (device_status_.detailed_status.error_code != 0)
   {
     stat.summaryf(
-      diagnostic_msgs::DiagnosticStatus::ERROR,
+      diagnostic_msgs::msg::DiagnosticStatus::ERROR,
       "Lidar reporting error code: %X",
       device_status_.detailed_status.error_code);
   }
   else if (device_status_.detailed_status.lockout_state)
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Lidar locked out.");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Lidar locked out.");
   }
   else
   {
-    stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "Streaming");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Streaming");
   }
 
   stat.add("Vendor Name", device_status_.vendor_name);
@@ -412,8 +385,8 @@ void UrgNode::populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrap
   stat.add("Firmware Date", device_status_.firmware_date);
   stat.add("Protocol Version", device_status_.protocol_version);
   stat.add("Device ID", device_status_.device_id);
-  stat.add("Computed Latency", urg_->getComputedLatency());
-  stat.add("User Time Offset", urg_->getUserTimeOffset());
+  stat.add("Computed Latency", urg_->getComputedLatency().seconds());
+  stat.add("User Time Offset", urg_->getUserTimeOffset().seconds());
 
   // Things not explicitly required by REP-0138, but still interesting.
   stat.add("Device Status", device_status_.status_str);
@@ -427,24 +400,22 @@ bool UrgNode::connect()
 {
   // Don't let external access to retrieve
   // status during the connection process.
-  boost::mutex::scoped_lock lock(lidar_mutex_);
+  std::unique_lock<std::mutex> lock(lidar_mutex_);
 
   try
   {
     urg_.reset();  // Clear any previous connections();
     if (!ip_address_.empty())
     {
-      urg_.reset(
-        new urg_node::URGCWrapper(ip_address_, ip_port_, publish_intensity_, publish_multiecho_, synchronize_time_));
+      EthernetConnection connection{ip_address_, ip_port_};
+      urg_ = std::make_unique<urg_node::URGCWrapper>(
+        connection, publish_intensity_, publish_multiecho_, synchronize_time_, this->get_logger());
     }
     else
     {
-      urg_.reset(new urg_node::URGCWrapper(
-        serial_baud_,
-        serial_port_,
-        publish_intensity_,
-        publish_multiecho_,
-        synchronize_time_));
+      SerialConnection connection{serial_port_, serial_baud_};
+      urg_ = std::make_unique<urg_node::URGCWrapper>(
+        connection, publish_intensity_, publish_multiecho_, synchronize_time_, this->get_logger());
     }
 
     std::stringstream ss;
@@ -467,7 +438,7 @@ bool UrgNode::connect()
       ss << " intensity and";
     }
     ss << " ID: " << urg_->getDeviceID();
-    ROS_INFO_STREAM(ss.str());
+    RCLCPP_INFO(this->get_logger(), "%s", ss.str().c_str());
 
     device_status_.status_str = urg_->getSensorStatus();
     device_status_.vendor_name = urg_->getVendorName();
@@ -477,22 +448,32 @@ bool UrgNode::connect()
     device_status_.protocol_version = urg_->getProtocolVersion();
     device_status_.device_id = urg_->getDeviceID();
 
-    if (diagnostic_updater_ && urg_)
-    {
-      diagnostic_updater_->setHardwareID(urg_->getDeviceID());
-    }
+    diagnostic_updater_.setHardwareID(urg_->getDeviceID());
+
+    // Configure initial properties. Dynamic reconfiguration (being able to
+    // change these at runtime) is not implemented yet; see initSetup().
+
+    // The publish frequency changes based on the number of skipped scans.
+    // Update accordingly here.
+    freq_min_ = 1.0 / (urg_->getScanPeriod() * (skip_ + 1));
+
+    urg_->setAngleLimitsAndCluster(angle_min_, angle_max_, cluster_);
+    urg_->setSkip(skip_);
+    urg_->setFrameId(frame_id_);
+    urg_->setUserLatency(time_offset_);
+    urg_->setRangeOffset(range_offset_);
 
     return true;
   }
-  catch (std::runtime_error& e)
+  catch (const std::runtime_error& e)
   {
-    ROS_ERROR_THROTTLE(10.0, "Error connecting to Hokuyo: %s", e.what());
+    RCLCPP_ERROR(this->get_logger(), "Error connecting to Hokuyo: %s", e.what());
     urg_.reset();
     return false;
   }
-  catch (std::exception& e)
+  catch (const std::exception& e)
   {
-    ROS_ERROR_THROTTLE(10.0, "Unknown error connecting to Hokuyo: %s", e.what());
+    RCLCPP_ERROR(this->get_logger(), "Unknown error connecting to Hokuyo: %s", e.what());
     urg_.reset();
     return false;
   }
@@ -508,36 +489,19 @@ void UrgNode::scanThread()
     {
       if (!connect())
       {
-        boost::this_thread::sleep(boost::posix_time::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         continue;  // Connect failed, sleep, try again.
       }
     }
-
-    // Configure limits (Must do this after creating the urgwidget)
-    update_reconfigure_limits();
 
     if (calibrate_time_)
     {
       calibrate_time_offset();
     }
 
-    // Clear the dynamic reconfigure server
-    srv_.reset();
-    // Spin once to de-register it's services before making a new
-    // service next.
-    ros::spinOnce();
-
-    if (!urg_ || !ros::ok())
+    if (!urg_ || !rclcpp::ok())
     {
       continue;
-    }
-    else
-    {
-      // Set up dynamic reconfigure
-      srv_.reset(new dynamic_reconfigure::Server<urg_node::URGConfig>(pnh_));
-      // Configure limits (Must do this after creating the urgwidget)
-      update_reconfigure_limits();
-      srv_->setCallback(boost::bind(&UrgNode::reconfigure_callback, this, _1, _2));
     }
 
     // Before starting, update the status
@@ -554,22 +518,22 @@ void UrgNode::scanThread()
       }
       device_status_.status_str = urg_->getSensorStatus();
       urg_->start();
-      ROS_INFO("Streaming data.");
+      RCLCPP_INFO(this->get_logger(), "Streaming data.");
       // Clear the error count.
       error_count_ = 0;
     }
-    catch (std::runtime_error& e)
+    catch (const std::runtime_error& e)
     {
-      ROS_ERROR_THROTTLE(10.0, "Error starting Hokuyo: %s", e.what());
+      RCLCPP_ERROR(this->get_logger(), "Error starting Hokuyo: %s", e.what());
       urg_.reset();
-      ros::Duration(1.0).sleep();
+      rclcpp::sleep_for(std::chrono::seconds(1));
       continue;  // Return to top of main loop
     }
     catch (...)
     {
-      ROS_ERROR_THROTTLE(10.0, "Unknown error starting Hokuyo");
+      RCLCPP_ERROR(this->get_logger(), "Unknown error starting Hokuyo");
       urg_.reset();
-      ros::Duration(1.0).sleep();
+      rclcpp::sleep_for(std::chrono::seconds(1));
       continue;  // Return to top of main loop
     }
 
@@ -578,33 +542,33 @@ void UrgNode::scanThread()
       // Don't allow external access during grabbing the scan.
       try
       {
-        boost::mutex::scoped_lock lock(lidar_mutex_);
+        std::unique_lock<std::mutex> lock(lidar_mutex_);
         if (publish_multiecho_)
         {
-          const sensor_msgs::MultiEchoLaserScanPtr msg(new sensor_msgs::MultiEchoLaserScan());
+          sensor_msgs::msg::MultiEchoLaserScan msg;
           if (urg_->grabScan(msg))
           {
-            echoes_pub_.publish(msg);
+            echoes_pub_->publish(msg);
             echoes_freq_->tick();
           }
           else
           {
-            ROS_WARN_THROTTLE(10.0, "Could not grab multi echo scan.");
+            RCLCPP_WARN(this->get_logger(), "Could not grab multi echo scan.");
             device_status_.status_str = urg_->getSensorStatus();
             error_count_++;
           }
         }
         else
         {
-          const sensor_msgs::LaserScanPtr msg(new sensor_msgs::LaserScan());
+          sensor_msgs::msg::LaserScan msg;
           if (urg_->grabScan(msg))
           {
-            laser_pub_.publish(msg);
+            laser_pub_->publish(msg);
             laser_freq_->tick();
           }
           else
           {
-            ROS_WARN_THROTTLE(10.0, "Could not grab single echo scan.");
+            RCLCPP_WARN(this->get_logger(), "Could not grab single echo scan.");
             device_status_.status_str = urg_->getSensorStatus();
             error_count_++;
           }
@@ -612,22 +576,22 @@ void UrgNode::scanThread()
       }
       catch (...)
       {
-        ROS_ERROR_THROTTLE(10.0, "Unknown error grabbing Hokuyo scan.");
+        RCLCPP_ERROR(this->get_logger(), "Unknown error grabbing Hokuyo scan.");
         error_count_++;
       }
 
       if (service_yield_)
       {
-        boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         service_yield_ = false;
       }
 
       // Reestablish conneciton if things seem to have gone wrong.
       if (error_count_ > error_limit_)
       {
-        ROS_ERROR_THROTTLE(10.0, "Error count exceeded limit, reconnecting.");
+        RCLCPP_ERROR(this->get_logger(), "Error count exceeded limit, reconnecting.");
         urg_.reset();
-        ros::Duration(2.0).sleep();
+        rclcpp::sleep_for(std::chrono::seconds(2));
 
         break;  // Return to top of main loop
       }
@@ -658,25 +622,28 @@ void UrgNode::run()
 
   if (publish_multiecho_)
   {
-    echoes_freq_.reset(new diagnostic_updater::HeaderlessTopicDiagnostic(
+    echoes_freq_ = std::make_unique<diagnostic_updater::HeaderlessTopicDiagnostic>(
       "Laser Echoes",
-      *diagnostic_updater_,
-      FrequencyStatusParam(&freq_min_, &freq_min_, diagnostics_tolerance_, diagnostics_window_time_)));
+      diagnostic_updater_,
+      FrequencyStatusParam(&freq_min_, &freq_min_, diagnostics_tolerance_, diagnostics_window_time_));
   }
   else
   {
-    laser_freq_.reset(new diagnostic_updater::HeaderlessTopicDiagnostic(
+    laser_freq_ = std::make_unique<diagnostic_updater::HeaderlessTopicDiagnostic>(
       "Laser Scan",
-      *diagnostic_updater_,
-      FrequencyStatusParam(&freq_min_, &freq_min_, diagnostics_tolerance_, diagnostics_window_time_)));
+      diagnostic_updater_,
+      FrequencyStatusParam(&freq_min_, &freq_min_, diagnostics_tolerance_, diagnostics_window_time_));
   }
 
   // Now that we are setup, kick off diagnostics.
   close_diagnostics_ = false;
-  diagnostics_thread_ = boost::thread(boost::bind(&UrgNode::updateDiagnostics, this));
+  diagnostics_thread_ = std::thread(std::bind(&UrgNode::updateDiagnostics, this));
 
   // Start scanning now that everything is configured.
   close_scan_ = false;
-  scan_thread_ = boost::thread(boost::bind(&UrgNode::scanThread, this));
+  scan_thread_ = std::thread(std::bind(&UrgNode::scanThread, this));
 }
 }  // namespace urg_node
+
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(urg_node::UrgNode)

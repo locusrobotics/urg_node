@@ -33,8 +33,11 @@
 *********************************************************************/
 
 #include <urg_node/urg_c_wrapper.hpp>
+#include <memory>
 #include <vector>
 #include <string>
+
+#include <rclcpp/rclcpp.hpp>
 
 #include <fcntl.h>
 #include <stdlib.h>
@@ -73,8 +76,6 @@ std::vector<std::string> split(const std::string &s, char delim)
 int
 main(int argc, char** argv)
 {
-  ros::Time::init();
-
   if (argc < 2 || argc > 3)
   {
     fprintf(stderr,
@@ -91,13 +92,11 @@ main(int argc, char** argv)
   {
     int fds[2];
     int res;
-    char buf[256];
-    int so;
 
     res = pipe(fds);
     assert(res == 0);
 
-    so = fileno(stdout);
+    int so = fileno(stdout);
     // close stdout handle and make the writable part of fds the new stdout.
     res = dup2(fds[1], so);
     assert(res != -1);
@@ -131,7 +130,7 @@ main(int argc, char** argv)
     }
   }
 
-  boost::shared_ptr<urg_node::URGCWrapper> urg_;
+  std::unique_ptr<urg_node::URGCWrapper> urg_;
 
   for (int retries = 10; retries; retries--)
   {
@@ -140,13 +139,15 @@ main(int argc, char** argv)
     {
       if (ip_address != "")
       {
-        urg_.reset(new urg_node::URGCWrapper(ip_address, ip_port,
-            publish_intensity, publish_multiecho, synchronize_time));
+        urg_node::EthernetConnection connection{ip_address, ip_port};
+        urg_ = std::make_unique<urg_node::URGCWrapper>(
+          connection, publish_intensity, publish_multiecho, synchronize_time);
       }
       else
       {
-        urg_.reset(new urg_node::URGCWrapper(serial_baud, serial_port,
-            publish_intensity, publish_multiecho, synchronize_time));
+        urg_node::SerialConnection connection{serial_port, serial_baud};
+        urg_ = std::make_unique<urg_node::URGCWrapper>(
+          connection, publish_intensity, publish_multiecho, synchronize_time);
       }
       std::string device_id = urg_->getDeviceID();
       if (verbose)
@@ -170,7 +171,7 @@ main(int argc, char** argv)
     {
       printf("getID failed: %s\n", e.what());
     }
-    ros::Duration(1.0).sleep();
+    rclcpp::sleep_for(std::chrono::seconds(1));
   }
 
   if (verbose)
