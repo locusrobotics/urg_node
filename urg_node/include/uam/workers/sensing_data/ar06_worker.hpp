@@ -35,9 +35,9 @@
 #ifndef UAM_WORKERS_SENSING_DATA_AR06_WORKER_H
 #define UAM_WORKERS_SENSING_DATA_AR06_WORKER_H
 
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/workers/uam_worker_base.h>
-#include <uam/uam_visitors.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/workers/uam_worker_base.hpp>
+#include <uam/uam_visitors.hpp>
 
 #include <optional>
 #include <string_view>

@@ -32,7 +32,7 @@
  */
 
 #include "ros/ros.h"
-#include <urg_node/urg_c_wrapper.h>
+#include <urg_node/urg_c_wrapper.hpp>
 #include <limits>
 #include <string>
 #include <vector>

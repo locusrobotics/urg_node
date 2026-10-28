@@ -41,8 +41,8 @@
 #include <boost/system/error_code.hpp>
 
 #include <ros/init.h>
-#include <uam/shape_shifter_packet.h>
-#include <uam/uam_visitors.h>
+#include <uam/shape_shifter_packet.hpp>
+#include <uam/uam_visitors.hpp>
 
 #include <memory>
 #include <string>

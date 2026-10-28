@@ -36,15 +36,15 @@
 #define UAM_WORKERS_UAM_COMMAND_WORKER_H
 
 // sensing data workers
-#include <uam/shape_shifter_packet.h>
-#include <uam/workers/empty_reply_worker.h>
-#include <uam/workers/sensing_data/ar00_worker.h>
-#include <uam/workers/sensing_data/ar01_worker.h>
-#include <uam/workers/sensing_data/ar06_worker.h>
-#include <uam/workers/vr00_worker.h>
-#include <uam/workers/xr00_worker.h>
-#include <uam/workers/id00_worker.h>
-#include <uam/workers/yr_worker.h>
+#include <uam/shape_shifter_packet.hpp>
+#include <uam/workers/empty_reply_worker.hpp>
+#include <uam/workers/sensing_data/ar00_worker.hpp>
+#include <uam/workers/sensing_data/ar01_worker.hpp>
+#include <uam/workers/sensing_data/ar06_worker.hpp>
+#include <uam/workers/vr00_worker.hpp>
+#include <uam/workers/xr00_worker.hpp>
+#include <uam/workers/id00_worker.hpp>
+#include <uam/workers/yr_worker.hpp>
 
 #include <string>
 #include <tuple>

@@ -36,7 +36,7 @@
 #define UAM_UAM_DRIVER_ROS_PARAMS_H
 
 #include <ros/node_handle.h>
-#include <uam/protocol_types/uam_protocol_types.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
 
 #include <optional>
 #include <string>

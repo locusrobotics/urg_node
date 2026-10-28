@@ -35,9 +35,9 @@
 #ifndef UAM_WORKERS_YR_WORKER_H
 #define UAM_WORKERS_YR_WORKER_H
 
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/uam_error_codes.h>
-#include <uam/workers/uam_worker_base.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/uam_error_codes.hpp>
+#include <uam/workers/uam_worker_base.hpp>
 
 #include <optional>
 #include <string>

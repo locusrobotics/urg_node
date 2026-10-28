@@ -46,7 +46,7 @@
 #include <std_srvs/Trigger.h>
 #include <bondcpp/bond.h>
 
-#include "urg_node/urg_c_wrapper.h"
+#include "urg_node/urg_c_wrapper.hpp"
 
 namespace urg_node
 {

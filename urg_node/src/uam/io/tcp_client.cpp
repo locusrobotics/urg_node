@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/io/tcp_client.h>
+#include <uam/io/tcp_client.hpp>
 
 #include <ros/console.h>
 

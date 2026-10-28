@@ -32,12 +32,12 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef UAM_WORKERS_XR00_WORKER_H
-#define UAM_WORKERS_XR00_WORKER_H
+#ifndef UAM_WORKERS_VR00_WORKER_H
+#define UAM_WORKERS_VR00_WORKER_H
 
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/workers/uam_worker_base.h>
-#include <uam/uam_visitors.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/workers/uam_worker_base.hpp>
+#include <uam/uam_visitors.hpp>
 
 #include <string_view>
 #include <optional>
@@ -45,9 +45,9 @@
 namespace uam
 {
 /**
- * @brief XR00 command worker
+ * @brief VR00 command worker
  */
-class XR00Worker : public WorkerBase<XR00Worker, 'X', 'R', '0', '0', protocol::XR00CommandReply>
+class VR00Worker : public WorkerBase<VR00Worker, 'V', 'R', '0', '0', protocol::VR00CommandReply>
 {
 public:
   /**
@@ -55,7 +55,7 @@ public:
    *
    * @param[in] idx_offset - Offset to be used in the buffer deserialization
    */
-  explicit XR00Worker(const uint32_t idx_offset = 0);
+  explicit VR00Worker(const uint32_t idx_offset = 0);
 
   /**
    * @brief Decode using raw buffer
@@ -75,26 +75,28 @@ public:
 
 private:
   /**
-   * @brief Decode status data using raw buffer
+   * @brief Decode version details using raw buffer
    *
    * @param[in] buffer - Raw byte array
    * @param[out] sensing_data - Decoded sensing data
    */
-  bool decodeStatusData(const std::string_view& buffer, protocol::sensing_data::StatusData& status_data) const;
+  bool decodeVersionDetails(const std::string_view& buffer, protocol::version_details::VersionDetails& version_details)
+    const;
 
   /**
-   * @brief Decode status data using raw reply
+   * @brief Decode version data using raw_reply
    *
-   * @param[in/out] status_data - Raw reply struct
+   * @param[in] version_details - Raw reply
+   * @param[out] sensing_data - Decoded sensing data
    */
-  bool decodeStatusData(protocol::sensing_data::StatusData& status_data) const;
+  bool decodeVersionDetails(protocol::version_details::VersionDetails& version_details) const;
 
   /**
-   * @brief Status data visitor (if buffer)
+   * @brief Version details visitor (if buffer)
    */
-  StatusDataVisitor status_data_visitor_;
+  VersionDetailsVisitor version_detail_visitor_;
 };
 
 }  // namespace uam
 
-#endif  // UAM_WORKERS_XR00_WORKER_H
+#endif  // UAM_WORKERS_VR00_WORKER_H

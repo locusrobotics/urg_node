@@ -32,7 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-#include <urg_node/urg_c_wrapper.h>
+#include <urg_node/urg_c_wrapper.hpp>
 #include <vector>
 #include <string>
 

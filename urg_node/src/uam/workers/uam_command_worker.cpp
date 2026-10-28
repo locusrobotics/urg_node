@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/workers/uam_command_worker.h>
+#include <uam/workers/uam_command_worker.hpp>
 
 #include <tuple>
 

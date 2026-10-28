@@ -36,9 +36,9 @@
 #define UAM_WORKERS_UAM_WORKER_BASE_H
 
 #include <ros/ros.h>
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/uam_error_codes.h>
-#include <uam/uam_visitors.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/uam_error_codes.hpp>
+#include <uam/uam_visitors.hpp>
 
 #include <boost/crc.hpp>
 

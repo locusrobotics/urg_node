@@ -33,7 +33,7 @@
  *********************************************************************/
 
 #include <ros/callback_queue.h>
-#include <uam/uam_driver_ros.h>
+#include <uam/uam_driver_ros.hpp>
 #include <urg_node/URGConfig.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>

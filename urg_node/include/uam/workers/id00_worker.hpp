@@ -32,12 +32,12 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef UAM_WORKERS_VR00_WORKER_H
-#define UAM_WORKERS_VR00_WORKER_H
+#ifndef UAM_WORKERS_ID00_WORKER_H
+#define UAM_WORKERS_ID00_WORKER_H
 
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/workers/uam_worker_base.h>
-#include <uam/uam_visitors.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/workers/uam_worker_base.hpp>
+#include <uam/uam_visitors.hpp>
 
 #include <string_view>
 #include <optional>
@@ -45,9 +45,9 @@
 namespace uam
 {
 /**
- * @brief VR00 command worker
+ * @brief ID00 command worker
  */
-class VR00Worker : public WorkerBase<VR00Worker, 'V', 'R', '0', '0', protocol::VR00CommandReply>
+class ID00Worker : public WorkerBase<ID00Worker, 'I', 'D', '0', '0', protocol::ID00CommandReply>
 {
 public:
   /**
@@ -55,7 +55,7 @@ public:
    *
    * @param[in] idx_offset - Offset to be used in the buffer deserialization
    */
-  explicit VR00Worker(const uint32_t idx_offset = 0);
+  explicit ID00Worker(const uint32_t idx_offset = 0);
 
   /**
    * @brief Decode using raw buffer
@@ -75,28 +75,20 @@ public:
 
 private:
   /**
-   * @brief Decode version details using raw buffer
+   * @brief Decode status data using raw buffer
    *
    * @param[in] buffer - Raw byte array
-   * @param[out] sensing_data - Decoded sensing data
+   * @param[out] configuration_id - Decoded configuratio id
    */
-  bool decodeVersionDetails(const std::string_view& buffer, protocol::version_details::VersionDetails& version_details)
-    const;
+  bool decodeConfigurationID(const std::string_view& buffer,
+                             protocol::configuration_details::ConfigurationID& configuration_id) const;
 
   /**
-   * @brief Decode version data using raw_reply
-   *
-   * @param[in] version_details - Raw reply
-   * @param[out] sensing_data - Decoded sensing data
+   * @brief Configuration ID buffer visitor
    */
-  bool decodeVersionDetails(protocol::version_details::VersionDetails& version_details) const;
-
-  /**
-   * @brief Version details visitor (if buffer)
-   */
-  VersionDetailsVisitor version_detail_visitor_;
+  ConfigurationIdVisitor configuration_id_visitor_;
 };
 
 }  // namespace uam
 
-#endif  // UAM_WORKERS_VR00_WORKER_H
+#endif  // UAM_WORKERS_ID00_WORKER_H

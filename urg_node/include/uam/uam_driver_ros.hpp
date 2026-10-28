@@ -39,10 +39,10 @@
 #include <sensor_msgs/LaserScan.h>
 #include <ros/callback_queue.h>
 #include <std_srvs/Trigger.h>
-#include <uam/uam_driver.h>
-#include <uam/uam_driver_ros_params.h>
+#include <uam/uam_driver.hpp>
+#include <uam/uam_driver_ros_params.hpp>
 #include <urg_node/URGConfig.h>
-#include <uam/type_traits.h>
+#include <uam/type_traits.hpp>
 #include <visualization_msgs/Marker.h>
 
 #include <atomic>

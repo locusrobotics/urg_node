@@ -31,7 +31,7 @@
  * Author: Chad Rockey, Michael Carroll, Mike O'Driscoll
  */
 
-#include "urg_node/urg_node_driver.h"
+#include "urg_node/urg_node_driver.hpp"
 
 #include <diagnostic_msgs/AddDiagnostics.h>
 #include <diagnostic_msgs/DiagnosticStatus.h>

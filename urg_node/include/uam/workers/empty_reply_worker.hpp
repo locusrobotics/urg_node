@@ -35,7 +35,7 @@
 #ifndef UAM_WORKERS_EMPTY_REPLY_WORKER_H
 #define UAM_WORKERS_EMPTY_REPLY_WORKER_H
 
-#include <uam/workers/uam_worker_base.h>
+#include <uam/workers/uam_worker_base.hpp>
 
 #include <optional>
 #include <string_view>

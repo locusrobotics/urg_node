@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/workers/sensing_data/ar01_worker.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/workers/sensing_data/ar01_worker.hpp>
 
 #include <optional>
 #include <string_view>

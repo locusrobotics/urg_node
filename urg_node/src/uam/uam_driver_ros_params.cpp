@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/uam_driver_ros_params.h>
+#include <uam/uam_driver_ros_params.hpp>
 
 namespace uam
 {

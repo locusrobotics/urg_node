@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/workers/vr00_worker.h>
+#include <uam/workers/vr00_worker.hpp>
 
 #include <string_view>
 #include <optional>

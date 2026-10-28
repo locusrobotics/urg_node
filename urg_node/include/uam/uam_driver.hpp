@@ -43,11 +43,11 @@
 #include <sensor_msgs/LaserScan.h>
 #include <urg_node_msgs/Status.h>
 
-#include <uam/scan_params.h>
-#include <uam/io/tcp_client.h>
-#include <uam/workers/uam_command_worker.h>
-#include <uam/workers/yr_worker.h>
-#include <uam/workers/scip_worker.h>
+#include <uam/scan_params.hpp>
+#include <uam/io/tcp_client.hpp>
+#include <uam/workers/uam_command_worker.hpp>
+#include <uam/workers/yr_worker.hpp>
+#include <uam/workers/scip_worker.hpp>
 
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/iter_find.hpp>

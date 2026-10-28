@@ -34,7 +34,7 @@
 
 #include <json_transport/json_transport.hpp>
 #include <ros/ros.h>
-#include <uam/uam_driver.h>
+#include <uam/uam_driver.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>

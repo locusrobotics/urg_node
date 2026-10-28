@@ -31,7 +31,7 @@
  * Author: Chad Rockey, Michael Carroll, Mike O'Driscoll
  */
 
-#include "urg_node/urg_node_driver.h"
+#include "urg_node/urg_node_driver.hpp"
 
 int main(int argc, char **argv)
 {

@@ -32,10 +32,10 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/uam_driver.h>
+#include <uam/uam_driver.hpp>
 #include <ros/callback_queue.h>
-#include <uam/uam_driver_ros_params.h>
-#include <uam/uam_driver_ros.h>
+#include <uam/uam_driver_ros_params.hpp>
+#include <uam/uam_driver_ros.hpp>
 
 int main(int argc, char** argv)
 {

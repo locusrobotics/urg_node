@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/uam_driver.h>
+#include <uam/uam_driver.hpp>
 
 #include <memory>
 #include <string>

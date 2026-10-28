@@ -35,8 +35,8 @@
 #ifndef UAM_UAM_VISITORS_H
 #define UAM_UAM_VISITORS_H
 
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/visitor.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/visitor.hpp>
 
 namespace uam
 {

@@ -35,8 +35,8 @@
 #ifndef UAM_WORKERS_SCIP_WORKER_H
 #define UAM_WORKERS_SCIP_WORKER_H
 
-#include <uam/protocol_types/scip_protocol_types.h>
-#include <uam/workers/uam_worker_base.h>
+#include <uam/protocol_types/scip_protocol_types.hpp>
+#include <uam/workers/uam_worker_base.hpp>
 
 #include <optional>
 #include <string>
