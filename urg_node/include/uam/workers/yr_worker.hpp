@@ -245,7 +245,7 @@ protected:
     auto current_crc = calculateReplyCrc(reply);
     if (current_crc != reply.footer.crc)
     {
-      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << reply.footer.crc);
+      RCLCPP_WARN_STREAM(rclcpp::get_logger("uam_worker_base"), "Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << reply.footer.crc);
       return false;
     }
     // Parse status
@@ -298,7 +298,7 @@ protected:
       {
         error_msg = std::string("Received bad status: unknown error " + status);
       }
-      ROS_ERROR_STREAM(error_msg);
+      RCLCPP_ERROR_STREAM(rclcpp::get_logger("uam_worker_base"), error_msg);
       return false;
     }
     return true;

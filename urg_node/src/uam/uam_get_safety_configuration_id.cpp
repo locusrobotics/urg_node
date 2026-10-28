@@ -32,14 +32,20 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <json_transport/json_transport.hpp>
-#include <ros/ros.h>
+// NOTE(RST-16563): this tool only ever used json_transport's thin typedef of
+// nlohmann::json (json_transport::json_t) for local JSON construction, never
+// its ROS message pack()/unpack() helpers. json_transport itself has no ROS2
+// port available, so we depend directly on nlohmann::json instead, which is
+// exactly what json_transport::json_t was a typedef for.
+#include <nlohmann/json.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <uam/uam_driver.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <boost/crc.hpp>
 
+#include <iostream>
 #include <string>
 
 boost::program_options::variables_map parseArgs(int argc, char** argv)
@@ -64,10 +70,10 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
 
   if (args.count("help"))
   {
-    ROS_INFO_STREAM(
-      "Get UAM Lidar FW version and safety configuration IDs.\n\n"
+    std::cout
+      << "Get UAM Lidar FW version and safety configuration IDs.\n\n"
       << "usage: " << boost::filesystem::path(argv[0]).filename().string() << " [options]\n\n"
-      << options);
+      << options << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -77,9 +83,9 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
   }
   catch (const std::exception& e)
   {
-    ROS_FATAL_STREAM(
-      e.what() << "usage: " << boost::filesystem::path(argv[0]).filename().string() << " [options]\n\n"
-               << options);
+    std::cerr
+      << e.what() << "usage: " << boost::filesystem::path(argv[0]).filename().string() << " [options]\n\n"
+      << options << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -88,7 +94,7 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
 
 std::uint32_t getSafetyAreasCRC32(uam::UamDriver& lidar)
 {
-  ROS_INFO_STREAM("Going to read Laser Safety areas");
+  std::cout << "Going to read Laser Safety areas" << std::endl;
   std::string combined_crcs = "";
   for (size_t area_number = 1; area_number <= uam::protocol::c_max_safety_area_index; area_number++)
   {
@@ -135,8 +141,7 @@ std::string getConfigurationId(uam::UamDriver& lidar)
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "detect_lidar");
-  ros::Time::init();
+  rclcpp::init(argc, argv);
   auto args = parseArgs(argc, argv);
 
   try
@@ -150,7 +155,7 @@ int main(int argc, char** argv)
     auto safey_areas_crc32 = getSafetyAreasCRC32(lidar);
 
     // Parse the resulting heartbeat message and populate a JSON document with the results
-    auto document = json_transport::json_t::object();
+    auto document = nlohmann::json::object();
     {
       document["model_number"] = byteArrayToString(version_details.version_details.sensor_model);
       document["serial_number"] = byteArrayToString(version_details.version_details.serial_number);
@@ -159,11 +164,13 @@ int main(int argc, char** argv)
       document["safety_areas_crc32"] = safey_areas_crc32;
     }
     std::cout << document.dump(4) << std::endl;
+    rclcpp::shutdown();
     return EXIT_SUCCESS;
   }
   catch (const std::exception& e)
   {
     std::cout << "Failed to listen for connected lidars: " << e.what() << std::endl;
+    rclcpp::shutdown();
     return EXIT_FAILURE;
   }
 }

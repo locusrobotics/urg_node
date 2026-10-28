@@ -36,6 +36,7 @@
 #define UAM_WORKERS_UAM_COMMAND_WORKER_H
 
 // sensing data workers
+#include <rclcpp/rclcpp.hpp>
 #include <uam/shape_shifter_packet.hpp>
 #include <uam/workers/empty_reply_worker.hpp>
 #include <uam/workers/sensing_data/ar00_worker.hpp>
@@ -112,7 +113,7 @@ public:
    * @param[in] wall_time - Wall time (the moment when the packet header was captured)
    * @return true if packet was successfully processed, false otherwise
    */
-  bool processByHandler(const protocol::ShapeShifterPacket& packet, const ros::Time& wall_time);
+  bool processByHandler(const protocol::ShapeShifterPacket& packet, const rclcpp::Time& wall_time);
 
   /**
    * @brief Call specific worker and result will be processed by the registered handler

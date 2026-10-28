@@ -40,7 +40,7 @@
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <ros/init.h>
+#include <rclcpp/rclcpp.hpp>
 #include <uam/shape_shifter_packet.hpp>
 #include <uam/uam_visitors.hpp>
 
@@ -58,7 +58,7 @@ public:
   /**
    * @brief type of the Callback that receives the packet
    */
-  using OnNewDataCallback = std::function<void(const protocol::ShapeShifterPacket& packet, const ros::Time&)>;
+  using OnNewDataCallback = std::function<void(const protocol::ShapeShifterPacket& packet, const rclcpp::Time&)>;
 
   /**
    * @brief This
@@ -68,7 +68,8 @@ public:
   /**
    * @brief Default C'tor
    */
-  explicit TcpClient(OnNewDataCallback callback);
+  explicit TcpClient(
+    OnNewDataCallback callback, const rclcpp::Logger& logger = rclcpp::get_logger("uam_tcp_client"));
 
   /**
    * @brief
@@ -77,7 +78,9 @@ public:
    * @param callback
    * @param external_context
    */
-  TcpClient(OnNewDataCallback callback, std::shared_ptr<boost::asio::io_service>& external_context);
+  TcpClient(
+    OnNewDataCallback callback, std::shared_ptr<boost::asio::io_service>& external_context,
+    const rclcpp::Logger& logger = rclcpp::get_logger("uam_tcp_client"));
 
   /**
    * @brief Default D'tor
@@ -130,7 +133,8 @@ public:
     if (status != std::future_status::ready)
     {
       // we are not expecting this to happen too often, no need to throttle this warning.
-      ROS_WARN_STREAM(
+      RCLCPP_WARN_STREAM(
+        logger_,
         "Failed sending command " << command << " : "
                                   << (status == std::future_status::timeout ? "timeout" : "deferred"));
       return false;
@@ -147,7 +151,7 @@ public:
   {
     if (!connected_)
     {
-      ROS_WARN_STREAM("Not connected, cannot start async read task");
+      RCLCPP_WARN_STREAM(logger_, "Not connected, cannot start async read task");
       return false;
     }
 
@@ -173,7 +177,7 @@ public:
   {
     if (!stopped_)
     {
-      ROS_ERROR_STREAM("Cannot send async readline with async receive in progress.");
+      RCLCPP_ERROR_STREAM(logger_, "Cannot send async readline with async receive in progress.");
       return;
     }
 
@@ -242,7 +246,7 @@ private:
     const boost::system::error_code& error_code,
     size_t bytes_transferred,
     const size_t missing_read,
-    const ros::Time& stamp);
+    const rclcpp::Time& stamp);
 
 private:
   /**
@@ -312,6 +316,16 @@ private:
    * @brief State of the async read task
    */
   std::atomic_bool stopped_;
+
+  /**
+   * @brief Logger object used for debug info
+   */
+  rclcpp::Logger logger_;
+
+  /**
+   * @brief Clock used to stamp received packets
+   */
+  rclcpp::Clock clock_;
 };
 
 }  // namespace uam

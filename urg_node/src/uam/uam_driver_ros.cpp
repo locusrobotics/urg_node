@@ -32,17 +32,16 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <ros/callback_queue.h>
 #include <uam/uam_driver_ros.hpp>
-#include <urg_node/URGConfig.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/point_cloud2_iterator.h>
-#include <urg_node_msgs/Status.h>
-#include <std_msgs/Bool.h>
-#include <std_srvs/Trigger.h>
+#include <geometry_msgs/msg/point.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <urg_node_msgs/msg/status.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 #include <algorithm>
 #include <atomic>
+#include <iomanip>
 #include <limits>
 #include <mutex>
 #include <string>
@@ -51,58 +50,76 @@
 
 namespace uam
 {
-UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const UamROSParams& params) :
+UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
+  Node("uam_driver_node", node_options),
   configured_(false),
   configure_attempts_(0),
-  lidar_(),
-  params_(params),
-  node_handle_(nh),
-  private_node_handle_(nh_prv),
-  publish_status_requested_(false),
-  params_changed_(false)
+  lidar_(this->get_logger()),
+  params_(UamROSParams::loadFromROS(this)),
+  scan_stamp_(0, 0, RCL_ROS_TIME),
+  configured_stamp_(0, 0, RCL_ROS_TIME),
+  discard_data_until_(0, 0, RCL_ROS_TIME),
+  publish_status_requested_(false)
 {
-  scan_publisher_ = node_handle_.advertise<sensor_msgs::LaserScan>(params.scan_topic, 1);
-  status_on_request_publisher_ = node_handle_.advertise<urg_node_msgs::Status>(params.status_topic, 1, true);
-  status_on_update_publisher_ =
-    node_handle_.advertise<urg_node_msgs::Status>(status_on_request_publisher_.getTopic() + "_update", 1, true);
-  if (params_.provide_laser_status_service)
-    request_status_service_ =
-      node_handle_.advertiseService(params.request_status_service, &UamROS::statusCallback, this);
+  // Latched (transient-local) QoS, to emulate the ROS1 latched topics for status/safety area publishers.
+  const auto latched_qos = rclcpp::QoS(1).transient_local();
 
-  configure_timer_ =
-    node_handle_.createTimer(params_.reconfiguration_timeout, &UamROS::configureTimerCallback, this, true, false);
+  scan_publisher_ = this->create_publisher<sensor_msgs::msg::LaserScan>(params_.scan_topic, 1);
+  status_on_request_publisher_ =
+    this->create_publisher<urg_node_msgs::msg::Status>(params_.status_topic, latched_qos);
+  status_on_update_publisher_ =
+    this->create_publisher<urg_node_msgs::msg::Status>(params_.status_topic + "_update", latched_qos);
+  if (params_.provide_laser_status_service)
+  {
+    request_status_service_ = this->create_service<std_srvs::srv::Trigger>(
+      params_.request_status_service,
+      std::bind(
+        &UamROS::statusCallback, this,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+  }
+
+  configure_timer_ = this->create_wall_timer(
+    std::chrono::duration<double>(params_.reconfiguration_timeout.seconds()),
+    std::bind(&UamROS::configureTimerCallback, this),
+    nullptr,
+    false);
 
   points_in_area_pub_ =
-    private_node_handle_.advertise<sensor_msgs::PointCloud2>(params_.points_in_safety_area_topic, 10);
-  points_in_area_markers_pub_ =
-    private_node_handle_.advertise<visualization_msgs::Marker>(params_.points_in_safety_area_topic + "_markers", 10);
+    this->create_publisher<sensor_msgs::msg::PointCloud2>(params_.points_in_safety_area_topic, 10);
+  points_in_area_markers_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
+    params_.points_in_safety_area_topic + "_markers", 10);
 
-  lidar_hard_reset_client_ = node_handle_.serviceClient<std_srvs::Trigger>(params_.lidar_hard_reset_service);
-  lidar_hard_reset_client_.waitForExistence();
+  // lidar_hard_reset_client_ uses its own reentrant callback group so its
+  // response can be processed while lidarHardReset() blocks waiting for it
+  // from a timer callback. This node must be spun with a
+  // rclcpp::executors::MultiThreadedExecutor for that to work.
+  lidar_hard_reset_callback_group_ =
+    this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  lidar_hard_reset_client_ = this->create_client<std_srvs::srv::Trigger>(
+    params_.lidar_hard_reset_service, rclcpp::ServicesQoS(), lidar_hard_reset_callback_group_);
+  lidar_hard_reset_client_->wait_for_service();
 
   // Advertise safety area publisher
   advertiseSafetyAreaPublishers();
 
-  // Clear the dynamic reconfigure server
-  srv_.reset(new dynamic_reconfigure::Server<urg_node::URGConfig>(private_node_handle_));
-  srv_->setCallback(boost::bind(&UamROS::dynamicReconfigureCallback, this, _1, _2));
-
-  scan_watchdog_timer_ = node_handle_.createTimer(params_.scan_timeout, &UamROS::scanWatchdogTimerCallback, this);
+  scan_watchdog_timer_ = this->create_wall_timer(
+    std::chrono::duration<double>(params_.scan_timeout.seconds()),
+    std::bind(&UamROS::scanWatchdogTimerCallback, this));
 
   lidar_.registerCallback<AR01Worker>(std::bind(
-    static_cast<void (UamROS::*)(const protocol::AR01CommandReply&, const ros::Time&)>(
+    static_cast<void (UamROS::*)(const protocol::AR01CommandReply&, const rclcpp::Time&)>(
       &UamROS::scanCallback<AR01Worker::Reply>),
     this,
     std::placeholders::_1,
     std::placeholders::_2));
   lidar_.registerCallback<AR06Worker>(std::bind(
-    static_cast<void (UamROS::*)(const protocol::AR06CommandReply&, const ros::Time&)>(
+    static_cast<void (UamROS::*)(const protocol::AR06CommandReply&, const rclcpp::Time&)>(
       &UamROS::scanCallback<AR06Worker::Reply>),
     this,
     std::placeholders::_1,
     std::placeholders::_2));
   lidar_.registerCallback<AR00Worker>(std::bind(
-    static_cast<void (UamROS::*)(const protocol::AR00CommandReply&, const ros::Time&)>(
+    static_cast<void (UamROS::*)(const protocol::AR00CommandReply&, const rclcpp::Time&)>(
       &UamROS::scanCallback<AR00Worker::Reply>),
     this,
     std::placeholders::_1,
@@ -111,30 +128,31 @@ UamROS::UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const U
   // Configure the lidar. On failure, start a timer to try again later.
   if (!configure())
   {
-    configure_timer_.start();
+    configure_timer_->reset();
   }
 }
 
 void UamROS::advertiseSafetyAreaPublishers()
 {
+  const auto latched_qos = rclcpp::QoS(1).transient_local();
   safety_area_publishers_[protocol::EYRAreaType::protection_1] =
-    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/protection_1", 1, true);
+    this->create_publisher<sensor_msgs::msg::LaserScan>("safety_area/protection_1", latched_qos);
   safety_area_publishers_[protocol::EYRAreaType::protection_2] =
-    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/protection_2", 1, true);
+    this->create_publisher<sensor_msgs::msg::LaserScan>("safety_area/protection_2", latched_qos);
   safety_area_publishers_[protocol::EYRAreaType::warning_1] =
-    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/warning_1", 1, true);
+    this->create_publisher<sensor_msgs::msg::LaserScan>("safety_area/warning_1", latched_qos);
   safety_area_publishers_[protocol::EYRAreaType::warning_2] =
-    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/warning_2", 1, true);
+    this->create_publisher<sensor_msgs::msg::LaserScan>("safety_area/warning_2", latched_qos);
   safety_area_publishers_[protocol::EYRAreaType::muting_1] =
-    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/muting_1", 1, true);
+    this->create_publisher<sensor_msgs::msg::LaserScan>("safety_area/muting_1", latched_qos);
   safety_area_publishers_[protocol::EYRAreaType::muting_2] =
-    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/muting_2", 1, true);
+    this->create_publisher<sensor_msgs::msg::LaserScan>("safety_area/muting_2", latched_qos);
   safety_area_publishers_[protocol::EYRAreaType::reference_center] =
-    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/reference_center", 1, true);
+    this->create_publisher<sensor_msgs::msg::LaserScan>("safety_area/reference_center", latched_qos);
   safety_area_publishers_[protocol::EYRAreaType::reference_max] =
-    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/reference_max", 1, true);
+    this->create_publisher<sensor_msgs::msg::LaserScan>("safety_area/reference_max", latched_qos);
   safety_area_publishers_[protocol::EYRAreaType::reference_min] =
-    private_node_handle_.advertise<sensor_msgs::LaserScan>("safety_area/reference_min", 1, true);
+    this->create_publisher<sensor_msgs::msg::LaserScan>("safety_area/reference_min", latched_qos);
 }
 
 void UamROS::publishSafetyArea(const size_t area_number)
@@ -143,7 +161,7 @@ void UamROS::publishSafetyArea(const size_t area_number)
     return;
   else if (!safety_areas_.count(area_number))
   {
-    ROS_ERROR_STREAM("Cannot find requested area number in the database.");
+    RCLCPP_ERROR_STREAM(this->get_logger(), "Cannot find requested area number in the database.");
     return;
   }
 
@@ -154,26 +172,32 @@ void UamROS::publishSafetyArea(const size_t area_number)
     auto message = safety_areas_.at(area_number).find(static_cast<protocol::EYRAreaType>(area_type));
     if (message != safety_areas_.at(area_number).end())
     {
-      safety_area_publishers_[static_cast<protocol::EYRAreaType>(area_type)].publish(message->second.second);
+      safety_area_publishers_[static_cast<protocol::EYRAreaType>(area_type)]->publish(*message->second.second);
     }
   }
 }
 
-void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
+void UamROS::scanWatchdogTimerCallback()
 {
   // If the timeout has expired, try to reconnect to the lidar
   std::lock_guard<std::mutex> lock(watchdog_mutex_);
-  bool should_reset_lidar = false;
-  auto elapsed_time = event.current_real - std::max(configured_stamp_, scan_stamp_);
+  const rclcpp::Time now = this->get_clock()->now();
+  const rclcpp::Time last_activity = std::max(configured_stamp_, scan_stamp_);
+  const rclcpp::Duration elapsed_time = now - last_activity;
   if (configured_ && elapsed_time > params_.scan_timeout)
   {
-    ROS_WARN_STREAM(
+    RCLCPP_WARN_STREAM(
+      this->get_logger(),
       "No scan sector messages have been received from Hokuyo lidar ("
-      << params_.ip_address << ") in the last " << std::setprecision(3) << elapsed_time.toSec() << " seconds (since "
-      << scan_stamp_ << "). Resetting the lidar.");
+      << params_.ip_address << ") in the last " << std::setprecision(3) << elapsed_time.seconds() << " seconds (since "
+      << scan_stamp_.nanoseconds() << "). Resetting the lidar.");
 
     auto lidar_reset_done = lidarHardReset();
-    ROS_WARN_STREAM_COND(!lidar_reset_done, "Lidar reset skipped. Check logs! Only reconfigure will be performed.");
+    if (!lidar_reset_done)
+    {
+      RCLCPP_WARN_STREAM(
+        this->get_logger(), "Lidar reset skipped. Check logs! Only reconfigure will be performed.");
+    }
     triggerReconfigure();
   }
 }
@@ -182,52 +206,63 @@ bool UamROS::lidarHardReset()
 {
   if (
     !last_restart_time_.has_value() ||
-    ros::Time::now() - last_restart_time_.value() > params_.lidar_power_cycle_interval)
+    this->get_clock()->now() - last_restart_time_.value() > params_.lidar_power_cycle_interval)
   {
     try
     {
-      last_restart_time_ = ros::Time::now();
-      std_srvs::Trigger srv;
-      if (lidar_hard_reset_client_.call(srv))
+      last_restart_time_ = this->get_clock()->now();
+      auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+      auto future = lidar_hard_reset_client_->async_send_request(request);
+      // Blocks this call until the response is ready. The response is delivered by the
+      // lidar_hard_reset_callback_group_ (a Reentrant group), which the MultiThreadedExecutor
+      // spinning this node can service concurrently with this (blocked) callback.
+      if (future.wait_for(std::chrono::seconds(10)) == std::future_status::ready)
       {
-        if (srv.response.success)
+        auto response = future.get();
+        if (response->success)
         {
-          ROS_WARN_STREAM("Lidar reset successful.");
+          RCLCPP_WARN_STREAM(this->get_logger(), "Lidar reset successful.");
           return true;
         }
         else
         {
-          ROS_ERROR_STREAM("Lidar reset failed: " << srv.response.message);
+          RCLCPP_ERROR_STREAM(this->get_logger(), "Lidar reset failed: " << response->message);
           return false;
         }
       }
       else
       {
-        ROS_ERROR_STREAM("Failed to call lidar reset service.");
+        RCLCPP_ERROR_STREAM(this->get_logger(), "Failed to call lidar reset service.");
         return false;
       }
     }
     catch (const std::exception& e)
     {
-      ROS_ERROR_STREAM("Error while restarting the lidar: " << e.what());
+      RCLCPP_ERROR_STREAM(this->get_logger(), "Error while restarting the lidar: " << e.what());
       return false;
     }
   }
   else
   {
-    ROS_WARN_STREAM("Lidar was restarted too recently. Skipping lidar restart.");
+    RCLCPP_WARN_STREAM(this->get_logger(), "Lidar was restarted too recently. Skipping lidar restart.");
     return false;
   }
 }
 
-bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
+void UamROS::statusCallback(
+  const std::shared_ptr<rmw_request_id_t> request_header,
+  const std_srvs::srv::Trigger::Request::SharedPtr req,
+  const std_srvs::srv::Trigger::Response::SharedPtr res)
 {
+  (void) request_header;
+  (void) req;
+
   // Check if the lidar is connected/configured
   if (!configured_)
   {
-    res.success = false;
-    res.message = "Status update requested but lidar is not connected!";
-    return true;
+    res->success = false;
+    res->message = "Status update requested but lidar is not connected!";
+    return;
   }
 
   // Number of scan cycles to wait for status update
@@ -236,7 +271,7 @@ bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::
   // 2 scan cycles -> 4 half(s) of scan
   static const uint32_t scan_cycles_timeout = 2;
   static const uint32_t half_scan_cycles_timeout = scan_cycles_timeout * 2;
-  static const ros::Duration sleep_time(scan_params_.getScanPeriod() / 2);
+  const auto sleep_time = std::chrono::duration<double>(scan_params_.getScanPeriod() / 2);
 
   // Let the received thread know that we are expecting status
   publish_status_requested_ = true;
@@ -245,39 +280,40 @@ bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::
   uint32_t cycles_waited = 0;
 
   // Mimic old behaviour: status is published in the service call
-  while (ros::ok() && true == publish_status_requested_.load() && cycles_waited < half_scan_cycles_timeout)
+  while (rclcpp::ok() && true == publish_status_requested_.load() && cycles_waited < half_scan_cycles_timeout)
   {
     // Sleep for 1/2 scan period
-    sleep_time.sleep();
+    std::this_thread::sleep_for(sleep_time);
     cycles_waited++;
   }
 
   if (!publish_status_requested_.load())
   {
-    res.success = true;
-    res.message = "Detailed status was successfully published";
+    res->success = true;
+    res->message = "Detailed status was successfully published";
   }
   else
   {
-    ROS_WARN_STREAM_THROTTLE(
-      5.0,
+    RCLCPP_WARN_STREAM_THROTTLE(
+      this->get_logger(), *this->get_clock(), 5000,
       "Failed to retrieved detailed status after " << scan_cycles_timeout << " scan cycles.");
-    res.success = false;
-    res.message = "Failed to retrieved detailed status";
+    res->success = false;
+    res->message = "Failed to retrieved detailed status";
   }
-  return true;
 }
 
-void UamROS::configureTimerCallback(const ros::TimerEvent& event)
+void UamROS::configureTimerCallback()
 {
-  // Stop the timer so that it may be restarted later
-  configure_timer_.stop();
+  // Stop the timer so that it may be restarted later (ROS2 wall timers are
+  // periodic, so we emulate the original one-shot timer by cancelling it here
+  // and only resetting it below if configuration is still not successful).
+  configure_timer_->cancel();
 
   // Try to configure the lidar again
   if (!configured_ && !configure())
   {
     // Configuration failed. Restart the timer to try again.
-    configure_timer_.start();
+    configure_timer_->reset();
   }
 }
 
@@ -285,22 +321,7 @@ void UamROS::triggerReconfigure()
 {
   lidar_.disconnect();
   configured_ = false;
-  configure_timer_.start();
-}
-
-void UamROS::updateReconfigureLimits()
-{
-  urg_node::URGConfig min, max;
-  srv_->getConfigMin(min);
-  srv_->getConfigMax(max);
-
-  min.angle_min = scan_params_.getAngleMinLimit();
-  min.angle_max = min.angle_min;
-  max.angle_max = scan_params_.getAngleMaxLimit();
-  max.angle_min = max.angle_max;
-
-  srv_->setConfigMin(min);
-  srv_->setConfigMax(max);
+  configure_timer_->reset();
 }
 
 bool UamROS::configure()
@@ -308,7 +329,7 @@ bool UamROS::configure()
   try
   {
     lidar_.connect(params_.ip_address, params_.ip_port);
-    ROS_INFO_STREAM("Connected to Uam lidar.");
+    RCLCPP_INFO_STREAM(this->get_logger(), "Connected to Uam lidar.");
 
     // TODO(cribeiromendes): make scip commands work seamlessly. Right now we
     // need to ask this before starting continuous async reads
@@ -316,14 +337,10 @@ bool UamROS::configure()
     // At this point the receiver thread is not yet running, so we can safely
     // write into scan_params
     scan_params_ = lidar_.getScanDetails();
-    // Since the spinner is running this method and is also responsible to
-    // run the reconfigure callback, we can safely access params_ without mutex
     scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
 
-    // Set the reconfigure limits after fetching scan details
-    updateReconfigureLimits();
     auto version_details = toString(lidar_.getVersionDetails());
-    ROS_INFO_STREAM("Sensor details: " << version_details);
+    RCLCPP_INFO_STREAM(this->get_logger(), "Sensor details: " << version_details);
 
     // Read laser safety areas
     readSafetyAreas();
@@ -334,16 +351,17 @@ bool UamROS::configure()
     // Set discard deadline before starting streaming to ensure no startup packets slip through
     {
       std::lock_guard<std::mutex> lock(watchdog_mutex_);
-      configured_stamp_ = ros::Time::now();
+      configured_stamp_ = this->get_clock()->now();
       if (params_.discard_startup_data_s > 0.0)
       {
-        discard_data_until_ = configured_stamp_ + ros::Duration(params_.discard_startup_data_s);
-        ROS_WARN_STREAM(
+        discard_data_until_ = configured_stamp_ + rclcpp::Duration::from_seconds(params_.discard_startup_data_s);
+        RCLCPP_WARN_STREAM(
+          this->get_logger(),
           "Discarding UAM scan data for " << params_.discard_startup_data_s << " seconds after startup/reconnect.");
       }
       else
       {
-        discard_data_until_ = ros::Time(0);
+        discard_data_until_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
       }
     }
 
@@ -354,12 +372,14 @@ bool UamROS::configure()
   }
   catch (const std::exception& e)
   {
-    ROS_ERROR_STREAM("Error while configuring the lidar: " << e.what());
+    RCLCPP_ERROR_STREAM(this->get_logger(), "Error while configuring the lidar: " << e.what());
     lidar_.disconnect();
     configure_attempts_++;
-    if (configure_attempts_ > params_.configure_attempts)
+    if (configure_attempts_ > static_cast<uint32_t>(params_.configure_attempts))
     {
-      ROS_WARN_STREAM("Could not configure lidar after " << configure_attempts_ << " attempts. Triggering hard reset");
+      RCLCPP_WARN_STREAM(
+        this->get_logger(), "Could not configure lidar after " << configure_attempts_
+                                                                << " attempts. Triggering hard reset");
       if (lidarHardReset())
       {
         configure_attempts_ = 0;
@@ -370,34 +390,7 @@ bool UamROS::configure()
   return configured_;
 }
 
-bool UamROS::dynamicReconfigureCallback(urg_node::URGConfig& config, int level)
-{
-  if (level < 0)
-  {
-    config.angle_max = params_.angle_max;
-    config.angle_min = params_.angle_min;
-    config.time_offset = params_.time_offset.toSec();
-    config.range_offset = params_.range_offset;
-    config.discard_startup_data_s = params_.discard_startup_data_s;
-    return true;
-  }
-
-  std::lock_guard<std::mutex> lock(reconfigure_mutex_);
-  params_.angle_max = config.angle_max;
-  params_.angle_min = config.angle_min;
-  params_.time_offset = ros::Duration(config.time_offset);
-  params_.range_offset = config.range_offset;
-  if (params_.discard_startup_data_s != config.discard_startup_data_s)
-  {
-    std::lock_guard<std::mutex> watchdog_lock(watchdog_mutex_);
-    discard_data_until_ = ros::Time::now() + ros::Duration(config.discard_startup_data_s);
-  }
-  params_.discard_startup_data_s = config.discard_startup_data_s;
-  params_changed_ = true;
-  return true;
-}
-
-void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ranges, const ros::Time& stamp)
+void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ranges, const rclcpp::Time& stamp)
   {
     auto getLut = [this](const ScanParameters& scan_params)
     {
@@ -419,30 +412,26 @@ void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ra
       return lut;
     };
 
-    auto buildCloudStaticFields = [](const std::string& frame_id) -> sensor_msgs::PointCloud2
+    auto buildCloudStaticFields = [](const std::string& frame_id) -> sensor_msgs::msg::PointCloud2
     {
       // Fill metadata
-      sensor_msgs::PointCloud2 cloud_out;
+      sensor_msgs::msg::PointCloud2 cloud_out;
       cloud_out.header.frame_id = frame_id;
       cloud_out.height = 1u;
       cloud_out.is_bigendian = false;
       cloud_out.is_dense = true;
 
-      // Setup fields
-      auto offset = 0;
-      offset = addPointField(cloud_out, "x", 1, sensor_msgs::PointField::FLOAT32, offset);
-      offset = addPointField(cloud_out, "y", 1, sensor_msgs::PointField::FLOAT32, offset);
-      offset = addPointField(cloud_out, "z", 1, sensor_msgs::PointField::FLOAT32, offset);
-      offset += sizeOfPointField(sensor_msgs::PointField::FLOAT32);
-      cloud_out.point_step = offset;
+      // Setup fields (x, y, z as packed float32, matching the previous manual addPointField calls)
+      sensor_msgs::PointCloud2Modifier modifier(cloud_out);
+      modifier.setPointCloud2FieldsByString(1, "xyz");
       return cloud_out;
     };
 
     auto getRayMarker = [](const std::string& frame_id, const std::string& ns)
     {
-      visualization_msgs::Marker marker;
+      visualization_msgs::msg::Marker marker;
       marker.header.frame_id = frame_id;
-      marker.type = visualization_msgs::Marker::LINE_LIST;
+      marker.type = visualization_msgs::msg::Marker::LINE_LIST;
       marker.ns = ns;
       marker.scale.x = 0.001;
       marker.color.a = 1.0;
@@ -453,7 +442,7 @@ void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ra
     // Compute the Lookup table of sen and cos
     static LaserScanCachedLookup lut = getLut(scan_params_);
     // Get the cloud, we can re-use it and clear the points
-    static sensor_msgs::PointCloud2 cloud_out = buildCloudStaticFields(params_.frame_id);
+    static sensor_msgs::msg::PointCloud2 cloud_out = buildCloudStaticFields(params_.frame_id);
     cloud_out.header.stamp = stamp;
     cloud_out.data.clear();
     sensor_msgs::PointCloud2Modifier modifier(cloud_out);
@@ -471,7 +460,7 @@ void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ra
     for (const auto& [index, range] : ranges)
     {
       // Get x and y for the pair index + range(m)
-      geometry_msgs::Point pt;
+      geometry_msgs::msg::Point pt;
       pt.x = 0;
       pt.y = 0;
       marker.points.emplace_back(pt);
@@ -487,14 +476,14 @@ void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ra
 
     if (!marker.points.empty())
     {
-      marker.action = visualization_msgs::Marker::ADD;
+      marker.action = visualization_msgs::msg::Marker::ADD;
     }
     else
     {
-      marker.action = visualization_msgs::Marker::DELETE;
+      marker.action = visualization_msgs::msg::Marker::DELETE;
     }
-    points_in_area_markers_pub_.publish(marker);
-    points_in_area_pub_.publish(cloud_out);
+    points_in_area_markers_pub_->publish(marker);
+    points_in_area_pub_->publish(cloud_out);
   };
 
 void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensing_data, const bool override_check)
@@ -519,7 +508,7 @@ void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensi
   if (on_request_status || on_update_status)
   {
     last_received_status_ = sensing_data;
-    urg_node_msgs::Status msg;
+    urg_node_msgs::msg::Status msg;
     msg.operating_mode = sensing_data.operating_mode;
     msg.error_status = sensing_data.error_state;
     msg.error_code = sensing_data.error_code;
@@ -532,13 +521,13 @@ void UamROS::updateStatus(const protocol::sensing_data::SensingDataHeader& sensi
     msg.optical_window_contaminated = sensing_data.optical_window_contaminated;
     if (on_request_status)
     {
-      status_on_request_publisher_.publish(msg);
+      status_on_request_publisher_->publish(msg);
       publishSafetyArea(sensing_data.area_number);
       publish_status_requested_ = false;
     }
     if (on_update_status)
     {
-      status_on_update_publisher_.publish(msg);
+      status_on_update_publisher_->publish(msg);
       publishSafetyArea(sensing_data.area_number);
     }
   }
@@ -550,11 +539,11 @@ void UamROS::readSafetyAreas()
   if (!safety_areas_.empty())
     return;
 
-  ROS_INFO_STREAM("Going to read Laser Safety areas");
+  RCLCPP_INFO_STREAM(this->get_logger(), "Going to read Laser Safety areas");
 
   auto toSafetyArea = [this](const protocol::YRCommandReply& yr) -> ScanWithCRC
   {
-    sensor_msgs::LaserScan msg;
+    sensor_msgs::msg::LaserScan msg;
     msg.header.frame_id = params_.frame_id;
     msg.angle_min = scan_params_.getAngleMinLimit();
     msg.angle_max = scan_params_.getAngleMaxLimit();
@@ -571,7 +560,7 @@ void UamROS::readSafetyAreas()
       std::back_inserter(msg.ranges),
       [](const auto& range)
       { return (range < 0x7FFF) ? static_cast<float>(range) / 1000.0f : std::numeric_limits<float>::quiet_NaN(); });
-    return std::make_pair(yr.footer.crc, boost::make_shared<const sensor_msgs::LaserScan>(msg));
+    return std::make_pair(yr.footer.crc, std::make_shared<const sensor_msgs::msg::LaserScan>(msg));
   };
 
   decltype(safety_areas_) cached_areas;
@@ -594,7 +583,7 @@ void UamROS::readSafetyAreas()
   }
   // We got the complete list of areas, swap
   std::swap(cached_areas, safety_areas_);
-  ROS_INFO_STREAM("Done reading Laser Safety areas.");
+  RCLCPP_INFO_STREAM(this->get_logger(), "Done reading Laser Safety areas.");
   if (params_.log_safety_areas_crc)
   {
     std::string area_crc_array = "";
@@ -607,7 +596,10 @@ void UamROS::readSafetyAreas()
       }
       area_crc_array += ";";
     }
-    ROS_INFO_STREAM("Safety area CRC: " << area_crc_array);
+    RCLCPP_INFO_STREAM(this->get_logger(), "Safety area CRC: " << area_crc_array);
   }
 }
 }  // namespace uam
+
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(uam::UamROS)

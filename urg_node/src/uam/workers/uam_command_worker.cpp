@@ -38,7 +38,7 @@
 
 namespace uam
 {
-bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packet, const ros::Time& time)
+bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packet, const rclcpp::Time& time)
 {
   // Verify packet header
   const auto packet_type = packet.get<protocol::CommandReplyHeader>();
@@ -116,7 +116,9 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
   }
   else
   {
-    ROS_ERROR_STREAM("Unknown packet type with: " << packet_type.header[0] << packet_type.header[1]);
+    RCLCPP_ERROR_STREAM(
+      rclcpp::get_logger("uam_worker_base"),
+      "Unknown packet type with: " << packet_type.header[0] << packet_type.header[1]);
   }
 
   return processed_successfully;

@@ -101,7 +101,7 @@ public:
   {
     if (raw_reply.size() != NR_LINES)
     {
-      ROS_ERROR_STREAM(
+      RCLCPP_ERROR_STREAM(rclcpp::get_logger("uam_worker_base"), 
         "Invalid response with only: " << raw_reply.size()
                                           << " line. Expected: " << NR_LINES);
       return std::nullopt;
@@ -110,7 +110,7 @@ public:
     std::optional<Reply> reply = static_cast<const TDerived*>(this)->decode(raw_reply);
     if (!reply.has_value())
     {
-      ROS_ERROR_STREAM("Failed to decode message");
+      RCLCPP_ERROR_STREAM(rclcpp::get_logger("uam_worker_base"), "Failed to decode message");
       return std::nullopt;
     }
     return reply;
@@ -183,7 +183,7 @@ public:
     failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::RPM), reply.rpm);
     if (failed)
     {
-      ROS_ERROR_STREAM("Failed To decode PP reply params");
+      RCLCPP_ERROR_STREAM(rclcpp::get_logger("uam_worker_base"), "Failed To decode PP reply params");
       return std::nullopt;
     }
     return reply;

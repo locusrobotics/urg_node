@@ -40,8 +40,10 @@
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <sensor_msgs/LaserScan.h>
-#include <urg_node_msgs/Status.h>
+#include <rclcpp/rclcpp.hpp>
+
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <urg_node_msgs/msg/status.hpp>
 
 #include <uam/scan_params.hpp>
 #include <uam/io/tcp_client.hpp>
@@ -92,7 +94,7 @@ public:
   /**
    * @brief
    */
-  UamDriver();
+  explicit UamDriver(const rclcpp::Logger& logger = rclcpp::get_logger("uam_driver"));
 
   /**
    * @brief Default D'tor
@@ -274,10 +276,13 @@ public:
    *
    * @param Stamped packet
    */
-  inline void packetCallback(const uam::protocol::ShapeShifterPacket& packet, const ros::Time& wall_time)
+  inline void packetCallback(const uam::protocol::ShapeShifterPacket& packet, const rclcpp::Time& wall_time)
   {
     auto success = uam_packet_worker_.processByHandler(packet, wall_time);
-    ROS_ERROR_STREAM_COND(!success, "Failed processing packet");
+    if (!success)
+    {
+      RCLCPP_ERROR_STREAM(logger_, "Failed processing packet");
+    }
   }
 
   /**
@@ -403,6 +408,11 @@ private:
    * This is populated by the receive event sequence after the pending command has been sent.
    */
   scip_protocol::PPReply pending_scip_reply_;
+
+  /**
+   * @brief Logger object used for debug info
+   */
+  rclcpp::Logger logger_;
 };
 }  // namespace uam
 

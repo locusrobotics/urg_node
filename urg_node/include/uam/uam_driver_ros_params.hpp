@@ -35,7 +35,7 @@
 #ifndef UAM_UAM_DRIVER_ROS_PARAMS_H
 #define UAM_UAM_DRIVER_ROS_PARAMS_H
 
-#include <ros/node_handle.h>
+#include <rclcpp/rclcpp.hpp>
 #include <uam/protocol_types/uam_protocol_types.hpp>
 
 #include <optional>
@@ -52,9 +52,13 @@ public:
   /**
    * @brief Method for loading parameter values from ROS.
    *
-   * @param[in] nh - The ROS node handle with which to load parameters
+   * Dynamic reconfiguration (changing values at runtime through
+   * `ros2 param set`) is not implemented yet; values are read once here at
+   * node startup.
+   *
+   * @param[in] node - The ROS node from which to declare/load parameters
    */
-  static UamROSParams loadFromROS(const ros::NodeHandle& nh);
+  static UamROSParams loadFromROS(rclcpp::Node* node);
 
   /**
    * @brief Controls (filters) the angle of the first range measurement in radians.
@@ -69,7 +73,7 @@ public:
   /**
    * @brief The amount of seconds the client waits for a reply to the requested command
    */
-  ros::Duration command_reply_timeout { 2.0 };
+  rclcpp::Duration command_reply_timeout { rclcpp::Duration::from_seconds(2.0) };
 
   /**
    * @brief The frame id attached to the LaserScan message header
@@ -114,12 +118,12 @@ public:
   /**
    * @brief Period between lidar reconfiguration attempts
    */
-  ros::Duration reconfiguration_timeout { 5.0 };
+  rclcpp::Duration reconfiguration_timeout { rclcpp::Duration::from_seconds(5.0) };
 
   /**
    * @brief Period between lidar reconnect attempts
    */
-  ros::Duration reconnect_timeout { 5.0 };
+  rclcpp::Duration reconnect_timeout { rclcpp::Duration::from_seconds(5.0) };
 
 
   /**
@@ -130,7 +134,7 @@ public:
   /**
    * @brief If no scan sectors have been received after this many seconds, reconnect to the lidar
    */
-  ros::Duration scan_timeout { 5.0 };
+  rclcpp::Duration scan_timeout { rclcpp::Duration::from_seconds(5.0) };
 
   /**
    * @brief The topic name where LaserScan messages will be published
@@ -156,7 +160,7 @@ public:
   /**
     * @brief The minimum time between lidar power cycles
   */
-  ros::Duration lidar_power_cycle_interval { 30 };
+  rclcpp::Duration lidar_power_cycle_interval { rclcpp::Duration::from_seconds(30) };
 
   /**
    * @brief Number of configure attempts before attempting hard reset
@@ -177,7 +181,7 @@ public:
   /**
    * @brief Additional time offset to add to the lidar timestamps to compensate for unmeasured delays
    */
-  ros::Duration time_offset { 0. };
+  rclcpp::Duration time_offset { rclcpp::Duration::from_seconds(0.) };
 
   /**
    * @brief Enable or disable intensity readings

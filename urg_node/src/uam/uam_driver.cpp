@@ -39,14 +39,16 @@
 
 namespace uam
 {
-UamDriver::UamDriver() :
+UamDriver::UamDriver(const rclcpp::Logger& logger) :
   io_service_(std::make_shared<boost::asio::io_service>()),
-  client_(std::bind(&UamDriver::packetCallback, this, std::placeholders::_1, std::placeholders::_2), io_service_),
+  client_(
+    std::bind(&UamDriver::packetCallback, this, std::placeholders::_1, std::placeholders::_2), io_service_, logger),
   uam_packet_worker_(),
   scip_pp_worker_(),
   command_timeout_(10.0),
   command_send_timeout_(std::chrono::seconds(5)),
-  subscription_mode_(ESubscriptionMode::INVALID)
+  subscription_mode_(ESubscriptionMode::INVALID),
+  logger_(logger)
 {
   // Register command callback (VR, XR, ID, YR)
   uam_packet_worker_.registerCallback<VR00Worker>(
@@ -176,7 +178,7 @@ void UamDriver::startStreaming(const bool publish_intensity, const bool publish_
 {
   if (subscription_mode_ != ESubscriptionMode::INVALID)
   {
-    ROS_WARN_STREAM("Already streaming!");
+    RCLCPP_WARN_STREAM(logger_, "Already streaming!");
     return;
   }
 
@@ -217,7 +219,7 @@ void UamDriver::stopStreaming()
 {
   if (subscription_mode_ == ESubscriptionMode::INVALID)
   {
-    ROS_WARN_STREAM("Not streaming, skipping action!");
+    RCLCPP_WARN_STREAM(logger_, "Not streaming, skipping action!");
     return;
   }
 
