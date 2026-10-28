@@ -143,7 +143,7 @@ void UamROS::publishSafetyArea(const size_t area_number)
     return;
   else if (!safety_areas_.count(area_number))
   {
-    ROS_ERROR_STREAM("Cannot find requested area number in the database.");
+    LOCUS_LOG_ERROR_STREAM(logger_, "Cannot find requested area number in the database.");
     return;
   }
 
@@ -167,13 +167,13 @@ void UamROS::scanWatchdogTimerCallback(const ros::TimerEvent& event)
   auto elapsed_time = event.current_real - std::max(configured_stamp_, scan_stamp_);
   if (configured_ && elapsed_time > params_.scan_timeout)
   {
-    ROS_WARN_STREAM(
+    LOCUS_LOG_WARN_STREAM(logger_,
       "No scan sector messages have been received from Hokuyo lidar ("
       << params_.ip_address << ") in the last " << std::setprecision(3) << elapsed_time.toSec() << " seconds (since "
       << scan_stamp_ << "). Resetting the lidar.");
 
     auto lidar_reset_done = lidarHardReset();
-    ROS_WARN_STREAM_COND(!lidar_reset_done, "Lidar reset skipped. Check logs! Only reconfigure will be performed.");
+    LOCUS_LOG_WARN_STREAM_COND(logger_, !lidar_reset_done, "Lidar reset skipped. Check logs! Only reconfigure will be performed.");
     triggerReconfigure();
   }
 }
@@ -192,30 +192,30 @@ bool UamROS::lidarHardReset()
       {
         if (srv.response.success)
         {
-          ROS_WARN_STREAM("Lidar reset successful.");
+          LOCUS_LOG_WARN_STREAM(logger_, "Lidar reset successful.");
           return true;
         }
         else
         {
-          ROS_ERROR_STREAM("Lidar reset failed: " << srv.response.message);
+          LOCUS_LOG_ERROR_STREAM(logger_, "Lidar reset failed: " << srv.response.message);
           return false;
         }
       }
       else
       {
-        ROS_ERROR_STREAM("Failed to call lidar reset service.");
+        LOCUS_LOG_ERROR_STREAM(logger_, "Failed to call lidar reset service.");
         return false;
       }
     }
     catch (const std::exception& e)
     {
-      ROS_ERROR_STREAM("Error while restarting the lidar: " << e.what());
+      LOCUS_LOG_ERROR_STREAM(logger_, "Error while restarting the lidar: " << e.what());
       return false;
     }
   }
   else
   {
-    ROS_WARN_STREAM("Lidar was restarted too recently. Skipping lidar restart.");
+    LOCUS_LOG_WARN_STREAM(logger_, "Lidar was restarted too recently. Skipping lidar restart.");
     return false;
   }
 }
@@ -259,7 +259,7 @@ bool UamROS::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::
   }
   else
   {
-    ROS_WARN_STREAM_THROTTLE(
+    LOCUS_LOG_WARN_STREAM_THROTTLE(logger_,
       5.0,
       "Failed to retrieved detailed status after " << scan_cycles_timeout << " scan cycles.");
     res.success = false;
@@ -308,7 +308,7 @@ bool UamROS::configure()
   try
   {
     lidar_.connect(params_.ip_address, params_.ip_port);
-    ROS_INFO_STREAM("Connected to Uam lidar.");
+    LOCUS_LOG_INFO_STREAM(logger_, "Connected to Uam lidar.");
 
     // TODO(cribeiromendes): make scip commands work seamlessly. Right now we
     // need to ask this before starting continuous async reads
@@ -323,7 +323,7 @@ bool UamROS::configure()
     // Set the reconfigure limits after fetching scan details
     updateReconfigureLimits();
     auto version_details = toString(lidar_.getVersionDetails());
-    ROS_INFO_STREAM("Sensor details: " << version_details);
+    LOCUS_LOG_INFO_STREAM(logger_, "Sensor details: " << version_details);
 
     // Read laser safety areas
     readSafetyAreas();
@@ -338,7 +338,7 @@ bool UamROS::configure()
       if (params_.discard_startup_data_s > 0.0)
       {
         discard_data_until_ = configured_stamp_ + ros::Duration(params_.discard_startup_data_s);
-        ROS_WARN_STREAM(
+        LOCUS_LOG_WARN_STREAM(logger_,
           "Discarding UAM scan data for " << params_.discard_startup_data_s << " seconds after startup/reconnect.");
       }
       else
@@ -354,12 +354,12 @@ bool UamROS::configure()
   }
   catch (const std::exception& e)
   {
-    ROS_ERROR_STREAM("Error while configuring the lidar: " << e.what());
+    LOCUS_LOG_ERROR_STREAM(logger_, "Error while configuring the lidar: " << e.what());
     lidar_.disconnect();
     configure_attempts_++;
     if (configure_attempts_ > params_.configure_attempts)
     {
-      ROS_WARN_STREAM("Could not configure lidar after " << configure_attempts_ << " attempts. Triggering hard reset");
+      LOCUS_LOG_WARN_STREAM(logger_, "Could not configure lidar after " << configure_attempts_ << " attempts. Triggering hard reset");
       if (lidarHardReset())
       {
         configure_attempts_ = 0;
@@ -550,7 +550,7 @@ void UamROS::readSafetyAreas()
   if (!safety_areas_.empty())
     return;
 
-  ROS_INFO_STREAM("Going to read Laser Safety areas");
+  LOCUS_LOG_INFO_STREAM(logger_, "Going to read Laser Safety areas");
 
   auto toSafetyArea = [this](const protocol::YRCommandReply& yr) -> ScanWithCRC
   {
@@ -594,7 +594,7 @@ void UamROS::readSafetyAreas()
   }
   // We got the complete list of areas, swap
   std::swap(cached_areas, safety_areas_);
-  ROS_INFO_STREAM("Done reading Laser Safety areas.");
+  LOCUS_LOG_INFO_STREAM(logger_, "Done reading Laser Safety areas.");
   if (params_.log_safety_areas_crc)
   {
     std::string area_crc_array = "";
@@ -607,7 +607,7 @@ void UamROS::readSafetyAreas()
       }
       area_crc_array += ";";
     }
-    ROS_INFO_STREAM("Safety area CRC: " << area_crc_array);
+    LOCUS_LOG_INFO_STREAM(logger_, "Safety area CRC: " << area_crc_array);
   }
 }
 }  // namespace uam

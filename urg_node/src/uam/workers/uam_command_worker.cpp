@@ -116,7 +116,7 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
   }
   else
   {
-    ROS_ERROR_STREAM("Unknown packet type with: " << packet_type.header[0] << packet_type.header[1]);
+    LOCUS_LOG_ERROR_STREAM(logger_, "Unknown packet type with: " << packet_type.header[0] << packet_type.header[1]);
   }
 
   return processed_successfully;

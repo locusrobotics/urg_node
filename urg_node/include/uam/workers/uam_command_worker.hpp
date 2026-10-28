@@ -46,6 +46,8 @@
 #include <uam/workers/id00_worker.hpp>
 #include <uam/workers/yr_worker.hpp>
 
+#include <locus_cpp/ros_util.h>
+
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -173,6 +175,11 @@ private:
     uam::ID00Worker,
     uam::YRWorker>
     workers_;
+
+  /**
+   * @brief Logger instance
+   */
+  locus_cpp::Logger logger_ { "UamPacketWorker" };
 };
 }  // namespace uam
 

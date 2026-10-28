@@ -38,6 +38,8 @@
 #include <uam/protocol_types/scip_protocol_types.hpp>
 #include <uam/workers/uam_worker_base.hpp>
 
+#include <locus_cpp/ros_util.h>
+
 #include <optional>
 #include <string>
 #include <string_view>
@@ -101,7 +103,7 @@ public:
   {
     if (raw_reply.size() != NR_LINES)
     {
-      ROS_ERROR_STREAM(
+      LOCUS_LOG_ERROR_STREAM(logger_,
         "Invalid response with only: " << raw_reply.size()
                                           << " line. Expected: " << NR_LINES);
       return std::nullopt;
@@ -110,7 +112,7 @@ public:
     std::optional<Reply> reply = static_cast<const TDerived*>(this)->decode(raw_reply);
     if (!reply.has_value())
     {
-      ROS_ERROR_STREAM("Failed to decode message");
+      LOCUS_LOG_ERROR_STREAM(logger_, "Failed to decode message");
       return std::nullopt;
     }
     return reply;
@@ -145,6 +147,11 @@ protected:
     }
     return result;
   }
+
+  /**
+   * @brief Logger instance
+   */
+  locus_cpp::Logger logger_ { "SCIPWorker" };
 
 private:
   /**
@@ -183,7 +190,7 @@ public:
     failed = failed || !decodeField(raw_reply.at(scip_protocol::PPReplyLineIndex::RPM), reply.rpm);
     if (failed)
     {
-      ROS_ERROR_STREAM("Failed To decode PP reply params");
+      LOCUS_LOG_ERROR_STREAM(logger_, "Failed To decode PP reply params");
       return std::nullopt;
     }
     return reply;

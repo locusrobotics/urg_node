@@ -150,7 +150,7 @@ bool UrgNode::updateStatus()
         // }
         // else
         // {
-        //   ROS_WARN("Failed to get detection report.");
+        //   LOCUS_LOG_WARN(logger_, "Failed to get detection report.");
         // }
 
         // Publish the status on the latched topic for inspection.
@@ -159,7 +159,7 @@ bool UrgNode::updateStatus()
       }
       else
       {
-        ROS_WARN("Failed to retrieve status");
+        LOCUS_LOG_WARN(logger_, "Failed to retrieve status");
       }
     }
   }
@@ -168,7 +168,7 @@ bool UrgNode::updateStatus()
 
 bool UrgNode::statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
 {
-  ROS_INFO("Got update lidar status callback");
+  LOCUS_LOG_INFO(logger_, "Got update lidar status callback");
   res.success = false;
   res.message = "Laser not ready";
 
@@ -190,7 +190,7 @@ bool UrgNode::reconfigure_callback(urg_node::URGConfig& config, int level)
 {
   if (!urg_)
   {
-    ROS_ERROR("Reconfigure failed, not ready");
+    LOCUS_LOG_ERROR(logger_, "Reconfigure failed, not ready");
     return false;
   }
 
@@ -202,7 +202,7 @@ bool UrgNode::reconfigure_callback(urg_node::URGConfig& config, int level)
   else if (level > 0)  // Must stop
   {
     urg_->stop();
-    ROS_INFO("Stopped data due to reconfigure.");
+    LOCUS_LOG_INFO(logger_, "Stopped data due to reconfigure.");
 
     // Change values that required stopping
     urg_->setAngleLimitsAndCluster(config.angle_min, config.angle_max, config.cluster);
@@ -211,11 +211,11 @@ bool UrgNode::reconfigure_callback(urg_node::URGConfig& config, int level)
     try
     {
       urg_->start();
-      ROS_INFO("Streaming data after reconfigure.");
+      LOCUS_LOG_INFO(logger_, "Streaming data after reconfigure.");
     }
     catch (std::runtime_error& e)
     {
-      ROS_FATAL("%s", e.what());
+      LOCUS_LOG_FATAL(logger_, "%s", e.what());
       ros::Duration(1.0).sleep();
       ros::shutdown();
       return false;
@@ -238,7 +238,7 @@ void UrgNode::update_reconfigure_limits()
 {
   if (!urg_ || !srv_)
   {
-    ROS_DEBUG_THROTTLE(10, "Unable to update reconfigure limits. Not Ready.");
+    LOCUS_LOG_DEBUG_THROTTLE(logger_, 10, "Unable to update reconfigure limits. Not Ready.");
     return;
   }
 
@@ -260,20 +260,20 @@ void UrgNode::calibrate_time_offset()
   boost::mutex::scoped_lock lock(lidar_mutex_);
   if (!urg_)
   {
-    ROS_DEBUG_THROTTLE(10, "Unable to calibrate time offset. Not Ready.");
+    LOCUS_LOG_DEBUG_THROTTLE(logger_, 10, "Unable to calibrate time offset. Not Ready.");
     return;
   }
   try
   {
     // Don't let outside interruption effect lidar offset.
-    ROS_INFO("Starting calibration. This will take a few seconds.");
-    ROS_WARN("Time calibration is still experimental.");
+    LOCUS_LOG_INFO(logger_, "Starting calibration. This will take a few seconds.");
+    LOCUS_LOG_WARN(logger_, "Time calibration is still experimental.");
     ros::Duration latency = urg_->computeLatency(10);
-    ROS_INFO("Calibration finished. Latency is: %.4f.", latency.toSec());
+    LOCUS_LOG_INFO(logger_, "Calibration finished. Latency is: %.4f.", latency.toSec());
   }
   catch (std::runtime_error& e)
   {
-    ROS_FATAL("Could not calibrate time offset: %s", e.what());
+    LOCUS_LOG_FATAL(logger_, "Could not calibrate time offset: %s", e.what());
     ros::Duration(1.0).sleep();
     ros::shutdown();
   }
@@ -467,7 +467,7 @@ bool UrgNode::connect()
       ss << " intensity and";
     }
     ss << " ID: " << urg_->getDeviceID();
-    ROS_INFO_STREAM(ss.str());
+    LOCUS_LOG_INFO_STREAM(logger_, ss.str());
 
     device_status_.status_str = urg_->getSensorStatus();
     device_status_.vendor_name = urg_->getVendorName();
@@ -486,13 +486,13 @@ bool UrgNode::connect()
   }
   catch (std::runtime_error& e)
   {
-    ROS_ERROR_THROTTLE(10.0, "Error connecting to Hokuyo: %s", e.what());
+    LOCUS_LOG_ERROR_THROTTLE(logger_, 10.0, "Error connecting to Hokuyo: %s", e.what());
     urg_.reset();
     return false;
   }
   catch (std::exception& e)
   {
-    ROS_ERROR_THROTTLE(10.0, "Unknown error connecting to Hokuyo: %s", e.what());
+    LOCUS_LOG_ERROR_THROTTLE(logger_, 10.0, "Unknown error connecting to Hokuyo: %s", e.what());
     urg_.reset();
     return false;
   }
@@ -554,20 +554,20 @@ void UrgNode::scanThread()
       }
       device_status_.status_str = urg_->getSensorStatus();
       urg_->start();
-      ROS_INFO("Streaming data.");
+      LOCUS_LOG_INFO(logger_, "Streaming data.");
       // Clear the error count.
       error_count_ = 0;
     }
     catch (std::runtime_error& e)
     {
-      ROS_ERROR_THROTTLE(10.0, "Error starting Hokuyo: %s", e.what());
+      LOCUS_LOG_ERROR_THROTTLE(logger_, 10.0, "Error starting Hokuyo: %s", e.what());
       urg_.reset();
       ros::Duration(1.0).sleep();
       continue;  // Return to top of main loop
     }
     catch (...)
     {
-      ROS_ERROR_THROTTLE(10.0, "Unknown error starting Hokuyo");
+      LOCUS_LOG_ERROR_THROTTLE(logger_, 10.0, "Unknown error starting Hokuyo");
       urg_.reset();
       ros::Duration(1.0).sleep();
       continue;  // Return to top of main loop
@@ -589,7 +589,7 @@ void UrgNode::scanThread()
           }
           else
           {
-            ROS_WARN_THROTTLE(10.0, "Could not grab multi echo scan.");
+            LOCUS_LOG_WARN_THROTTLE(logger_, 10.0, "Could not grab multi echo scan.");
             device_status_.status_str = urg_->getSensorStatus();
             error_count_++;
           }
@@ -604,7 +604,7 @@ void UrgNode::scanThread()
           }
           else
           {
-            ROS_WARN_THROTTLE(10.0, "Could not grab single echo scan.");
+            LOCUS_LOG_WARN_THROTTLE(logger_, 10.0, "Could not grab single echo scan.");
             device_status_.status_str = urg_->getSensorStatus();
             error_count_++;
           }
@@ -612,7 +612,7 @@ void UrgNode::scanThread()
       }
       catch (...)
       {
-        ROS_ERROR_THROTTLE(10.0, "Unknown error grabbing Hokuyo scan.");
+        LOCUS_LOG_ERROR_THROTTLE(logger_, 10.0, "Unknown error grabbing Hokuyo scan.");
         error_count_++;
       }
 
@@ -625,7 +625,7 @@ void UrgNode::scanThread()
       // Reestablish conneciton if things seem to have gone wrong.
       if (error_count_ > error_limit_)
       {
-        ROS_ERROR_THROTTLE(10.0, "Error count exceeded limit, reconnecting.");
+        LOCUS_LOG_ERROR_THROTTLE(logger_, 10.0, "Error count exceeded limit, reconnecting.");
         urg_.reset();
         ros::Duration(2.0).sleep();
 

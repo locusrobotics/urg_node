@@ -39,6 +39,8 @@
 #include <uam/uam_error_codes.hpp>
 #include <uam/workers/uam_worker_base.hpp>
 
+#include <locus_cpp/ros_util.h>
+
 #include <optional>
 #include <string>
 
@@ -245,7 +247,7 @@ protected:
     auto current_crc = calculateReplyCrc(reply);
     if (current_crc != reply.footer.crc)
     {
-      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << reply.footer.crc);
+      LOCUS_LOG_WARN_STREAM(logger_, "Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << reply.footer.crc);
       return false;
     }
     // Parse status
@@ -298,7 +300,7 @@ protected:
       {
         error_msg = std::string("Received bad status: unknown error " + status);
       }
-      ROS_ERROR_STREAM(error_msg);
+      LOCUS_LOG_ERROR_STREAM(logger_, error_msg);
       return false;
     }
     return true;
@@ -308,6 +310,11 @@ protected:
    * @brief Callback to execute when processing the packet
    */
   PacketEventCallback callback_ { nullptr };
+
+  /**
+   * @brief Logger instance
+   */
+  locus_cpp::Logger logger_ { "YRWorker" };
 };
 
 }  // namespace uam

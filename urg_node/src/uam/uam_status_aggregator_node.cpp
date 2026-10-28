@@ -35,6 +35,8 @@
 #include <ros/ros.h>
 #include <urg_node_msgs/StatusArray.h>
 
+#include <locus_cpp/ros_util.h>
+
 #include <string>
 #include <vector>
 
@@ -68,7 +70,7 @@ public:
    */
   explicit StatusAggregator(const StatusAggregatorParams& params) : params_(params)
   {
-    auto isTopicNameInvalid = [](const std::string& topic_name) -> bool
+    auto isTopicNameInvalid = [this](const std::string& topic_name) -> bool
     {
       std::string error;
       auto name_valid = ros::names::validate(topic_name, error);
@@ -77,7 +79,7 @@ public:
         error = "Cannot have empty topic names";
         name_valid = false;
       }
-      ROS_WARN_STREAM_COND(!name_valid, "Invalid topic name detected: " << error);
+      LOCUS_LOG_WARN_STREAM_COND(logger_, !name_valid, "Invalid topic name detected: " << error);
       return !name_valid;
     };
 
@@ -88,7 +90,7 @@ public:
 
     if (params_.status_topics.empty())
     {
-      ROS_ERROR_STREAM("No valid status topic(s) found.");
+      LOCUS_LOG_ERROR_STREAM(logger_, "No valid status topic(s) found.");
       return;
     }
 
@@ -160,6 +162,11 @@ private:
    * @brief Status Subscriber vector
    */
   std::vector<ros::Subscriber> status_subscribers_;
+
+  /**
+   * @brief Logger instance
+   */
+  locus_cpp::Logger logger_ { "StatusAggregator" };
 };
 
 }  // namespace uam

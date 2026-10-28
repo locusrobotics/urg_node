@@ -99,7 +99,7 @@ void TcpClient::disconnect()
       socket_.close(error_code);
       if (error_code)
       {
-        ROS_WARN_STREAM("Failed to close socket. " << error_code.message());
+        LOCUS_LOG_WARN_STREAM(logger_, "Failed to close socket. " << error_code.message());
       }
     }
     // Clear async read flag
@@ -121,7 +121,7 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
     auto remote_address = boost::asio::ip::address::from_string(remote_ip, error_code);
     if (error_code)
     {
-      ROS_ERROR_STREAM(
+      LOCUS_LOG_ERROR_STREAM(logger_,
         "Failed to convert the provided remote ip string (" << remote_ip << ") into a valid IP address. "
                                                             << error_code.message());
       return false;
@@ -134,10 +134,10 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
     auto connect_future = socket_.async_connect(remote_endpoint_, boost::asio::use_future);
     if (std::future_status::ready != connect_future.wait_for(std::chrono::seconds(5)))
     {
-      ROS_ERROR_STREAM("Connect Timed out...");
+      LOCUS_LOG_ERROR_STREAM(logger_, "Connect Timed out...");
       boost::system::error_code error_code;
       socket_.close(error_code);
-      ROS_ERROR_STREAM_COND(error_code, "Error while closing socket: " << error_code.message());
+      LOCUS_LOG_ERROR_STREAM_COND(logger_, error_code, "Error while closing socket: " << error_code.message());
       return false;
     }
 
@@ -147,7 +147,7 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
     }
     catch (const boost::system::system_error& error)
     {
-      ROS_ERROR_STREAM("Failed to connect: " << error.what());
+      LOCUS_LOG_ERROR_STREAM(logger_, "Failed to connect: " << error.what());
       return false;
     }
   }
@@ -161,23 +161,23 @@ bool TcpClient::connect(const std::string& remote_ip, uint16_t remote_port)
   socket_.set_option(option, error_code);
   if (error_code)
   {
-    ROS_ERROR_STREAM("Failed to set option: " << error_code.message());
+    LOCUS_LOG_ERROR_STREAM(logger_, "Failed to set option: " << error_code.message());
     disconnect();
     return false;
   }
 
-  ROS_INFO_STREAM("Connected to: " << remote_ip << ":" << remote_port);
+  LOCUS_LOG_INFO_STREAM(logger_, "Connected to: " << remote_ip << ":" << remote_port);
 
   int recv_buf_size;
   socklen_t recv_buf_size_len = sizeof(recv_buf_size);
   auto rc = getsockopt(socket_.native_handle(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &recv_buf_size_len);
   if (rc == 0)
   {
-    ROS_INFO_STREAM("Actual receive buffer size: " << recv_buf_size << " bytes");
+    LOCUS_LOG_INFO_STREAM(logger_, "Actual receive buffer size: " << recv_buf_size << " bytes");
   }
   else
   {
-    ROS_ERROR_STREAM("Error getting receive buffer size: " << strerror(errno));
+    LOCUS_LOG_ERROR_STREAM(logger_, "Error getting receive buffer size: " << strerror(errno));
   }
 
   return true;
@@ -217,12 +217,12 @@ void TcpClient::handlePacket(
     // error conditions.
     if (connected_ || error_code != boost::asio::error::operation_aborted)
     {
-      ROS_ERROR_STREAM("Error receiving lidar message. " << error_code.message());
+      LOCUS_LOG_ERROR_STREAM(logger_, "Error receiving lidar message. " << error_code.message());
     }
   }
   else if (bytes_transferred != missing_read)
   {
-    ROS_WARN_STREAM(
+    LOCUS_LOG_WARN_STREAM(logger_,
       "Failed to read missing bytes. Received " << bytes_transferred << "bytes\n"
                                                 << "Expected " << missing_read << " bytes");
   }
@@ -245,12 +245,12 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
     // error conditions.
     if (connected_ || error_code != boost::asio::error::operation_aborted)
     {
-      ROS_ERROR_STREAM("Error receiving lidar message. " << error_code.message());
+      LOCUS_LOG_ERROR_STREAM(logger_, "Error receiving lidar message. " << error_code.message());
     }
   }
   else if (sizeof(protocol::CommandReplyHeader) != bytes_transferred)
   {
-    ROS_WARN_STREAM(
+    LOCUS_LOG_WARN_STREAM(logger_,
       "Failed to read: " << error_code.message() << " Received " << bytes_transferred << "bytes\n"
                          << "Expected " << sizeof(protocol::CommandReplyHeader) << " bytes");
   }
@@ -288,12 +288,12 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
       }
       else
       {
-        ROS_WARN_STREAM("Error in the expected size!");
+        LOCUS_LOG_WARN_STREAM(logger_, "Error in the expected size!");
       }
     }
     else
     {
-      ROS_WARN_STREAM("Packet was received but could not make sense of it, skipping it.");
+      LOCUS_LOG_WARN_STREAM(logger_, "Packet was received but could not make sense of it, skipping it.");
     }
   }
   asyncReadData(packet_offset);

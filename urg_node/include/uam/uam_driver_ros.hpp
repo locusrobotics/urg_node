@@ -45,6 +45,8 @@
 #include <uam/type_traits.hpp>
 #include <visualization_msgs/Marker.h>
 
+#include <locus_cpp/ros_util.h>
+
 #include <atomic>
 #include <limits>
 #include <map>
@@ -172,7 +174,7 @@ private:
     {
       // According to the documentation, when the sensor gets into lockout state
       // it will keep sending pointcloud but the measurement values are not updated.
-      ROS_WARN_STREAM_THROTTLE(5.0, "Sensor is in lockout state, skipping scan readings!");
+      LOCUS_LOG_WARN_STREAM_THROTTLE(logger_, 5.0, "Sensor is in lockout state, skipping scan readings!");
       return;
     }
 
@@ -197,7 +199,7 @@ private:
 
     if (reply.ranges.size() <= last_step)
     {
-      ROS_ERROR_STREAM("Unexpected outcome: " << reply.ranges.size() << " and last_step is " << last_step);
+      LOCUS_LOG_ERROR_STREAM(logger_, "Unexpected outcome: " << reply.ranges.size() << " and last_step is " << last_step);
       return;
     }
 
@@ -247,7 +249,7 @@ private:
       // If this happens after a lidar power cycle (when the rest of the system is initialized), it breaks the
       // laser filtering pipeline. The likelihood of nominally receiving all nan readings in our use case is so
       // infinitesimally small we can just skip publishing in this case.
-      ROS_WARN_STREAM_THROTTLE(5.0, "All ranges are NaN/invalid, skipping scan publish!");
+      LOCUS_LOG_WARN_STREAM_THROTTLE(logger_, 5.0, "All ranges are NaN/invalid, skipping scan publish!");
       // We return early to avoid publishing misleading scans or area information.
       return;
     }
@@ -523,6 +525,11 @@ private:
   std::atomic_bool publish_status_requested_;
 
   /**@}*/
+
+  /**
+   * @brief Logger instance
+   */
+  locus_cpp::Logger logger_ { "UamROS" };
 };
 
 }  // namespace uam

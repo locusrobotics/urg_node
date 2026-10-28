@@ -352,7 +352,7 @@ bool URGCWrapper::getAR00Status(URGStatus& status)
 
   if (!reply.has_value())
   {
-    ROS_WARN_STREAM("Failed to decode incoming AR00 reply.");
+    LOCUS_LOG_WARN_STREAM(logger_, "Failed to decode incoming AR00 reply.");
     return false;
   }
   status = reply->sensing_data;
@@ -371,7 +371,7 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
   // Get the response
   std::string response = sendCommand(str_cmd);
 
-  ROS_DEBUG_STREAM("Full response: " << response);
+  LOCUS_LOG_DEBUG_STREAM(logger_, "Full response: " << response);
 
   // Strip STX and ETX before calculating the CRC.
   response.erase(0, 1);
@@ -390,7 +390,7 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
 
   if (checksum_result != crc)
   {
-    ROS_WARN("Received bad frame, incorrect checksum");
+    LOCUS_LOG_WARN(logger_, "Received bad frame, incorrect checksum");
     return false;
   }
 
@@ -398,13 +398,13 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
   // Grab the status
   uint16_t status = 0;
   ss.clear();
-  ROS_DEBUG_STREAM("Status " << response.substr(8, 2));
+  LOCUS_LOG_DEBUG_STREAM(logger_, "Status " << response.substr(8, 2));
   ss << response.substr(8, 2);  // Status is 8th position 2 chars.
   ss >> std::hex >> status;
 
   if (status != 0)
   {
-    ROS_WARN("Received bad status");
+    LOCUS_LOG_WARN(logger_, "Received bad status");
     return false;
   }
 
@@ -434,7 +434,7 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
     ss.clear();
     ss << msg.substr(offset_pos + 8, 4);  // "Step" is offset 8 from beginning 4 chars long.
     ss >> std::hex >> step;
-    ROS_DEBUG_STREAM(i << " Area: " << area << " Distance: " << distance << " Step: " << step);
+    LOCUS_LOG_DEBUG_STREAM(logger_, i << " Area: " << area << " Distance: " << distance << " Step: " << step);
 
     UrgDetectionReport r;
     r.area = area;
@@ -456,7 +456,7 @@ bool URGCWrapper::getDL00Status(UrgDetectionReport& report)
       // are empty.
       if (iter - 1 == reports.begin())
       {
-        ROS_WARN("All reports are empty, no detections available.");
+        LOCUS_LOG_WARN(logger_, "All reports are empty, no detections available.");
         report.status = status;
         return false;
       }
@@ -494,7 +494,7 @@ bool URGCWrapper::setToSCIP2()
   if (n > 0 && strcmp(buffer, "SCIP2.0") == 0
     && urg_open(&urg_, URG_SERIAL, serial_port_.c_str(), (long)serial_baud_) >= 0)  // NOLINT
   {
-    ROS_DEBUG_STREAM("Set sensor to SCIP 2.0.");
+    LOCUS_LOG_DEBUG_STREAM(logger_, "Set sensor to SCIP 2.0.");
     return true;
   }
   return false;
@@ -525,7 +525,7 @@ std::string URGCWrapper::sendCommand(std::string cmd)
 
   if (s_bytes < 0)
   {
-    ROS_ERROR_STREAM("Failed to send command.");
+    LOCUS_LOG_ERROR_STREAM(logger_, "Failed to send command.");
     return result;
   }
 
@@ -542,7 +542,7 @@ std::string URGCWrapper::sendCommand(std::string cmd)
     total_read_len += read_len;
     if (read_len <= 0)
     {
-      ROS_ERROR("Read socket failed: %s", strerror(errno));
+      LOCUS_LOG_ERROR(logger_, "Read socket failed: %s", strerror(errno));
       result.clear();
       return result;
     }
@@ -553,7 +553,7 @@ std::string URGCWrapper::sendCommand(std::string cmd)
   std::stringstream ss;
   ss << recv_header.substr(1, 4);
   ss >> std::hex >> expected_read;
-  ROS_DEBUG_STREAM("Read len " << expected_read);
+  LOCUS_LOG_DEBUG_STREAM(logger_, "Read len " << expected_read);
 
   // Already read len of 5, take that out.
   uint32_t arr_size = expected_read - 5;
@@ -561,12 +561,12 @@ std::string URGCWrapper::sendCommand(std::string cmd)
   // based on the currently known messages on the hokuyo documentations
   if (arr_size > 10000)
   {
-    ROS_ERROR("Buffer creation bounds exceeded, shouldn't allocate: %u bytes", arr_size);
+    LOCUS_LOG_ERROR(logger_, "Buffer creation bounds exceeded, shouldn't allocate: %u bytes", arr_size);
     result.clear();
     return result;
   }
 
-  ROS_DEBUG_STREAM("Creating buffer read of arr_Size: " << arr_size);
+  LOCUS_LOG_DEBUG_STREAM(logger_, "Creating buffer read of arr_Size: " << arr_size);
   // Create buffer space for read.
   boost::shared_array<char> data;
   data.reset(new char[arr_size]);
@@ -576,15 +576,15 @@ std::string URGCWrapper::sendCommand(std::string cmd)
   read_len = 0;
   expected_read = arr_size;
 
-  ROS_DEBUG_STREAM("Expected body size: " << expected_read);
+  LOCUS_LOG_DEBUG_STREAM(logger_, "Expected body size: " << expected_read);
   while (total_read_len < expected_read)
   {
     read_len = read(sock, data.get()+total_read_len, expected_read - total_read_len);
     total_read_len += read_len;
-    ROS_DEBUG_STREAM("Read in after header " << read_len);
+    LOCUS_LOG_DEBUG_STREAM(logger_, "Read in after header " << read_len);
     if (read_len <= 0)
     {
-      ROS_ERROR("Read socket failed: %s", strerror(errno));
+      LOCUS_LOG_ERROR(logger_, "Read socket failed: %s", strerror(errno));
       result.clear();
       return result;
     }
@@ -1030,7 +1030,7 @@ ros::Time URGCWrapper::getSynchronizedTime(long time_stamp, long long system_tim
         hardware_clock_ = 0.0;
         last_hardware_time_stamp_ = 0;
         stamp = system_time;
-        ROS_INFO("%s: detected clock warp, reset EMA", __func__);
+        LOCUS_LOG_INFO(logger_, "%s: detected clock warp, reset EMA", __func__);
     }
   }
   return stamp;

@@ -176,7 +176,7 @@ void UamDriver::startStreaming(const bool publish_intensity, const bool publish_
 {
   if (subscription_mode_ != ESubscriptionMode::INVALID)
   {
-    ROS_WARN_STREAM("Already streaming!");
+    LOCUS_LOG_WARN_STREAM(logger_, "Already streaming!");
     return;
   }
 
@@ -217,7 +217,7 @@ void UamDriver::stopStreaming()
 {
   if (subscription_mode_ == ESubscriptionMode::INVALID)
   {
-    ROS_WARN_STREAM("Not streaming, skipping action!");
+    LOCUS_LOG_WARN_STREAM(logger_, "Not streaming, skipping action!");
     return;
   }
 

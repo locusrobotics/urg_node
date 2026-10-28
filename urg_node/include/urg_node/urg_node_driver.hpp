@@ -48,6 +48,8 @@
 
 #include "urg_node/urg_c_wrapper.hpp"
 
+#include <locus_cpp/ros_util.h>
+
 namespace urg_node
 {
 class UrgNode
@@ -140,6 +142,8 @@ private:
   ros::Publisher status_pub_;
 
   ros::ServiceServer status_service_;
+
+  locus_cpp::Logger logger_ { "UrgNode" };
 };
 
 }  // namespace urg_node

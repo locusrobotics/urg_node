@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5.0)
 project(urg_node)
 
 find_package(catkin REQUIRED COMPONENTS
-  diagnostic_updater dynamic_reconfigure laser_proc
+  diagnostic_updater dynamic_reconfigure laser_proc locus_cpp
   nodelet rosconsole roscpp sensor_msgs std_msgs std_srvs tf urg_c
   json_transport
   urg_node_msgs
@@ -22,7 +22,7 @@ generate_dynamic_reconfigure_options(cfg/URG.cfg)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES uam_workers uam_driver urg_c_wrapper urg_node_driver
-  CATKIN_DEPENDS dynamic_reconfigure laser_proc nodelet rosconsole
+  CATKIN_DEPENDS dynamic_reconfigure laser_proc locus_cpp nodelet rosconsole
   roscpp sensor_msgs std_msgs std_srvs urg_c visualization_msgs
   DEPENDS
 )

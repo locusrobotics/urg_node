@@ -40,7 +40,14 @@
 #include <boost/program_options.hpp>
 #include <boost/crc.hpp>
 
+#include <locus_cpp/ros_util.h>
+
 #include <string>
+
+namespace
+{
+const locus_cpp::Logger logger("UamGetSafetyConfigurationId");
+}  // namespace
 
 boost::program_options::variables_map parseArgs(int argc, char** argv)
 {
@@ -64,7 +71,7 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
 
   if (args.count("help"))
   {
-    ROS_INFO_STREAM(
+    LOCUS_LOG_INFO_STREAM(logger,
       "Get UAM Lidar FW version and safety configuration IDs.\n\n"
       << "usage: " << boost::filesystem::path(argv[0]).filename().string() << " [options]\n\n"
       << options);
@@ -77,7 +84,7 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
   }
   catch (const std::exception& e)
   {
-    ROS_FATAL_STREAM(
+    LOCUS_LOG_FATAL_STREAM(logger,
       e.what() << "usage: " << boost::filesystem::path(argv[0]).filename().string() << " [options]\n\n"
                << options);
     exit(EXIT_FAILURE);
@@ -88,7 +95,7 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
 
 std::uint32_t getSafetyAreasCRC32(uam::UamDriver& lidar)
 {
-  ROS_INFO_STREAM("Going to read Laser Safety areas");
+  LOCUS_LOG_INFO_STREAM(logger, "Going to read Laser Safety areas");
   std::string combined_crcs = "";
   for (size_t area_number = 1; area_number <= uam::protocol::c_max_safety_area_index; area_number++)
   {

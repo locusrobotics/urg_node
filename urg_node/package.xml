@@ -20,6 +20,7 @@
   <depend>diagnostic_updater</depend>
   <depend>dynamic_reconfigure</depend>
   <depend>laser_proc</depend>
+  <depend>locus_cpp</depend>
   <depend>nodelet</depend>
   <depend>rosconsole</depend>
   <depend>roscpp</depend>

@@ -46,6 +46,8 @@
 #include <urg_c/urg_utils.h>
 #include <uam/workers/sensing_data/ar00_worker.hpp>
 
+#include <locus_cpp/ros_util.h>
+
 
 
 namespace urg_node
@@ -227,6 +229,8 @@ private:
   int ip_port_;
   std::string serial_port_;
   int serial_baud_;
+
+  locus_cpp::Logger logger_ { "URGCWrapper" };
 };
 }  // namespace urg_node
 

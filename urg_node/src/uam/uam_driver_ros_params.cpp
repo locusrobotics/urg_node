@@ -34,10 +34,14 @@
 
 #include <uam/uam_driver_ros_params.hpp>
 
+#include <locus_cpp/ros_util.h>
+
 namespace uam
 {
 UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
 {
+  static const locus_cpp::Logger logger("UamROSParams");
+
   UamROSParams params;
   nh.getParam("angle_min", params.angle_min);
   nh.getParam("angle_max", params.angle_max);
@@ -45,7 +49,7 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
   nh.getParam("publish_multiecho", params.use_multi_echo);
   if (params.use_multi_echo && params.use_intensity)
   {
-    ROS_WARN_STREAM("Multiecho and intensity are not supported. Publishing only intensity.");
+    LOCUS_LOG_WARN_STREAM(logger, "Multiecho and intensity are not supported. Publishing only intensity.");
     params.use_multi_echo = false;
   }
   nh.getParam("frame_id", params.frame_id);
@@ -53,7 +57,7 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
   auto port = nh.param("ip_port", static_cast<int>(params.ip_port));
   if (params.ip_port < 0)
   {
-    ROS_WARN_STREAM("Invalid port! Using: " << params.ip_port);
+    LOCUS_LOG_WARN_STREAM(logger, "Invalid port! Using: " << params.ip_port);
   }
   else
   {
@@ -85,7 +89,7 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
       reference_area < static_cast<int>(protocol::EYRAreaType::protection_1) ||
       reference_area > static_cast<int>(protocol::EYRAreaType::warning_2))
     {
-      ROS_WARN_STREAM(
+      LOCUS_LOG_WARN_STREAM(logger,
         "Invalid Reference Area Type Detected, supported options are: "
         "protection_1 = 0, protection_2 = 1, warning_1 = 2, warning_2 = 3. Detected: "
         << reference_area);

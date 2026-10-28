@@ -44,6 +44,8 @@
 #include <uam/shape_shifter_packet.hpp>
 #include <uam/uam_visitors.hpp>
 
+#include <locus_cpp/ros_util.h>
+
 #include <memory>
 #include <string>
 
@@ -130,7 +132,7 @@ public:
     if (status != std::future_status::ready)
     {
       // we are not expecting this to happen too often, no need to throttle this warning.
-      ROS_WARN_STREAM(
+      LOCUS_LOG_WARN_STREAM(logger_,
         "Failed sending command " << command << " : "
                                   << (status == std::future_status::timeout ? "timeout" : "deferred"));
       return false;
@@ -147,7 +149,7 @@ public:
   {
     if (!connected_)
     {
-      ROS_WARN_STREAM("Not connected, cannot start async read task");
+      LOCUS_LOG_WARN_STREAM(logger_, "Not connected, cannot start async read task");
       return false;
     }
 
@@ -173,7 +175,7 @@ public:
   {
     if (!stopped_)
     {
-      ROS_ERROR_STREAM("Cannot send async readline with async receive in progress.");
+      LOCUS_LOG_ERROR_STREAM(logger_, "Cannot send async readline with async receive in progress.");
       return;
     }
 
@@ -312,6 +314,11 @@ private:
    * @brief State of the async read task
    */
   std::atomic_bool stopped_;
+
+  /**
+   * @brief Logger instance
+   */
+  locus_cpp::Logger logger_ { "TcpClient" };
 };
 
 }  // namespace uam

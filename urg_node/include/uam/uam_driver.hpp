@@ -52,6 +52,8 @@
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/iter_find.hpp>
 
+#include <locus_cpp/ros_util.h>
+
 #include <algorithm>
 #include <memory>
 #include <set>
@@ -277,7 +279,7 @@ public:
   inline void packetCallback(const uam::protocol::ShapeShifterPacket& packet, const ros::Time& wall_time)
   {
     auto success = uam_packet_worker_.processByHandler(packet, wall_time);
-    ROS_ERROR_STREAM_COND(!success, "Failed processing packet");
+    LOCUS_LOG_ERROR_STREAM_COND(logger_, !success, "Failed processing packet");
   }
 
   /**
@@ -403,6 +405,11 @@ private:
    * This is populated by the receive event sequence after the pending command has been sent.
    */
   scip_protocol::PPReply pending_scip_reply_;
+
+  /**
+   * @brief Logger instance
+   */
+  locus_cpp::Logger logger_ { "UamDriver" };
 };
 }  // namespace uam
 
