@@ -20,7 +20,10 @@
 
   <build_depend>libboost-dev</build_depend>
   <build_export_depend>libboost-dev</build_export_depend>
+  <build_depend>libboost-filesystem-dev</build_depend>
+  <build_depend>libboost-program-options-dev</build_depend>
   <depend>diagnostic_updater</depend>
+  <depend>json_transport</depend>
   <depend>laser_proc</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
@@ -28,6 +31,7 @@
   <depend>std_srvs</depend>
   <depend>urg_c</depend>
   <depend>urg_node_msgs</depend>
+  <depend>visualization_msgs</depend>
 
   <exec_depend>urdf</exec_depend>
 

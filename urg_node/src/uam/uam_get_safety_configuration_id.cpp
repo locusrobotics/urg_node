@@ -33,20 +33,21 @@
  *********************************************************************/
 
 #include <json_transport/json_transport.hpp>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include <uam/uam_driver.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <boost/crc.hpp>
 
-#include <locus_cpp/ros_util.h>
+#include <locus_cpp/ros_util.hpp>
 
+#include <iostream>
 #include <string>
 
 namespace
 {
-const locus_cpp::Logger logger("UamGetSafetyConfigurationId");
+const locus_cpp::Logger logger(rclcpp::get_logger("UamGetSafetyConfigurationId"));
 }  // namespace
 
 boost::program_options::variables_map parseArgs(int argc, char** argv)
@@ -142,8 +143,7 @@ std::string getConfigurationId(uam::UamDriver& lidar)
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "detect_lidar");
-  ros::Time::init();
+  rclcpp::init(argc, argv);
   auto args = parseArgs(argc, argv);
 
   try
@@ -166,11 +166,13 @@ int main(int argc, char** argv)
       document["safety_areas_crc32"] = safey_areas_crc32;
     }
     std::cout << document.dump(4) << std::endl;
+    rclcpp::shutdown();
     return EXIT_SUCCESS;
   }
   catch (const std::exception& e)
   {
     std::cout << "Failed to listen for connected lidars: " << e.what() << std::endl;
+    rclcpp::shutdown();
     return EXIT_FAILURE;
   }
 }

@@ -34,8 +34,6 @@
 
 #include <uam/io/tcp_client.hpp>
 
-#include <ros/console.h>
-
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
@@ -46,13 +44,15 @@
 
 namespace uam
 {
-TcpClient::TcpClient(OnNewDataCallback callback) :
-  connected_(false),
-  io_service_owner_(true),
+TcpClient::TcpClient(OnNewDataCallback callback, const rclcpp::Logger& logger) :
   io_service_(std::make_shared<boost::asio::io_service>()),
+  io_service_owner_(true),
+  connected_(false),
   socket_(*io_service_),
   callback_(callback),
-  stopped_(true)
+  stopped_(true),
+  logger_(logger),
+  clock_(RCL_ROS_TIME)
 {
   // Add a fake task to the io_service to prevent it from exiting until desired
   io_work_ = std::make_unique<boost::asio::io_service::work>(*io_service_);
@@ -60,13 +60,17 @@ TcpClient::TcpClient(OnNewDataCallback callback) :
   io_thread_ = std::thread([this]() { this->io_service_->run(); });
 }
 
-TcpClient::TcpClient(OnNewDataCallback callback, std::shared_ptr<boost::asio::io_service>& external_context) :
-  connected_(false),
-  io_service_owner_(false),
+TcpClient::TcpClient(
+  OnNewDataCallback callback, std::shared_ptr<boost::asio::io_service>& external_context,
+  const rclcpp::Logger& logger) :
   io_service_(external_context),
+  io_service_owner_(false),
+  connected_(false),
   socket_(*io_service_),
   callback_(callback),
-  stopped_(true)
+  stopped_(true),
+  logger_(logger),
+  clock_(RCL_ROS_TIME)
 {
 }
 
@@ -209,7 +213,7 @@ void TcpClient::handlePacket(
   const boost::system::error_code& error_code,
   size_t bytes_transferred,
   const size_t missing_read,
-  const ros::Time& stamp)
+  const rclcpp::Time& stamp)
 {
   if (error_code)
   {
@@ -263,7 +267,7 @@ void TcpClient::handleReceive(const boost::system::error_code& error_code, size_
 
     if (should_try_complete_read)
     {
-      auto stamp = ros::Time::now();
+      auto stamp = clock_.now();
       auto expected_total_size = receive_buffer_.get<protocol::CommandReplyHeader>().cmd_size;
       auto valid_expected_size =
         decodeField(expected_total_size) && expected_total_size <= sizeof(protocol::AR01CommandReply);

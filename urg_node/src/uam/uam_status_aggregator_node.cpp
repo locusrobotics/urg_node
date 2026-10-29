@@ -32,11 +32,13 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <ros/ros.h>
-#include <urg_node_msgs/StatusArray.h>
+#include <rclcpp/rclcpp.hpp>
+#include <urg_node_msgs/msg/status_array.hpp>
 
-#include <locus_cpp/ros_util.h>
+#include <locus_cpp/ros_util.hpp>
 
+#include <algorithm>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -47,11 +49,12 @@ namespace uam
  */
 struct StatusAggregatorParams
 {
-  static StatusAggregatorParams loadFromROS(const ros::NodeHandle& nh)
+  static StatusAggregatorParams loadFromROS(rclcpp::Node* node)
   {
     StatusAggregatorParams params;
-    nh.param("status_topics", params.status_topics, params.status_topics);
-    nh.param("publish_on_change", params.publish_on_change, params.publish_on_change);
+    params.status_topics =
+      node->declare_parameter<std::vector<std::string>>("status_topics", params.status_topics);
+    params.publish_on_change = node->declare_parameter<bool>("publish_on_change", params.publish_on_change);
     return params;
   }
   std::vector<std::string> status_topics {};
@@ -59,28 +62,51 @@ struct StatusAggregatorParams
 };
 
 /**
+ * @brief Equality comparison for Status messages, used to detect changes when
+ * publish_on_change is enabled. urg_node_msgs::msg::Status does not define
+ * operator== in ROS2 the way the ROS1 message did, so it is implemented here.
+ */
+bool statusEqual(const urg_node_msgs::msg::Status& lhs, const urg_node_msgs::msg::Status& rhs)
+{
+  return lhs.operating_mode == rhs.operating_mode && lhs.area_number == rhs.area_number &&
+         lhs.error_status == rhs.error_status && lhs.error_code == rhs.error_code &&
+         lhs.lockout_status == rhs.lockout_status && lhs.ossd1_state == rhs.ossd1_state &&
+         lhs.ossd2_state == rhs.ossd2_state && lhs.warning1_state == rhs.warning1_state &&
+         lhs.warning2_state == rhs.warning2_state &&
+         lhs.optical_window_contaminated == rhs.optical_window_contaminated;
+}
+
+/**
  * @brief Status aggregator
  */
-class StatusAggregator
+class StatusAggregator : public rclcpp::Node
 {
 public:
   /**
    * @brief Constructor
-   * @param[in] params - Configuration parameters
    */
-  explicit StatusAggregator(const StatusAggregatorParams& params) : params_(params)
+  explicit StatusAggregator(const rclcpp::NodeOptions& node_options = rclcpp::NodeOptions()) :
+    Node("uam_status_aggregator_node", node_options),
+    params_(StatusAggregatorParams::loadFromROS(this)),
+    logger_(this->get_logger())
   {
     auto isTopicNameInvalid = [this](const std::string& topic_name) -> bool
     {
-      std::string error;
-      auto name_valid = ros::names::validate(topic_name, error);
-      if (name_valid && topic_name.empty())
+      if (topic_name.empty())
       {
-        error = "Cannot have empty topic names";
-        name_valid = false;
+        LOCUS_LOG_WARN_STREAM(logger_, "Invalid topic name detected: Cannot have empty topic names");
+        return true;
       }
-      LOCUS_LOG_WARN_STREAM_COND(logger_, !name_valid, "Invalid topic name detected: " << error);
-      return !name_valid;
+      try
+      {
+        rclcpp::expand_topic_or_service_name(topic_name, this->get_name(), this->get_namespace());
+        return false;
+      }
+      catch (const std::exception& e)
+      {
+        LOCUS_LOG_WARN_STREAM(logger_, "Invalid topic name detected: " << e.what());
+        return true;
+      }
     };
 
     // Check for invalid topics
@@ -94,8 +120,8 @@ public:
       return;
     }
 
-    ros::NodeHandle nh;
-    output_status_publisher_ = nh.advertise<urg_node_msgs::StatusArray>("lidar_sensors_status", 10, true);
+    output_status_publisher_ =
+      this->create_publisher<urg_node_msgs::msg::StatusArray>("lidar_sensors_status", rclcpp::QoS(10).transient_local());
 
     output_status_.status.resize(params_.status_topics.size());
 
@@ -103,26 +129,21 @@ public:
     for (size_t topic_idx = 0; topic_idx < params_.status_topics.size(); topic_idx++)
     {
       const auto& topic = params_.status_topics.at(topic_idx);
-      status_subscribers_.push_back(nh.subscribe<urg_node_msgs::Status>(
+      status_subscribers_.push_back(this->create_subscription<urg_node_msgs::msg::Status>(
         topic,
         1,
-        boost::bind(
-          &StatusAggregator::statusCallback,
-          this,
-          boost::placeholders::_1,
-          std::ref(output_status_.status[topic_idx]))));
+        [this, topic_idx](const urg_node_msgs::msg::Status::SharedPtr status)
+        {
+          this->statusCallback(status, output_status_.status[topic_idx]);
+        }));
     }
     configured_ = true;
   }
 
   /**
-   * @brief Spin callback queue if node is properly configured
+   * @brief Whether the node was successfully configured with at least one valid status topic
    */
-  void run()
-  {
-    if (configured_)
-      ros::spin();
-  }
+  inline bool isConfigured() const { return configured_; }
 
 private:
   /**
@@ -130,12 +151,12 @@ private:
    * @param[in] status - Incoming status
    * @param[in] last_status - Last staus
    */
-  void statusCallback(const urg_node_msgs::StatusConstPtr& status, urg_node_msgs::Status& last_status)
+  void statusCallback(const urg_node_msgs::msg::Status::SharedPtr status, urg_node_msgs::msg::Status& last_status)
   {
-    bool should_publish = params_.publish_on_change ? *status != last_status : true;
+    bool should_publish = params_.publish_on_change ? !statusEqual(*status, last_status) : true;
     last_status = *status;
     if (should_publish)
-      output_status_publisher_.publish(output_status_);
+      output_status_publisher_->publish(output_status_);
   }
 
   /**
@@ -151,29 +172,34 @@ private:
   /**
    * @brief Ouptut combined status
    */
-  urg_node_msgs::StatusArray output_status_;
+  urg_node_msgs::msg::StatusArray output_status_;
 
   /**
    * @brief Output combined status publisher
    */
-  ros::Publisher output_status_publisher_;
+  rclcpp::Publisher<urg_node_msgs::msg::StatusArray>::SharedPtr output_status_publisher_;
 
   /**
    * @brief Status Subscriber vector
    */
-  std::vector<ros::Subscriber> status_subscribers_;
+  std::vector<rclcpp::Subscription<urg_node_msgs::msg::Status>::SharedPtr> status_subscribers_;
 
   /**
-   * @brief Logger instance
+   * @brief Logger object used for debug info
    */
-  locus_cpp::Logger logger_ { "StatusAggregator" };
+  locus_cpp::Logger logger_;
 };
 
 }  // namespace uam
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "uam_status_aggregator_node");
-  uam::StatusAggregator node(uam::StatusAggregatorParams::loadFromROS(ros::NodeHandle("~")));
-  node.run();
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<uam::StatusAggregator>();
+  if (node->isConfigured())
+  {
+    rclcpp::spin(node);
+  }
+  rclcpp::shutdown();
+  return 0;
 }

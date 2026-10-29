@@ -39,7 +39,7 @@
 #include <uam/uam_error_codes.hpp>
 #include <uam/workers/uam_worker_base.hpp>
 
-#include <locus_cpp/ros_util.h>
+#include <locus_cpp/ros_util.hpp>
 
 #include <optional>
 #include <string>
@@ -314,7 +314,7 @@ protected:
   /**
    * @brief Logger instance
    */
-  locus_cpp::Logger logger_ { "YRWorker" };
+  locus_cpp::Logger logger_ { rclcpp::get_logger("YRWorker") };
 };
 
 }  // namespace uam

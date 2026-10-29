@@ -35,17 +35,17 @@
 #ifndef UAM_UAM_DRIVER_ROS_H
 #define UAM_UAM_DRIVER_ROS_H
 
-#include <dynamic_reconfigure/server.h>
-#include <sensor_msgs/LaserScan.h>
-#include <ros/callback_queue.h>
-#include <std_srvs/Trigger.h>
+#include <rclcpp/rclcpp.hpp>
+#include <geometry_msgs/msg/point.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <uam/uam_driver.hpp>
 #include <uam/uam_driver_ros_params.hpp>
-#include <urg_node/URGConfig.h>
 #include <uam/type_traits.hpp>
-#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/msg/marker.hpp>
 
-#include <locus_cpp/ros_util.h>
+#include <locus_cpp/ros_util.hpp>
 
 #include <atomic>
 #include <limits>
@@ -58,7 +58,7 @@
 
 namespace uam
 {
-class UamROS
+class UamROS : public rclcpp::Node
 {
   /**
    * @brief Alias to validate if a given type has intensities field.
@@ -69,7 +69,7 @@ class UamROS
   /**
    * @brief Pair of CRC and safety area as laser scan
    */
-  using ScanWithCRC = std::pair<uint32_t, sensor_msgs::LaserScan::ConstPtr>;
+  using ScanWithCRC = std::pair<uint32_t, sensor_msgs::msg::LaserScan::ConstSharedPtr>;
 
   /**
    * @brief Safety Area Alias
@@ -94,16 +94,15 @@ public:
    *
    * The class will immediately connect to the lidar and start publishing scans.
    *
-   * @param[in] node_handle - A node handle in the global namespace, used for advertising topics
-   * @param[in] params - A populated parameters structure containing the node configuration
+   * @param[in] node_options - Node options, forwarded to rclcpp::Node
    */
-  UamROS(const ros::NodeHandle& nh, const ros::NodeHandle& nh_prv, const UamROSParams& params);
+  explicit UamROS(const rclcpp::NodeOptions & node_options = rclcpp::NodeOptions());
 
 private:
   /**
    * @brief Attempt to reconnect to the lidar if no scan are received
    */
-  void scanWatchdogTimerCallback(const ros::TimerEvent& event);
+  void scanWatchdogTimerCallback();
 
   /**
    * @brief Connect and configure
@@ -114,58 +113,42 @@ private:
 
   /**
    * @brief Attempt to connect to and configure the lidar in response to a timer event
-   *
-   * @param[in] event - Timer event
    */
-  void configureTimerCallback(const ros::TimerEvent& event);
-
-  /**
-   * @brief Dynamic reconfigure callback
-   *
-   * @param[in] config - Configuration
-   * @param[in] level - Level
-   */
-  bool dynamicReconfigureCallback(urg_node::URGConfig& config, int level);
+  void configureTimerCallback();
 
   /**
    * @brief Publish points in the configured reference safety area
    * @param ranges[in] - Pair of scan index and respective range, in meters
    * @param stamp[in] - Output message stamps
    */
-  void publishPointsInArea(const std::vector<std::pair<size_t, float>>& ranges, const ros::Time& stamp);
+  void publishPointsInArea(const std::vector<std::pair<size_t, float>>& ranges, const rclcpp::Time& stamp);
 
   /**
    * @brief Scan callback packet callback
+   *
+   * Dynamic reconfiguration (changing angle_min/angle_max/time_offset/range_offset/
+   * discard_startup_data_s at runtime) is not implemented yet; these values are
+   * read once at startup (see UamROSParams::loadFromROS) and applied in configure().
    *
    * @param[in] reply - Reply message
    * @param[in] wall_time - wall time
    */
   template <typename T>
-  void scanCallback(const T& reply, const ros::Time& wall_time)
+  void scanCallback(const T& reply, const rclcpp::Time& wall_time)
   {
     bool discard_scan = false;
     {
       std::lock_guard<std::mutex> lock(watchdog_mutex_);
-      scan_stamp_ = ros::Time::now();
-      discard_scan = !discard_data_until_.isZero() && scan_stamp_ < discard_data_until_;
+      scan_stamp_ = this->get_clock()->now();
+      discard_scan = discard_data_until_.nanoseconds() != 0 && scan_stamp_ < discard_data_until_;
     }
     if (discard_scan)
     {
       // we already log about this somewhere else
       return;
     }
-    ros::Duration time_offset;
-    double range_offset = 0;
-    {
-      std::lock_guard<std::mutex> lock(reconfigure_mutex_);
-      range_offset = params_.range_offset;
-      time_offset = params_.time_offset;
-      if (params_changed_)
-      {
-        scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
-        params_changed_ = false;
-      }
-    }
+    const rclcpp::Duration time_offset = params_.time_offset;
+    const double range_offset = params_.range_offset;
 
     // Update status
     updateStatus(reply.sensing_data);
@@ -179,7 +162,7 @@ private:
     }
 
     // Fill scan metadata and header
-    sensor_msgs::LaserScan msg;
+    sensor_msgs::msg::LaserScan msg;
     msg.header.frame_id = params_.frame_id;
     msg.angle_min = scan_params_.getAngleMin();
     msg.angle_max = scan_params_.getAngleMax();
@@ -189,7 +172,7 @@ private:
     msg.range_min = scan_params_.getRangeMin();
     msg.range_max = scan_params_.getRangeMax();
 
-    msg.header.stamp = wall_time + time_offset + ros::Duration(scan_params_.getAngularTimeOffset());
+    msg.header.stamp = wall_time + time_offset + rclcpp::Duration::from_seconds(scan_params_.getAngularTimeOffset());
 
     // First and last steps
     const auto first_step = scan_params_.getFirstStep();
@@ -205,7 +188,7 @@ private:
 
     msg.ranges.reserve(number_of_readings);
 
-    const sensor_msgs::LaserScan::ConstPtr safety_area =
+    const sensor_msgs::msg::LaserScan::ConstSharedPtr safety_area =
       params_.reference_safety_area.has_value() &&
         safety_areas_.count(reply.sensing_data.area_number) &&
         0 != safety_areas_.at(reply.sensing_data.area_number).count(*params_.reference_safety_area) ?
@@ -267,7 +250,7 @@ private:
       // else is required by the if constexpr
     }
     // Publish Scan
-    scan_publisher_.publish(msg);
+    scan_publisher_->publish(msg);
 
     // Publish Points in area
     // We still want to call this even if ranges_in_safety_area is empty,
@@ -279,11 +262,14 @@ private:
   /**
    * @brief Request status service callback
    *
+   * @param[in] request_header - request header (unused)
    * @param[in] req - request
    * @param[in] res - response
-   * @return always true
    */
-  bool statusCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  void statusCallback(
+    const std::shared_ptr<rmw_request_id_t> request_header,
+    const std_srvs::srv::Trigger::Request::SharedPtr req,
+    const std_srvs::srv::Trigger::Response::SharedPtr res);
 
   /**
    * @brief Trigger reconfigure routine
@@ -293,14 +279,15 @@ private:
   /**
    * @brief Lidar hard reset
    *
+   * This issues a blocking call to the lidar_hard_reset_service_. It is only
+   * safe to call this from a callback group other than the one driving the
+   * executor's only thread; this node must be spun with a
+   * rclcpp::executors::MultiThreadedExecutor for this call to complete
+   * without deadlocking.
+   *
    * @return true if successfully reset
    */
   bool lidarHardReset();
-
-  /**
-   * @brief Update Reconfigure limits (as in urg_node_driver)
-   */
-  void updateReconfigureLimits();
 
   /**
    * @brief Update status
@@ -312,7 +299,6 @@ private:
 
   /**
    * @brief Advertise safety area type publishers
-   * @param[in] publishers - List of publishers to advertise
    */
   void advertiseSafetyAreaPublishers();
 
@@ -373,7 +359,7 @@ private:
   /**@}*/
 
   /**
-   * \defgroup Dynamic reconfigure details section
+   * \defgroup Configuration details section
    * @{
    */
 
@@ -381,16 +367,6 @@ private:
    * @brief UAM configuration parameters
    */
   UamROSParams params_;
-
-  /**
-   * @brief Synchronization guard for watchdog variables accessed by ROS and lidar callbacks
-   */
-  std::mutex reconfigure_mutex_;
-
-  /**
-   * @brief Flag pointing that reconfigure was requested
-   */
-  bool params_changed_;
 
   /**@}*/
 
@@ -407,22 +383,22 @@ private:
   /**
    * @brief Watchdog timer to reconnect if no sectors are received
    */
-  ros::Timer scan_watchdog_timer_;
+  rclcpp::TimerBase::SharedPtr scan_watchdog_timer_;
 
   /**
    * @brief The last received scan sector timestamp
    */
-  ros::Time scan_stamp_;
+  rclcpp::Time scan_stamp_;
 
   /**
    * @brief The last time the lidar was configured
    */
-  ros::Time configured_stamp_;
+  rclcpp::Time configured_stamp_;
 
   /**
    * @brief Drop outgoing scan data until this ROS time
    */
-  ros::Time discard_data_until_;
+  rclcpp::Time discard_data_until_;
 
   /**@}*/
 
@@ -432,38 +408,25 @@ private:
    */
 
   /**
-   * @brief Node Handler
-   */
-  ros::NodeHandle node_handle_;
-  /**
-   * @brief Node Handler
-   */
-  ros::NodeHandle private_node_handle_;
-
-  /**
    * @brief Configure Timer
    */
-  ros::Timer configure_timer_;
+  rclcpp::TimerBase::SharedPtr configure_timer_;
 
   /**
    * @brief Safety Area publishers
    */
-  std::array<ros::Publisher, uam::protocol::EYRAreaType::MAX> safety_area_publishers_;
+  std::array<rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr, uam::protocol::EYRAreaType::MAX>
+    safety_area_publishers_;
 
   /**
    * @brief Safety area violation points
    */
-  ros::Publisher points_in_area_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr points_in_area_pub_;
 
   /**
    * @brief Safety area violation markers
    */
-  ros::Publisher points_in_area_markers_pub_;
-
-  /**
-   * @brief Dynamic reconfigure server
-   */
-  boost::shared_ptr<dynamic_reconfigure::Server<urg_node::URGConfig>> srv_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr points_in_area_markers_pub_;
 
   /**
    * @brief Scan Parameters
@@ -473,45 +436,47 @@ private:
   /**
    * @brief Scan Publisher
    */
-  ros::Publisher scan_publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan_publisher_;
 
   /**
    * @brief Status Publisher
-   * 
+   *
    * Publishes lidar status on request
    */
-  ros::Publisher status_on_request_publisher_;
+  rclcpp::Publisher<urg_node_msgs::msg::Status>::SharedPtr status_on_request_publisher_;
 
   /**
    * @brief Status Publisher
-   * 
+   *
    * Publishes lidar status on update
    */
-  ros::Publisher status_on_update_publisher_;
-
-  /**
-   * @brief Lidar restarting publisher
-   */
-  ros::Publisher lidar_restarting_publisher_;
+  rclcpp::Publisher<urg_node_msgs::msg::Status>::SharedPtr status_on_update_publisher_;
 
   /**
    * @brief Status Service
    */
-  ros::ServiceServer request_status_service_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr request_status_service_;
 
   /**
    * @brief Lidar hard reset service client
    *
    * Used to cycle the lidar power
   */
-  ros::ServiceClient lidar_hard_reset_client_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr lidar_hard_reset_client_;
+
+  /**
+   * @brief Dedicated callback group for the (blocking) lidar hard reset service client,
+   * so its response can be processed while a timer callback is blocked waiting for it.
+   * Requires this node be spun with a MultiThreadedExecutor.
+   */
+  rclcpp::CallbackGroup::SharedPtr lidar_hard_reset_callback_group_;
 
   /**
    * @brief Last restart time
    *
    * Used to track the restart time of the lidar
-   */  
-  std::optional<ros::Time> last_restart_time_;
+   */
+  std::optional<rclcpp::Time> last_restart_time_;
 
   /**
    * @brief Last received sensing data status
@@ -527,11 +492,10 @@ private:
   /**@}*/
 
   /**
-   * @brief Logger instance
+   * @brief Logger object used for debug info
    */
-  locus_cpp::Logger logger_ { "UamROS" };
+  locus_cpp::Logger logger_;
 };
-
 }  // namespace uam
 
 #endif  // UAM_UAM_DRIVER_ROS_H

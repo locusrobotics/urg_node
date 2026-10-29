@@ -40,8 +40,12 @@
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <sensor_msgs/LaserScan.h>
-#include <urg_node_msgs/Status.h>
+#include <rclcpp/rclcpp.hpp>
+
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <urg_node_msgs/msg/status.hpp>
+
+#include <locus_cpp/ros_util.hpp>
 
 #include <uam/scan_params.hpp>
 #include <uam/io/tcp_client.hpp>
@@ -51,8 +55,6 @@
 
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/iter_find.hpp>
-
-#include <locus_cpp/ros_util.h>
 
 #include <algorithm>
 #include <memory>
@@ -94,7 +96,7 @@ public:
   /**
    * @brief
    */
-  UamDriver();
+  explicit UamDriver(const rclcpp::Logger& logger = rclcpp::get_logger("uam_driver"));
 
   /**
    * @brief Default D'tor
@@ -276,7 +278,7 @@ public:
    *
    * @param Stamped packet
    */
-  inline void packetCallback(const uam::protocol::ShapeShifterPacket& packet, const ros::Time& wall_time)
+  inline void packetCallback(const uam::protocol::ShapeShifterPacket& packet, const rclcpp::Time& wall_time)
   {
     auto success = uam_packet_worker_.processByHandler(packet, wall_time);
     LOCUS_LOG_ERROR_STREAM_COND(logger_, !success, "Failed processing packet");
@@ -407,9 +409,9 @@ private:
   scip_protocol::PPReply pending_scip_reply_;
 
   /**
-   * @brief Logger instance
+   * @brief Logger object used for debug info
    */
-  locus_cpp::Logger logger_ { "UamDriver" };
+  locus_cpp::Logger logger_;
 };
 }  // namespace uam
 

@@ -38,7 +38,7 @@
 
 namespace uam
 {
-bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packet, const ros::Time& time)
+bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packet, const rclcpp::Time& time)
 {
   // Verify packet header
   const auto packet_type = packet.get<protocol::CommandReplyHeader>();

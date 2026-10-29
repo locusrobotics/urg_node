@@ -38,7 +38,7 @@
 #include <uam/protocol_types/scip_protocol_types.hpp>
 #include <uam/workers/uam_worker_base.hpp>
 
-#include <locus_cpp/ros_util.h>
+#include <locus_cpp/ros_util.hpp>
 
 #include <optional>
 #include <string>
@@ -151,7 +151,7 @@ protected:
   /**
    * @brief Logger instance
    */
-  locus_cpp::Logger logger_ { "SCIPWorker" };
+  locus_cpp::Logger logger_ { rclcpp::get_logger("SCIPWorker") };
 
 private:
   /**
