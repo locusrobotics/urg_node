@@ -62,8 +62,6 @@ UamROSParams UamROSParams::loadFromROS(rclcpp::Node* node)
   {
     params.ip_port = static_cast<unsigned int>(port);
   }
-  params.max_range = node->declare_parameter<double>("max_range", params.max_range);
-  params.max_range = node->declare_parameter<double>("min_range", params.max_range);
   double time_offset_sec = node->declare_parameter<double>("time_offset", params.time_offset.seconds());
   params.time_offset = rclcpp::Duration::from_seconds(time_offset_sec);
 
