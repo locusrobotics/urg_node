@@ -67,11 +67,6 @@ public:
   double angle_max { 2.36 };
 
   /**
-   * @brief The amount of seconds the client waits for a reply to the requested command
-   */
-  ros::Duration command_reply_timeout { 2.0 };
-
-  /**
    * @brief The frame id attached to the LaserScan message header
    */
   std::string frame_id { "laser" };
@@ -105,12 +100,6 @@ public:
    * @brief Period between lidar reconfiguration attempts
    */
   ros::Duration reconfiguration_timeout { 5.0 };
-
-  /**
-   * @brief Period between lidar reconnect attempts
-   */
-  ros::Duration reconnect_timeout { 5.0 };
-
 
   /**
    * @brief Update Laser Status service name
