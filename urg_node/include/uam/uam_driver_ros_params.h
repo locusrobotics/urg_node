@@ -92,16 +92,6 @@ public:
   bool log_safety_areas_crc { false };
 
   /**
-   * @brief The user defined maximum range of the lidar
-   */
-  double max_range { 40.0 };
-
-  /**
-   * @brief The user defined minimum range of the lidar
-   */
-  double min_range { 0.0 };
-
-  /**
    * @brief If the update_laser_status service is to be provided
    */
   bool provide_laser_status_service { false };
