@@ -71,11 +71,6 @@ public:
   double angle_max { 2.36 };
 
   /**
-   * @brief The amount of seconds the client waits for a reply to the requested command
-   */
-  rclcpp::Duration command_reply_timeout { rclcpp::Duration::from_seconds(2.0) };
-
-  /**
    * @brief The frame id attached to the LaserScan message header
    */
   std::string frame_id { "laser" };
@@ -109,12 +104,6 @@ public:
    * @brief Period between lidar reconfiguration attempts
    */
   rclcpp::Duration reconfiguration_timeout { rclcpp::Duration::from_seconds(5.0) };
-
-  /**
-   * @brief Period between lidar reconnect attempts
-   */
-  rclcpp::Duration reconnect_timeout { rclcpp::Duration::from_seconds(5.0) };
-
 
   /**
    * @brief Update Laser Status service name
