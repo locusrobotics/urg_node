@@ -81,9 +81,8 @@ void UrgNode::initSetup()
   device_status_.detailed_status.error_code = 0;
   device_status_.detailed_status.lockout_state = false;
 
-  // Declare parameters so we can change these later. Dynamic reconfiguration
-  // (changing values at runtime through `ros2 param set`) is not implemented
-  // yet; values are read once here and applied when connecting to the laser.
+  // TODO(ihadzic): replace parameter handling with utilities from PikNik
+  //                generate_parameter_library
   ip_address_ = this->declare_parameter<std::string>("ip_address", ip_address_);
   ip_port_ = this->declare_parameter<int>("ip_port", ip_port_);
   serial_port_ = this->declare_parameter<std::string>("serial_port", serial_port_);
@@ -126,9 +125,6 @@ void UrgNode::initSetup()
   status_pub_ = this->create_publisher<urg_node_msgs::msg::Status>("laser_status", 1);
 
   diagnostic_updater_.add("Hardware Status", this, &UrgNode::populateDiagnosticsStatus);
-
-  parameters_callback_handle_ = this->add_on_set_parameters_callback(
-    std::bind(&UrgNode::paramChangeCallback, this, std::placeholders::_1));
 
   // Put this in a separate thread since connecting might take a while, and a
   // Node's constructor must return promptly (e.g. when loaded as a component).
@@ -227,79 +223,6 @@ void UrgNode::statusCallback(
     res->message = "Failed to update status";
     res->success = false;
   }
-}
-
-rcl_interfaces::msg::SetParametersResult UrgNode::paramChangeCallback(
-  const std::vector<rclcpp::Parameter>& parameters)
-{
-  // Dynamic reconfiguration is not implemented yet (see initSetup() comment);
-  // this only validates that a requested change is well-formed. A follow-up
-  // change will make these parameters truly dynamic.
-  auto result = rcl_interfaces::msg::SetParametersResult();
-  result.successful = true;
-
-  std::stringstream reason;
-
-  for (const auto& parameter : parameters)
-  {
-    const rclcpp::ParameterType type = parameter.get_type();
-    const std::string& name = parameter.get_name();
-
-    if (name == "frame_id" || name == "ip_address" || name == "serial_port")
-    {
-      if (type != rclcpp::ParameterType::PARAMETER_STRING)
-      {
-        reason << "The parameter " << name << " must be a string.\n";
-        result.successful = false;
-      }
-    }
-    else if (name == "ip_port" || name == "serial_baud" || name == "error_limit")
-    {
-      if (type != rclcpp::ParameterType::PARAMETER_INTEGER)
-      {
-        reason << "The parameter " << name << " must be an integer.\n";
-        result.successful = false;
-      }
-    }
-    else if (name == "calibrate_time" || name == "synchronize_time" ||
-      name == "publish_intensity" || name == "publish_multiecho" || name == "get_detailed_status")
-    {
-      if (type != rclcpp::ParameterType::PARAMETER_BOOL)
-      {
-        reason << "The parameter " << name << " must be a bool.\n";
-        result.successful = false;
-      }
-    }
-    else if (name == "diagnostics_tolerance" || name == "diagnostics_window_time" ||
-      name == "time_offset" || name == "range_offset" || name == "angle_min" || name == "angle_max")
-    {
-      if (type != rclcpp::ParameterType::PARAMETER_DOUBLE && type != rclcpp::ParameterType::PARAMETER_INTEGER)
-      {
-        reason << "The parameter " << name << " must be a double.\n";
-        result.successful = false;
-      }
-    }
-    else if (name == "cluster")
-    {
-      if (type != rclcpp::ParameterType::PARAMETER_INTEGER ||
-        parameter.as_int() < 1 || parameter.as_int() > 99)
-      {
-        reason << "The parameter " << name << " must be an integer between 1 and 99.\n";
-        result.successful = false;
-      }
-    }
-    else if (name == "skip")
-    {
-      if (type != rclcpp::ParameterType::PARAMETER_INTEGER ||
-        parameter.as_int() < 0 || parameter.as_int() > 9)
-      {
-        reason << "The parameter " << name << " must be an integer between 0 and 9.\n";
-        result.successful = false;
-      }
-    }
-  }
-  result.reason = reason.str();
-  return result;
 }
 
 void UrgNode::calibrate_time_offset()

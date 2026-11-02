@@ -46,7 +46,6 @@
 #include <diagnostic_updater/publisher.hpp>
 #include <laser_proc/laser_publisher.hpp>
 
-#include <rcl_interfaces/msg/set_parameters_result.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <std_srvs/srv/trigger.hpp>
@@ -81,8 +80,6 @@ public:
 private:
   void initSetup();
   bool connect();
-  rcl_interfaces::msg::SetParametersResult paramChangeCallback(
-    const std::vector<rclcpp::Parameter>& parameters);
   void calibrate_time_offset();
   void updateDiagnostics();
   void populateDiagnosticsStatus(diagnostic_updater::DiagnosticStatusWrapper &stat);
@@ -162,9 +159,6 @@ private:
   rclcpp::Publisher<urg_node_msgs::msg::Status>::SharedPtr status_pub_;
 
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr status_service_;
-
-  // Need to hold reference to callback, or it gets deregistered
-  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameters_callback_handle_;
 
   locus_cpp::Logger logger_;
 };
