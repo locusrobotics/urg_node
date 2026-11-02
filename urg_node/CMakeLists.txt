@@ -77,7 +77,7 @@ if(BUILD_URG)
     DESTINATION lib/${PROJECT_NAME}
   )
 
-  install(DIRECTORY launch urdf meshes
+  install(DIRECTORY urdf meshes
     DESTINATION share/${PROJECT_NAME}
   )
 endif()
@@ -173,6 +173,9 @@ if(BUILD_TESTING AND (BUILD_URG OR BUILD_UAM))
 endif()
 
 if(BUILD_URG OR BUILD_UAM)
+  install(DIRECTORY launch
+    DESTINATION share/${PROJECT_NAME}
+  )
   ament_export_dependencies(
     Boost
     locus_cpp

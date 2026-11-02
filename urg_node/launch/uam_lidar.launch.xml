@@ -1,0 +1,28 @@
+<launch>
+
+<!-- A simple launch file for testing the UAM (Hokuyo UAM-05LP) driver as a standalone node.
+     Topics, services, and the node name are left at their driver defaults (no remapping). -->
+
+  <arg name="ip_address" default="10.66.171.8"/>
+  <arg name="angle_min" default="-2.35619449"/>
+  <arg name="angle_max" default="2.35619449"/>
+  <arg name="time_offset" default="-0.0218"/>
+  <!-- Reference safety area type used to compute the points_in_safety_area cloud and markers.
+       Options are: protection_1 = 0, protection_2 = 1, warning_1 = 2, warning_2 = 3 -->
+  <arg name="reference_safety_area_type" default="3"/>
+  <!-- Drop scan data for this long after each startup/reconnect (seconds) -->
+  <arg name="discard_startup_data_s" default="0.0"/>
+
+  <node pkg="urg_node" exec="uam_driver_ros_node" output="screen">
+    <param name="ip_address" value="$(var ip_address)"/>
+    <param name="angle_min" value="$(var angle_min)"/>
+    <param name="angle_max" value="$(var angle_max)"/>
+    <param name="time_offset" value="$(var time_offset)"/>
+    <param name="publish_multiecho" value="false"/>
+    <param name="publish_intensity" value="false"/>
+    <param name="provide_laser_status_service" value="true"/>
+    <param name="reference_safety_area_type" value="$(var reference_safety_area_type)"/>
+    <param name="discard_startup_data_s" value="$(var discard_startup_data_s)"/>
+  </node>
+
+</launch>
