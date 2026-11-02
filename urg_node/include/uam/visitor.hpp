@@ -58,7 +58,7 @@ inline bool getFromChars(const char* first, const char* last, Tp& value, int bas
   {
     // From bytes does not accept bool. We need a cast here
     char tmp_value;
-    if (std::from_chars(first, last, tmp_value, 16).ec != std::errc {})
+    if (std::from_chars(first, last, tmp_value, base).ec != std::errc {})
     {
       return false;
     }
@@ -67,7 +67,7 @@ inline bool getFromChars(const char* first, const char* last, Tp& value, int bas
   }
   else
   {
-    return std::from_chars(first, last, value, 16).ec == std::errc {};
+    return std::from_chars(first, last, value, base).ec == std::errc {};
   }
 }
 

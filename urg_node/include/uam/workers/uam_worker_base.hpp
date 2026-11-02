@@ -141,7 +141,7 @@ public:
    * @param[in] recv_bytes - Number of received bytes
    * @return true if size check passes, false otherwise
    */
-  inline const bool validateSize(const size_t recv_bytes) const { return recv_bytes == sizeof(Reply); }
+  inline bool validateSize(const size_t recv_bytes) const { return recv_bytes == sizeof(Reply); }
 
   /**
    * @brief Validate if the reply is of the type TDerived
