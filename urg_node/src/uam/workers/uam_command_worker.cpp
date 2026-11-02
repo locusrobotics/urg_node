@@ -44,7 +44,6 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
   const auto packet_type = packet.get<protocol::CommandReplyHeader>();
   auto received_packet_size = packet_type.cmd_size;
   decodeField(received_packet_size);
-  bool valid_packet = false;
   bool processed_successfully = false;
 
   // Subscription commands can have 2 different reply types:
@@ -57,7 +56,6 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
     (std::get<AR02Worker>(workers_).validateReplyType(packet_type) &&
      received_packet_size == sizeof(AR00Worker::Reply)))
   {
-    valid_packet = true;
     processed_successfully = std::get<AR00Worker>(workers_).processByHandler(packet.get<AR00Worker::Reply>(), time);
   }
   else if (

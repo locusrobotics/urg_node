@@ -36,7 +36,6 @@
 #define UAM_UAM_DRIVER_H
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 
@@ -252,7 +251,7 @@ public:
   void subscribe()
   {
     static_assert(ESubscriptionMode::INVALID != TypeToEnum<TWorker>(), "Invalid worker type");
-    auto reply = sendCommandWithReply<TWorker>(command_timeout_);
+    sendCommandWithReply<TWorker>(command_timeout_);
     subscription_mode_ = TypeToEnum<TWorker>();
   }
 
@@ -264,7 +263,7 @@ public:
   template <typename TWorker>
   void unsubscribe()
   {
-    auto reply = sendCommandWithReply<TWorker>(command_timeout_);
+    sendCommandWithReply<TWorker>(command_timeout_);
     subscription_mode_ = ESubscriptionMode::INVALID;
   }
 

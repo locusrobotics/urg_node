@@ -36,7 +36,6 @@
 #define UAM_IO_TCP_CLIENT_H
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 

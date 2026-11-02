@@ -386,14 +386,14 @@ bool UamROS::configure()
 
 void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ranges, const rclcpp::Time& stamp)
   {
-    auto getLut = [this](const ScanParameters& scan_params)
+    auto getLut = [](const ScanParameters& scan_params)
     {
       LaserScanCachedLookup lut;
-      lut.scan_angle_min = scan_params_.getAngleMinLimit();
-      lut.scan_angle_max = scan_params_.getAngleMaxLimit();
-      lut.scan_angle_increment = scan_params_.getAngleIncrement();
+      lut.scan_angle_min = scan_params.getAngleMinLimit();
+      lut.scan_angle_max = scan_params.getAngleMaxLimit();
+      lut.scan_angle_increment = scan_params.getAngleIncrement();
 
-      auto number_of_steps = scan_params_.getLastStep() - scan_params_.getFirstStep() + 1;
+      const size_t number_of_steps = scan_params.getLastStep() - scan_params.getFirstStep() + 1;
       lut.sin_lookup.reserve(number_of_steps);
       lut.cos_lookup.reserve(number_of_steps);
 

@@ -174,9 +174,10 @@ private:
 
     msg.header.stamp = wall_time + time_offset + rclcpp::Duration::from_seconds(scan_params_.getAngularTimeOffset());
 
-    // First and last steps
-    const auto first_step = scan_params_.getFirstStep();
-    const auto last_step = scan_params_.getLastStep();
+    // First and last steps (device step indices, always non-negative; held as
+    // size_t for clean comparison against container sizes/indices below)
+    const size_t first_step = scan_params_.getFirstStep();
+    const size_t last_step = scan_params_.getLastStep();
 
     const auto number_of_readings = last_step - first_step + 1;
 
