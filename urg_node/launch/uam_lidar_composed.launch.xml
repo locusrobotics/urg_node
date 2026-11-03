@@ -8,6 +8,10 @@
      component_container_mt container. Do not load it into a single-threaded
      component_container. -->
 
+  <!-- Namespace for the container and driver; defaults to the ROBOT environment
+       variable. The leading slash in the namespaces below makes a blank/unset
+       ROBOT resolve to the root namespace instead of failing. -->
+  <arg name="namespace" default="$(env ROBOT '')"/>
   <arg name="ip_address" default="10.66.171.8"/>
   <arg name="angle_min" default="-2.35619449"/>
   <arg name="angle_max" default="2.35619449"/>
@@ -18,8 +22,8 @@
   <!-- Drop scan data for this long after each startup/reconnect (seconds) -->
   <arg name="discard_startup_data_s" default="0.0"/>
 
-  <node_container pkg="rclcpp_components" exec="component_container_mt" name="uam_container" namespace="">
-    <composable_node pkg="urg_node" plugin="uam::UamROS" name="uam_driver_node" namespace="">
+  <node_container pkg="rclcpp_components" exec="component_container_mt" name="uam_container" namespace="/$(var namespace)">
+    <composable_node pkg="urg_node" plugin="uam::UamROS" name="uam_driver_node" namespace="/$(var namespace)">
       <param name="ip_address" value="$(var ip_address)"/>
       <param name="angle_min" value="$(var angle_min)"/>
       <param name="angle_max" value="$(var angle_max)"/>
