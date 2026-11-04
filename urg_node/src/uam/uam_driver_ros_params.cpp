@@ -69,12 +69,25 @@ UamROSParams UamROSParams::loadFromROS(rclcpp::Node* node)
     "reconfiguration_timeout", params.reconfiguration_timeout.seconds());
   params.reconfiguration_timeout = rclcpp::Duration::from_seconds(reconfig_timeout);
 
+  double scan_timeout_sec = node->declare_parameter<double>(
+    "scan_timeout", params.scan_timeout.seconds());
+  params.scan_timeout = rclcpp::Duration::from_seconds(scan_timeout_sec);
+
+  double lidar_power_cycle_interval_sec = node->declare_parameter<double>(
+    "lidar_power_cycle_interval", params.lidar_power_cycle_interval.seconds());
+  params.lidar_power_cycle_interval = rclcpp::Duration::from_seconds(lidar_power_cycle_interval_sec);
+
   params.scan_topic = node->declare_parameter<std::string>("topic", params.scan_topic);
+  params.status_topic = node->declare_parameter<std::string>("status_topic", params.status_topic);
+  params.points_in_safety_area_topic = node->declare_parameter<std::string>(
+    "points_in_safety_area_topic", params.points_in_safety_area_topic);
 
   params.provide_laser_status_service = node->declare_parameter<bool>(
     "provide_laser_status_service", params.provide_laser_status_service);
   params.request_status_service = node->declare_parameter<std::string>(
     "request_status_service", params.request_status_service);
+  params.lidar_hard_reset_service = node->declare_parameter<std::string>(
+    "lidar_hard_reset_service", params.lidar_hard_reset_service);
   params.range_offset = node->declare_parameter<double>("range_offset", params.range_offset);
   params.log_safety_areas_crc = node->declare_parameter<bool>(
     "log_safety_areas_crc", params.log_safety_areas_crc);
