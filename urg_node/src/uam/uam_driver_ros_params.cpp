@@ -59,8 +59,6 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
   {
     params.ip_port = static_cast<unsigned int>(port);
   }
-  nh.getParam("max_range", params.max_range);
-  nh.getParam("min_range", params.max_range);
   double time_offset_sec = 0;
   nh.getParam("time_offset", time_offset_sec);
   params.time_offset = ros::Duration(time_offset_sec);
