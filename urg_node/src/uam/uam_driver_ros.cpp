@@ -229,6 +229,7 @@ bool UamROS::lidarHardReset()
       }
       else
       {
+        lidar_hard_reset_client_->remove_pending_request(future);
         LOCUS_LOG_ERROR_STREAM(logger_, "Failed to call lidar reset service.");
         return false;
       }
