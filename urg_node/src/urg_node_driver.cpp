@@ -382,6 +382,18 @@ bool UrgNode::connect()
     // Update accordingly here.
     freq_min_ = 1.0 / (urg_->getScanPeriod() * (skip_ + 1));
 
+    // clamp angle min and max to device limits
+    const double min_angle = urg_->getAngleMinLimit();
+    const double max_angle = urg_->getAngleMaxLimit();
+    angle_min_ = angle_min_ < min_angle ? min_angle :
+       (angle_min_ > max_angle ? max_angle : angle_min_);
+    angle_max_ = angle_max_ < min_angle ? min_angle :
+      (angle_max_ > max_angle ? max_angle : angle_max_);
+    if (!urg_->setAngleLimitsAndCluster(angle_min_, angle_max_, cluster_))
+    {
+      LOCUS_LOG_ERROR_THROTTLE(logger_, 10.0, "Failed to set angle limits and cluster");
+      return false;
+    }
     urg_->setAngleLimitsAndCluster(angle_min_, angle_max_, cluster_);
     urg_->setSkip(skip_);
     urg_->setFrameId(frame_id_);
