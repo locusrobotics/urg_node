@@ -35,9 +35,8 @@
 #ifndef UAM_SHAPE_SHIFTER_PACKET_H
 #define UAM_SHAPE_SHIFTER_PACKET_H
 
-#include <ros/console.h>
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/type_traits.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/type_traits.hpp>
 
 #include <array>
 #include <tuple>

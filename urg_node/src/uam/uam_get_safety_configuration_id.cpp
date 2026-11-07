@@ -33,14 +33,22 @@
  *********************************************************************/
 
 #include <json_transport/json_transport.hpp>
-#include <ros/ros.h>
-#include <uam/uam_driver.h>
+#include <rclcpp/rclcpp.hpp>
+#include <uam/uam_driver.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <boost/crc.hpp>
 
+#include <locus_cpp/ros_util.hpp>
+
+#include <iostream>
 #include <string>
+
+namespace
+{
+const locus_cpp::Logger logger(rclcpp::get_logger("UamGetSafetyConfigurationId"));
+}  // namespace
 
 boost::program_options::variables_map parseArgs(int argc, char** argv)
 {
@@ -64,7 +72,7 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
 
   if (args.count("help"))
   {
-    ROS_INFO_STREAM(
+    LOCUS_LOG_INFO_STREAM(logger,
       "Get UAM Lidar FW version and safety configuration IDs.\n\n"
       << "usage: " << boost::filesystem::path(argv[0]).filename().string() << " [options]\n\n"
       << options);
@@ -77,7 +85,7 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
   }
   catch (const std::exception& e)
   {
-    ROS_FATAL_STREAM(
+    LOCUS_LOG_FATAL_STREAM(logger,
       e.what() << "usage: " << boost::filesystem::path(argv[0]).filename().string() << " [options]\n\n"
                << options);
     exit(EXIT_FAILURE);
@@ -88,7 +96,7 @@ boost::program_options::variables_map parseArgs(int argc, char** argv)
 
 std::uint32_t getSafetyAreasCRC32(uam::UamDriver& lidar)
 {
-  ROS_INFO_STREAM("Going to read Laser Safety areas");
+  LOCUS_LOG_INFO_STREAM(logger, "Going to read Laser Safety areas");
   std::string combined_crcs = "";
   for (size_t area_number = 1; area_number <= uam::protocol::c_max_safety_area_index; area_number++)
   {
@@ -135,8 +143,7 @@ std::string getConfigurationId(uam::UamDriver& lidar)
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "detect_lidar");
-  ros::Time::init();
+  rclcpp::init(argc, argv);
   auto args = parseArgs(argc, argv);
 
   try
@@ -159,11 +166,13 @@ int main(int argc, char** argv)
       document["safety_areas_crc32"] = safey_areas_crc32;
     }
     std::cout << document.dump(4) << std::endl;
+    rclcpp::shutdown();
     return EXIT_SUCCESS;
   }
   catch (const std::exception& e)
   {
     std::cout << "Failed to listen for connected lidars: " << e.what() << std::endl;
+    rclcpp::shutdown();
     return EXIT_FAILURE;
   }
 }

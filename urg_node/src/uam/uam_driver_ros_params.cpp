@@ -32,60 +32,76 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/uam_driver_ros_params.h>
+#include <uam/uam_driver_ros_params.hpp>
+
+#include <locus_cpp/ros_util.hpp>
 
 namespace uam
 {
-UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
+UamROSParams UamROSParams::loadFromROS(rclcpp::Node* node)
 {
+  const locus_cpp::Logger logger(node->get_logger());
   UamROSParams params;
-  nh.getParam("angle_min", params.angle_min);
-  nh.getParam("angle_max", params.angle_max);
-  nh.getParam("publish_intensity", params.use_intensity);
-  nh.getParam("publish_multiecho", params.use_multi_echo);
+  params.angle_min = node->declare_parameter<double>("angle_min", params.angle_min);
+  params.angle_max = node->declare_parameter<double>("angle_max", params.angle_max);
+  params.use_intensity = node->declare_parameter<bool>("publish_intensity", params.use_intensity);
+  params.use_multi_echo = node->declare_parameter<bool>("publish_multiecho", params.use_multi_echo);
   if (params.use_multi_echo && params.use_intensity)
   {
-    ROS_WARN_STREAM("Multiecho and intensity are not supported. Publishing only intensity.");
+    LOCUS_LOG_WARN_STREAM(logger, "Multiecho and intensity are not supported. Publishing only intensity.");
     params.use_multi_echo = false;
   }
-  nh.getParam("frame_id", params.frame_id);
-  nh.getParam("ip_address", params.ip_address);
-  auto port = nh.param("ip_port", static_cast<int>(params.ip_port));
-  if (params.ip_port < 0)
+  params.frame_id = node->declare_parameter<std::string>("frame_id", params.frame_id);
+  params.ip_address = node->declare_parameter<std::string>("ip_address", params.ip_address);
+  auto port = node->declare_parameter<int>("ip_port", static_cast<int>(params.ip_port));
+  if (port < 0)
   {
-    ROS_WARN_STREAM("Invalid port! Using: " << params.ip_port);
+    LOCUS_LOG_WARN_STREAM(logger, "Invalid port! Using: " << params.ip_port);
   }
   else
   {
     params.ip_port = static_cast<unsigned int>(port);
   }
-  nh.getParam("max_range", params.max_range);
-  nh.getParam("min_range", params.max_range);
-  double time_offset_sec = 0;
-  nh.getParam("time_offset", time_offset_sec);
-  params.time_offset = ros::Duration(time_offset_sec);
+  double time_offset_sec = node->declare_parameter<double>("time_offset", params.time_offset.seconds());
+  params.time_offset = rclcpp::Duration::from_seconds(time_offset_sec);
 
-  double reconfig_timeout = params.reconfiguration_timeout.toSec();
-  if (nh.param("reconfiguration_timeout", reconfig_timeout, reconfig_timeout))
-  {
-    params.reconfiguration_timeout = ros::Duration(reconfig_timeout);
-  }
-  nh.getParam("topic", params.scan_topic);
+  double reconfig_timeout = node->declare_parameter<double>(
+    "reconfiguration_timeout", params.reconfiguration_timeout.seconds());
+  params.reconfiguration_timeout = rclcpp::Duration::from_seconds(reconfig_timeout);
 
-  nh.getParam("provide_laser_status_service", params.provide_laser_status_service);
-  nh.getParam("request_status_service", params.request_status_service);
-  nh.getParam("range_offset", params.range_offset);
-  nh.getParam("log_safety_areas_crc", params.log_safety_areas_crc);
-  nh.getParam("discard_startup_data_s", params.discard_startup_data_s);
+  double scan_timeout_sec = node->declare_parameter<double>(
+    "scan_timeout", params.scan_timeout.seconds());
+  params.scan_timeout = rclcpp::Duration::from_seconds(scan_timeout_sec);
 
-  int reference_area;
-  if (nh.getParam("reference_safety_area_type", reference_area))
+  double lidar_power_cycle_interval_sec = node->declare_parameter<double>(
+    "lidar_power_cycle_interval", params.lidar_power_cycle_interval.seconds());
+  params.lidar_power_cycle_interval = rclcpp::Duration::from_seconds(lidar_power_cycle_interval_sec);
+
+  params.scan_topic = node->declare_parameter<std::string>("topic", params.scan_topic);
+  params.status_topic = node->declare_parameter<std::string>("status_topic", params.status_topic);
+  params.points_in_safety_area_topic = node->declare_parameter<std::string>(
+    "points_in_safety_area_topic", params.points_in_safety_area_topic);
+
+  params.provide_laser_status_service = node->declare_parameter<bool>(
+    "provide_laser_status_service", params.provide_laser_status_service);
+  params.request_status_service = node->declare_parameter<std::string>(
+    "request_status_service", params.request_status_service);
+  params.lidar_hard_reset_service = node->declare_parameter<std::string>(
+    "lidar_hard_reset_service", params.lidar_hard_reset_service);
+  params.range_offset = node->declare_parameter<double>("range_offset", params.range_offset);
+  params.log_safety_areas_crc = node->declare_parameter<bool>(
+    "log_safety_areas_crc", params.log_safety_areas_crc);
+  params.discard_startup_data_s = node->declare_parameter<double>(
+    "discard_startup_data_s", params.discard_startup_data_s);
+
+  int reference_area = node->declare_parameter<int>("reference_safety_area_type", -1);
+  if (reference_area != -1)
   {
     if (
       reference_area < static_cast<int>(protocol::EYRAreaType::protection_1) ||
       reference_area > static_cast<int>(protocol::EYRAreaType::warning_2))
     {
-      ROS_WARN_STREAM(
+      LOCUS_LOG_WARN_STREAM(logger,
         "Invalid Reference Area Type Detected, supported options are: "
         "protection_1 = 0, protection_2 = 1, warning_1 = 2, warning_2 = 3. Detected: "
         << reference_area);
@@ -96,7 +112,7 @@ UamROSParams UamROSParams::loadFromROS(const ros::NodeHandle& nh)
     }
   }
 
-  nh.param("configure_attempts", params.configure_attempts, params.configure_attempts);
+  params.configure_attempts = node->declare_parameter<int>("configure_attempts", params.configure_attempts);
 
   return params;
 }

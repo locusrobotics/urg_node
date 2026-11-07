@@ -35,12 +35,14 @@
 #ifndef UAM_WORKERS_UAM_WORKER_BASE_H
 #define UAM_WORKERS_UAM_WORKER_BASE_H
 
-#include <ros/ros.h>
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/uam_error_codes.h>
-#include <uam/uam_visitors.h>
+#include <rclcpp/rclcpp.hpp>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/uam_error_codes.hpp>
+#include <uam/uam_visitors.hpp>
 
 #include <boost/crc.hpp>
+
+#include <locus_cpp/ros_util.hpp>
 
 #include <iomanip>
 #include <optional>
@@ -113,7 +115,7 @@ public:
   /**
    * @brief Packet callback type
    */
-  using PacketEventCallback = std::function<void(const Reply, const ros::Time&)>;
+  using PacketEventCallback = std::function<void(const Reply, const rclcpp::Time&)>;
 
   /**
    * @brief Return encoded request
@@ -139,7 +141,7 @@ public:
    * @param[in] recv_bytes - Number of received bytes
    * @return true if size check passes, false otherwise
    */
-  inline const bool validateSize(const size_t recv_bytes) const { return recv_bytes == sizeof(Reply); }
+  inline bool validateSize(const size_t recv_bytes) const { return recv_bytes == sizeof(Reply); }
 
   /**
    * @brief Validate if the reply is of the type TDerived
@@ -190,7 +192,7 @@ public:
         // receiving this, we can ignore the output of it
         validateStatus(status);
       }
-      ROS_WARN_STREAM(
+      LOCUS_LOG_WARN_STREAM(logger_,
         "Received unexpected packet. CRC check is " << is_crc_valid << " and size validity check is " << is_size_valid);
 
       return std::nullopt;
@@ -206,7 +208,7 @@ public:
     auto reply = static_cast<const TDerived*>(this)->decode(buffer);
     if (!reply.has_value())
     {
-      ROS_ERROR_STREAM("Failed to decode message");
+      LOCUS_LOG_ERROR_STREAM(logger_, "Failed to decode message");
       return std::nullopt;
     }
     return reply;
@@ -224,7 +226,7 @@ public:
     auto recv_bytes = raw_reply.header.cmd_size;
     if (!decodeField(recv_bytes))
     {
-      ROS_WARN_STREAM("Could not decode reply size.");
+      LOCUS_LOG_WARN_STREAM(logger_, "Could not decode reply size.");
       return std::nullopt;
     }
     // validate size
@@ -233,7 +235,7 @@ public:
     auto status = raw_reply.header.status;
     if (!decodeField(status))
     {
-      ROS_WARN_STREAM("Could not decode status.");
+      LOCUS_LOG_WARN_STREAM(logger_, "Could not decode status.");
       return std::nullopt;
     }
 
@@ -247,16 +249,16 @@ public:
         // something valid and we should call validateStatus to get why we are
         // receiving this, we can ignore the output of it
         validateStatus(status);
-        ROS_WARN_STREAM("Received unexpected packet.");
+        LOCUS_LOG_WARN_STREAM(logger_, "Received unexpected packet.");
       }
       else
-        ROS_WARN_STREAM("Received wrong packet size and crc check failed for packet type: " << HeaderMSB << HeaderLSB);
+        LOCUS_LOG_WARN_STREAM(logger_, "Received wrong packet size and crc check failed for packet type: " << HeaderMSB << HeaderLSB);
       return std::nullopt;
     }
 
     if (!validateCrc(raw_reply))
     {
-      ROS_WARN_STREAM_THROTTLE(5.0, "Failed to validate packet crc.");
+      LOCUS_LOG_WARN_STREAM_THROTTLE(logger_, 5.0, "Failed to validate packet crc.");
       return std::nullopt;
     }
 
@@ -269,7 +271,7 @@ public:
     auto reply = static_cast<const TDerived*>(this)->decode(raw_reply);
     if (!reply.has_value())
     {
-      ROS_ERROR_STREAM("Failed to decode message");
+      LOCUS_LOG_ERROR_STREAM(logger_, "Failed to decode message");
       return std::nullopt;
     }
     return reply;
@@ -283,11 +285,11 @@ public:
    *
    * @return true if message successfully decoded false otherwise
    */
-  bool processReply(const std::optional<Reply>& reply, const ros::Time& time) const
+  bool processReply(const std::optional<Reply>& reply, const rclcpp::Time& time) const
   {
     if (!reply.has_value())
     {
-      ROS_ERROR_STREAM("Failed to decode message");
+      LOCUS_LOG_ERROR_STREAM(logger_, "Failed to decode message");
       return false;
     }
     if (callback_)
@@ -296,7 +298,7 @@ public:
     }
     else
     {
-      ROS_WARN_STREAM_THROTTLE(5.0, "No handler for " << HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB);
+      LOCUS_LOG_WARN_STREAM_THROTTLE(logger_, 5.0, "No handler for " << HeaderMSB << HeaderLSB << SubHeaderMSB << SubHeaderLSB);
     }
     return true;
   }
@@ -306,7 +308,7 @@ public:
    *
    * @return true if message was successfully process, false otherwise
    */
-  bool processByHandler(const std::string& buffer, const ros::Time& time) const
+  bool processByHandler(const std::string& buffer, const rclcpp::Time& time) const
   {
     return processReply(process(buffer), time);
   }
@@ -317,7 +319,7 @@ public:
    * @param[in] raw_reply - Raw structure
    * @return true if message successfully decoded false otherwise
    */
-  bool processByHandler(const Reply& raw_reply, const ros::Time& time) const
+  bool processByHandler(const Reply& raw_reply, const rclcpp::Time& time) const
   {
     return processReply(process(raw_reply), time);
   }
@@ -449,7 +451,7 @@ protected:
       footer_visitor_.crc.get(buffer, expected_crc);
     else if (buffer.size() - 1 - sizeof(protocol::CommandFooter))
     {
-      ROS_ERROR_STREAM("Invalid packet size, cannot get crc!");
+      LOCUS_LOG_ERROR_STREAM(logger_, "Invalid packet size, cannot get crc!");
       return false;
     }
     else
@@ -463,7 +465,7 @@ protected:
 
     if (current_crc != expected_crc)
     {
-      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << expected_crc);
+      LOCUS_LOG_WARN_STREAM(logger_, "Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << expected_crc);
       return false;
     }
     // Parse status
@@ -485,7 +487,7 @@ protected:
     decodeField(expected_crc);
     if (current_crc != expected_crc)
     {
-      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << expected_crc);
+      LOCUS_LOG_WARN_STREAM(logger_, "Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << expected_crc);
       return false;
     }
     return true;
@@ -549,7 +551,7 @@ protected:
       {
         error_msg = std::string("Received bad status: unknown error " + status);
       }
-      ROS_ERROR_STREAM(error_msg);
+      LOCUS_LOG_ERROR_STREAM(logger_, error_msg);
       return false;
     }
     return true;
@@ -640,6 +642,11 @@ protected:
    * @brief Callback to execute when processing the packet
    */
   PacketEventCallback callback_ { nullptr };
+
+  /**
+   * @brief Logger instance
+   */
+  locus_cpp::Logger logger_ { rclcpp::get_logger("WorkerBase") };
 };
 
 }  // namespace uam

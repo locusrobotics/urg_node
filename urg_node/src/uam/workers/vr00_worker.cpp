@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/workers/vr00_worker.h>
+#include <uam/workers/vr00_worker.hpp>
 
 #include <string_view>
 #include <optional>
@@ -79,7 +79,7 @@ bool VR00Worker::decodeVersionDetails(
   return true;
 }
 
-bool VR00Worker::decodeVersionDetails(protocol::version_details::VersionDetails& version_details) const
+bool VR00Worker::decodeVersionDetails(protocol::version_details::VersionDetails& /*version_details*/) const
 {
   // VR command is not encoded
   return true;

@@ -32,19 +32,18 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/workers/uam_command_worker.h>
+#include <uam/workers/uam_command_worker.hpp>
 
 #include <tuple>
 
 namespace uam
 {
-bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packet, const ros::Time& time)
+bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packet, const rclcpp::Time& time)
 {
   // Verify packet header
   const auto packet_type = packet.get<protocol::CommandReplyHeader>();
   auto received_packet_size = packet_type.cmd_size;
   decodeField(received_packet_size);
-  bool valid_packet = false;
   bool processed_successfully = false;
 
   // Subscription commands can have 2 different reply types:
@@ -57,7 +56,6 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
     (std::get<AR02Worker>(workers_).validateReplyType(packet_type) &&
      received_packet_size == sizeof(AR00Worker::Reply)))
   {
-    valid_packet = true;
     processed_successfully = std::get<AR00Worker>(workers_).processByHandler(packet.get<AR00Worker::Reply>(), time);
   }
   else if (
@@ -116,7 +114,7 @@ bool UamPacketWorker::processByHandler(const protocol::ShapeShifterPacket& packe
   }
   else
   {
-    ROS_ERROR_STREAM("Unknown packet type with: " << packet_type.header[0] << packet_type.header[1]);
+    LOCUS_LOG_ERROR_STREAM(logger_, "Unknown packet type with: " << packet_type.header[0] << packet_type.header[1]);
   }
 
   return processed_successfully;

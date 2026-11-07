@@ -35,9 +35,11 @@
 #ifndef UAM_WORKERS_YR_WORKER_H
 #define UAM_WORKERS_YR_WORKER_H
 
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/uam_error_codes.h>
-#include <uam/workers/uam_worker_base.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/uam_error_codes.hpp>
+#include <uam/workers/uam_worker_base.hpp>
+
+#include <locus_cpp/ros_util.hpp>
 
 #include <optional>
 #include <string>
@@ -245,7 +247,7 @@ protected:
     auto current_crc = calculateReplyCrc(reply);
     if (current_crc != reply.footer.crc)
     {
-      ROS_WARN_STREAM("Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << reply.footer.crc);
+      LOCUS_LOG_WARN_STREAM(logger_, "Invalid CRC. Calculated CRC: " << current_crc << " expected is: " << reply.footer.crc);
       return false;
     }
     // Parse status
@@ -298,7 +300,7 @@ protected:
       {
         error_msg = std::string("Received bad status: unknown error " + status);
       }
-      ROS_ERROR_STREAM(error_msg);
+      LOCUS_LOG_ERROR_STREAM(logger_, error_msg);
       return false;
     }
     return true;
@@ -308,6 +310,11 @@ protected:
    * @brief Callback to execute when processing the packet
    */
   PacketEventCallback callback_ { nullptr };
+
+  /**
+   * @brief Logger instance
+   */
+  locus_cpp::Logger logger_ { rclcpp::get_logger("YRWorker") };
 };
 
 }  // namespace uam

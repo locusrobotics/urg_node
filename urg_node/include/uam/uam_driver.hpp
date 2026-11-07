@@ -36,18 +36,21 @@
 #define UAM_UAM_DRIVER_H
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <sensor_msgs/LaserScan.h>
-#include <urg_node_msgs/Status.h>
+#include <rclcpp/rclcpp.hpp>
 
-#include <uam/scan_params.h>
-#include <uam/io/tcp_client.h>
-#include <uam/workers/uam_command_worker.h>
-#include <uam/workers/yr_worker.h>
-#include <uam/workers/scip_worker.h>
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <urg_node_msgs/msg/status.hpp>
+
+#include <locus_cpp/ros_util.hpp>
+
+#include <uam/scan_params.hpp>
+#include <uam/io/tcp_client.hpp>
+#include <uam/workers/uam_command_worker.hpp>
+#include <uam/workers/yr_worker.hpp>
+#include <uam/workers/scip_worker.hpp>
 
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/iter_find.hpp>
@@ -92,7 +95,7 @@ public:
   /**
    * @brief
    */
-  UamDriver();
+  explicit UamDriver(const rclcpp::Logger& logger = rclcpp::get_logger("uam_driver"));
 
   /**
    * @brief Default D'tor
@@ -248,7 +251,7 @@ public:
   void subscribe()
   {
     static_assert(ESubscriptionMode::INVALID != TypeToEnum<TWorker>(), "Invalid worker type");
-    auto reply = sendCommandWithReply<TWorker>(command_timeout_);
+    sendCommandWithReply<TWorker>(command_timeout_);
     subscription_mode_ = TypeToEnum<TWorker>();
   }
 
@@ -260,7 +263,7 @@ public:
   template <typename TWorker>
   void unsubscribe()
   {
-    auto reply = sendCommandWithReply<TWorker>(command_timeout_);
+    sendCommandWithReply<TWorker>(command_timeout_);
     subscription_mode_ = ESubscriptionMode::INVALID;
   }
 
@@ -274,10 +277,10 @@ public:
    *
    * @param Stamped packet
    */
-  inline void packetCallback(const uam::protocol::ShapeShifterPacket& packet, const ros::Time& wall_time)
+  inline void packetCallback(const uam::protocol::ShapeShifterPacket& packet, const rclcpp::Time& wall_time)
   {
     auto success = uam_packet_worker_.processByHandler(packet, wall_time);
-    ROS_ERROR_STREAM_COND(!success, "Failed processing packet");
+    LOCUS_LOG_ERROR_STREAM_COND(logger_, !success, "Failed processing packet");
   }
 
   /**
@@ -403,6 +406,11 @@ private:
    * This is populated by the receive event sequence after the pending command has been sent.
    */
   scip_protocol::PPReply pending_scip_reply_;
+
+  /**
+   * @brief Logger object used for debug info
+   */
+  locus_cpp::Logger logger_;
 };
 }  // namespace uam
 

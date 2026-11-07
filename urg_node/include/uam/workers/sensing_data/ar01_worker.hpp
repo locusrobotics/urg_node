@@ -32,12 +32,12 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef UAM_WORKERS_SENSING_DATA_AR06_WORKER_H
-#define UAM_WORKERS_SENSING_DATA_AR06_WORKER_H
+#ifndef UAM_WORKERS_SENSING_DATA_AR01_WORKER_H
+#define UAM_WORKERS_SENSING_DATA_AR01_WORKER_H
 
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/workers/uam_worker_base.h>
-#include <uam/uam_visitors.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/workers/uam_worker_base.hpp>
+#include <uam/uam_visitors.hpp>
 
 #include <optional>
 #include <string_view>
@@ -45,17 +45,15 @@
 namespace uam
 {
 /**
- * @brief AR06 command worker
+ * @brief AR01 command worker
  */
-class AR06Worker : public WorkerBase<AR06Worker, 'A', 'R', '0', '6', protocol::AR06CommandReply>
+class AR01Worker : public WorkerBase<AR01Worker, 'A', 'R', '0', '1', protocol::AR01CommandReply>
 {
 public:
   /**
    * @brief Default C'tor
-   *
-   * @param[in] idx_offset - Offset to be used in the buffer deserialization
    */
-  explicit AR06Worker(const uint32_t idx_offset = 0);
+  explicit AR01Worker(const uint32_t idx_offset = 0);
 
   /**
    * @brief Decode using raw buffer
@@ -90,7 +88,17 @@ private:
    */
   bool decodeDistances(
     const std::string_view& buffer,
-    protocol::sensing_data::DistanceDataArray<protocol::c_nr_ranges_multiecho>& distance_data) const;
+    protocol::sensing_data::DistanceDataArray<protocol::c_nr_ranges>& distance_data) const;
+
+  /**
+   * @brief Decode intensity using raw buffer
+   *
+   * @param[in] buffer - Raw byte array
+   * @param[out] distance_data - Decoded intensity data
+   */
+  bool decodeIntensities(
+    const std::string_view& buffer,
+    protocol::sensing_data::IntensityDataArray<protocol::c_nr_ranges>& intensity_data) const;
 
   /**
    * @brief Sensing data visitor (if buffer)
@@ -99,11 +107,14 @@ private:
 
   /**
    * @brief Distance data visitor (if buffer)
-   *
    */
-  DistanceDataVisitor<protocol::c_nr_ranges_multiecho> distances_visitor_;
-};
+  DistanceDataVisitor<protocol::c_nr_ranges> distances_visitor_;
 
+  /**
+   * @brief Intensity data visitor (if buffer)
+   */
+  IntensityDataArrayVisitor<protocol::c_nr_ranges> intensities_visitor_;
+};
 }  // namespace uam
 
-#endif  // UAM_WORKERS_SENSING_DATA_AR06_WORKER_H
+#endif  // UAM_WORKERS_SENSING_DATA_AR01_WORKER_H

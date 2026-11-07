@@ -35,7 +35,7 @@
 #ifndef UAM_SCAN_PARAMS_H
 #define UAM_SCAN_PARAMS_H
 
-#include <uam/protocol_types/scip_protocol_types.h>
+#include <uam/protocol_types/scip_protocol_types.hpp>
 
 #include <algorithm>
 #include <cmath>

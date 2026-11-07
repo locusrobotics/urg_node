@@ -32,23 +32,22 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef UAM_WORKERS_SENSING_DATA_AR00_WORKER_H
-#define UAM_WORKERS_SENSING_DATA_AR00_WORKER_H
+#ifndef UAM_WORKERS_VR00_WORKER_H
+#define UAM_WORKERS_VR00_WORKER_H
 
-#include <uam/protocol_types/uam_protocol_types.h>
-#include <uam/uam_error_codes.h>
-#include <uam/workers/uam_worker_base.h>
-#include <uam/uam_visitors.h>
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/workers/uam_worker_base.hpp>
+#include <uam/uam_visitors.hpp>
 
-#include <optional>
 #include <string_view>
+#include <optional>
 
 namespace uam
 {
 /**
- * @brief AR00 command worker
+ * @brief VR00 command worker
  */
-class AR00Worker : public WorkerBase<AR00Worker, 'A', 'R', '0', '0', protocol::AR00CommandReply>
+class VR00Worker : public WorkerBase<VR00Worker, 'V', 'R', '0', '0', protocol::VR00CommandReply>
 {
 public:
   /**
@@ -56,7 +55,7 @@ public:
    *
    * @param[in] idx_offset - Offset to be used in the buffer deserialization
    */
-  explicit AR00Worker(const uint32_t idx_offset = 0);
+  explicit VR00Worker(const uint32_t idx_offset = 0);
 
   /**
    * @brief Decode using raw buffer
@@ -76,34 +75,28 @@ public:
 
 private:
   /**
-   * @brief Decode sensing data using raw buffer
+   * @brief Decode version details using raw buffer
    *
    * @param[in] buffer - Raw byte array
    * @param[out] sensing_data - Decoded sensing data
    */
-  bool decodeSensingData(const std::string_view& buffer, protocol::sensing_data::SensingDataHeader& sensing_data) const;
+  bool decodeVersionDetails(const std::string_view& buffer, protocol::version_details::VersionDetails& version_details)
+    const;
 
   /**
-   * @brief Decode distances using raw buffer
+   * @brief Decode version data using raw_reply
    *
-   * @param[in] buffer - Raw byte array
-   * @param[out] distance_data - Decoded distance data
+   * @param[in] version_details - Raw reply
+   * @param[out] sensing_data - Decoded sensing data
    */
-  bool decodeDistances(
-    const std::string_view& buffer,
-    protocol::sensing_data::DistanceDataArray<protocol::c_nr_ranges>& distance_data) const;
+  bool decodeVersionDetails(protocol::version_details::VersionDetails& version_details) const;
 
   /**
-   * @brief Sensing data visitor (if buffer)
+   * @brief Version details visitor (if buffer)
    */
-  SensingDataVisitor sensing_data_visitor_;
-
-  /**
-   * @brief Distance data visitor (if buffer)
-   */
-  DistanceDataVisitor<protocol::c_nr_ranges> distances_visitor_;
+  VersionDetailsVisitor version_detail_visitor_;
 };
 
 }  // namespace uam
 
-#endif  // UAM_WORKERS_SENSING_DATA_AR00_WORKER_H
+#endif  // UAM_WORKERS_VR00_WORKER_H

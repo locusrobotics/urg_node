@@ -32,15 +32,69 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include <uam/uam_driver.h>
-#include <ros/callback_queue.h>
-#include <uam/uam_driver_ros_params.h>
-#include <uam/uam_driver_ros.h>
+#ifndef UAM_WORKERS_XR00_WORKER_H
+#define UAM_WORKERS_XR00_WORKER_H
 
-int main(int argc, char** argv)
+#include <uam/protocol_types/uam_protocol_types.hpp>
+#include <uam/workers/uam_worker_base.hpp>
+#include <uam/uam_visitors.hpp>
+
+#include <string_view>
+#include <optional>
+
+namespace uam
 {
-  ros::init(argc, argv, "uam_driver_node");
-  auto lidar =
-    uam::UamROS(ros::NodeHandle(), ros::NodeHandle("~"), uam::UamROSParams::loadFromROS(ros::NodeHandle("~")));
-  ros::spin();
-}
+/**
+ * @brief XR00 command worker
+ */
+class XR00Worker : public WorkerBase<XR00Worker, 'X', 'R', '0', '0', protocol::XR00CommandReply>
+{
+public:
+  /**
+   * @brief Default C'tor
+   *
+   * @param[in] idx_offset - Offset to be used in the buffer deserialization
+   */
+  explicit XR00Worker(const uint32_t idx_offset = 0);
+
+  /**
+   * @brief Decode using raw buffer
+   *
+   * @param[in] buffer - Raw byte array
+   * @return Decoded Reply or std::nullopt if decode failed
+   */
+  std::optional<Reply> decode(const std::string_view& buffer) const;
+
+  /**
+   * @brief Decode the incoming raw_reply
+   *
+   * @param[in] raw_reply - Raw reply
+   * @return Decoded reply, or std::nullopt if decode fails
+   */
+  std::optional<Reply> decode(const Reply& raw_reply) const;
+
+private:
+  /**
+   * @brief Decode status data using raw buffer
+   *
+   * @param[in] buffer - Raw byte array
+   * @param[out] sensing_data - Decoded sensing data
+   */
+  bool decodeStatusData(const std::string_view& buffer, protocol::sensing_data::StatusData& status_data) const;
+
+  /**
+   * @brief Decode status data using raw reply
+   *
+   * @param[in/out] status_data - Raw reply struct
+   */
+  bool decodeStatusData(protocol::sensing_data::StatusData& status_data) const;
+
+  /**
+   * @brief Status data visitor (if buffer)
+   */
+  StatusDataVisitor status_data_visitor_;
+};
+
+}  // namespace uam
+
+#endif  // UAM_WORKERS_XR00_WORKER_H
