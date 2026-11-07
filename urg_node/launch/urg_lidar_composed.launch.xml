@@ -21,7 +21,7 @@
 
   <node_container pkg="rclcpp_components" exec="component_container" name="urg_container" namespace="">
     <composable_node pkg="urg_node" plugin="urg_node::UrgNode" name="urg_node" namespace="">
-      <param name="ip_address" value="$(var ip_address)"/>
+      <param name="ip_address" value="$(var ip_address)" type="str"/>
       <param name="serial_port" value="$(var serial_port)"/>
       <param name="serial_baud" value="$(var serial_baud)"/>
       <param name="frame_id" value="$(var frame_id)"/>
