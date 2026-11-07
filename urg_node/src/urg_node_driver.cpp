@@ -122,7 +122,8 @@ void UrgNode::initSetup()
       &UrgNode::statusCallback, this,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-  status_pub_ = this->create_publisher<urg_node_msgs::msg::Status>("laser_status", 1);
+  status_pub_ = this->create_publisher<urg_node_msgs::msg::Status>(
+    "laser_status", rclcpp::QoS(1).transient_local());
 
   diagnostic_updater_.add("Hardware Status", this, &UrgNode::populateDiagnosticsStatus);
 

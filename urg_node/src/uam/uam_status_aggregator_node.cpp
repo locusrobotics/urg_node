@@ -131,7 +131,7 @@ public:
       const auto& topic = params_.status_topics.at(topic_idx);
       status_subscribers_.push_back(this->create_subscription<urg_node_msgs::msg::Status>(
         topic,
-        1,
+        rclcpp::QoS(1).transient_local(),
         [this, topic_idx](const urg_node_msgs::msg::Status::SharedPtr status)
         {
           this->statusCallback(status, output_status_.status[topic_idx]);
