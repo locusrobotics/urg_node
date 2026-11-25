@@ -466,10 +466,21 @@ void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ra
       return marker;
     };
 
-    // Compute the Lookup table of sen and cos
-    static LaserScanCachedLookup lut = getLut(*getScanParams());
-    // Get the cloud, we can re-use it and clear the points
-    static sensor_msgs::msg::PointCloud2 cloud_out = buildCloudStaticFields(params_.frame_id);
+    // Rebuild the lookup table when the scan parameters change; the LUT and
+    // the reused cloud are instance members touched only by this instance's
+    // receiver thread
+    const std::shared_ptr<const ScanParameters> scan_params = getScanParams();
+    if (points_in_area_lut_params_ != scan_params)
+    {
+      points_in_area_lut_ = getLut(*scan_params);
+      points_in_area_lut_params_ = scan_params;
+    }
+    const LaserScanCachedLookup& lut = points_in_area_lut_;
+    if (points_in_area_cloud_.fields.empty())
+    {
+      points_in_area_cloud_ = buildCloudStaticFields(params_.frame_id);
+    }
+    sensor_msgs::msg::PointCloud2& cloud_out = points_in_area_cloud_;
     cloud_out.header.stamp = stamp;
     cloud_out.data.clear();
     sensor_msgs::PointCloud2Modifier modifier(cloud_out);

@@ -483,6 +483,21 @@ private:
   mutable std::mutex scan_params_mutex_;
 
   /**
+   * @brief Cached sin/cos lookup for points-in-area conversion; used only by the receiver thread
+   */
+  LaserScanCachedLookup points_in_area_lut_;
+
+  /**
+   * @brief Scan parameters the lookup table was built from; used only by the receiver thread
+   */
+  std::shared_ptr<const ScanParameters> points_in_area_lut_params_;
+
+  /**
+   * @brief Reused points-in-area cloud message; used only by the receiver thread
+   */
+  sensor_msgs::msg::PointCloud2 points_in_area_cloud_;
+
+  /**
    * @brief Scan Publisher
    */
   rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan_publisher_;
