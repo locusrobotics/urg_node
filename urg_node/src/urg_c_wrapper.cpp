@@ -364,7 +364,7 @@ bool URGCWrapper::grabScan(sensor_msgs::msg::MultiEchoLaserScan& msg)
 bool URGCWrapper::getAR00Status(URGStatus& status)
 {
   // Construct and write AR00 command.
-  static uam::AR00Worker worker;
+  uam::AR00Worker worker;
 
   // Get the response
   std::string response = sendCommand(worker.getCommand());

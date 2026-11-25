@@ -79,10 +79,16 @@ UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
   }
 
+  // The timers share a mutually exclusive group so the blocking
+  // configure/watchdog callbacks serialize with each other without
+  // delaying the node's other callbacks (e.g. the status service).
+  timer_callback_group_ =
+    this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
   configure_timer_ = this->create_wall_timer(
     std::chrono::duration<double>(params_.reconfiguration_timeout.seconds()),
     std::bind(&UamROS::configureTimerCallback, this),
-    nullptr,
+    timer_callback_group_,
     false);
 
   points_in_area_pub_ =
@@ -98,14 +104,14 @@ UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
     this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
   lidar_hard_reset_client_ = this->create_client<std_srvs::srv::Trigger>(
     params_.lidar_hard_reset_service, rclcpp::ServicesQoS(), lidar_hard_reset_callback_group_);
-  lidar_hard_reset_client_->wait_for_service();
 
   // Advertise safety area publisher
   advertiseSafetyAreaPublishers();
 
   scan_watchdog_timer_ = this->create_wall_timer(
     std::chrono::duration<double>(params_.scan_timeout.seconds()),
-    std::bind(&UamROS::scanWatchdogTimerCallback, this));
+    std::bind(&UamROS::scanWatchdogTimerCallback, this),
+    timer_callback_group_);
 
   lidar_.registerCallback<AR01Worker>(std::bind(
     static_cast<void (UamROS::*)(const protocol::AR01CommandReply&, const rclcpp::Time&)>(
@@ -126,11 +132,24 @@ UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
     std::placeholders::_1,
     std::placeholders::_2));
 
-  // Configure the lidar. On failure, start a timer to try again later.
-  if (!configure())
-  {
-    configure_timer_->reset();
-  }
+  // Configure the lidar on the executor to avoid blocking in the constructor
+  init_timer_ = this->create_wall_timer(
+    std::chrono::nanoseconds(1),
+    [this]()
+    {
+      init_timer_->cancel();
+      configureTimerCallback();
+    },
+    timer_callback_group_);
+}
+
+UamROS::~UamROS()
+{
+  init_timer_->cancel();
+  configure_timer_->cancel();
+  scan_watchdog_timer_->cancel();
+  // Stop the receiver thread so no scan callback can run while members are destroyed
+  lidar_.stop();
 }
 
 void UamROS::advertiseSafetyAreaPublishers()
@@ -181,16 +200,21 @@ void UamROS::publishSafetyArea(const size_t area_number)
 void UamROS::scanWatchdogTimerCallback()
 {
   // If the timeout has expired, try to reconnect to the lidar
-  std::lock_guard<std::mutex> lock(watchdog_mutex_);
+  rclcpp::Time last_scan_stamp(0, 0, RCL_ROS_TIME);
+  rclcpp::Time last_activity(0, 0, RCL_ROS_TIME);
+  {
+    std::lock_guard<std::mutex> lock(watchdog_mutex_);
+    last_scan_stamp = scan_stamp_;
+    last_activity = std::max(configured_stamp_, scan_stamp_);
+  }
   const rclcpp::Time now = this->get_clock()->now();
-  const rclcpp::Time last_activity = std::max(configured_stamp_, scan_stamp_);
   const rclcpp::Duration elapsed_time = now - last_activity;
   if (configured_ && elapsed_time > params_.scan_timeout)
   {
     LOCUS_LOG_WARN_STREAM(logger_,
       "No scan sector messages have been received from Hokuyo lidar ("
       << params_.ip_address << ") in the last " << std::setprecision(3) << elapsed_time.seconds() << " seconds (since "
-      << scan_stamp_.nanoseconds() << "). Resetting the lidar.");
+      << last_scan_stamp.nanoseconds() << "). Resetting the lidar.");
 
     auto lidar_reset_done = lidarHardReset();
     LOCUS_LOG_WARN_STREAM_COND(
@@ -201,6 +225,15 @@ void UamROS::scanWatchdogTimerCallback()
 
 bool UamROS::lidarHardReset()
 {
+  // Fast-path: bail out earlier if the lidar hard reset service is not ready
+  // to avoid the 10-second timeout on service call.
+  if (!lidar_hard_reset_client_->service_is_ready())
+  {
+    LOCUS_LOG_ERROR_STREAM(logger_,
+      "Lidar hard reset service '" << params_.lidar_hard_reset_service
+      << "' is not available. Skipping lidar restart.");
+    return false;
+  }
   if (
     !last_restart_time_.has_value() ||
     this->get_clock()->now() - last_restart_time_.value() > params_.lidar_power_cycle_interval)
@@ -269,7 +302,7 @@ void UamROS::statusCallback(
   // 2 scan cycles -> 4 half(s) of scan
   static const uint32_t scan_cycles_timeout = 2;
   static const uint32_t half_scan_cycles_timeout = scan_cycles_timeout * 2;
-  const auto sleep_time = std::chrono::duration<double>(scan_params_.getScanPeriod() / 2);
+  const auto sleep_time = std::chrono::duration<double>(getScanParams()->getScanPeriod() / 2);
 
   // Let the received thread know that we are expecting status
   publish_status_requested_ = true;
@@ -332,10 +365,9 @@ bool UamROS::configure()
     // TODO(cribeiromendes): make scip commands work seamlessly. Right now we
     // need to ask this before starting continuous async reads
 
-    // At this point the receiver thread is not yet running, so we can safely
-    // write into scan_params
-    scan_params_ = lidar_.getScanDetails();
-    scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
+    auto scan_params = std::make_shared<ScanParameters>(lidar_.getScanDetails());
+    scan_params->setAngleLimits(params_.angle_min, params_.angle_max);
+    setScanParams(std::move(scan_params));
 
     auto version_details = toString(lidar_.getVersionDetails());
     LOCUS_LOG_INFO_STREAM(logger_, "Sensor details: " << version_details);
@@ -434,10 +466,21 @@ void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ra
       return marker;
     };
 
-    // Compute the Lookup table of sen and cos
-    static LaserScanCachedLookup lut = getLut(scan_params_);
-    // Get the cloud, we can re-use it and clear the points
-    static sensor_msgs::msg::PointCloud2 cloud_out = buildCloudStaticFields(params_.frame_id);
+    // Rebuild the lookup table when the scan parameters change; the LUT and
+    // the reused cloud are instance members touched only by this instance's
+    // receiver thread
+    const std::shared_ptr<const ScanParameters> scan_params = getScanParams();
+    if (points_in_area_lut_params_ != scan_params)
+    {
+      points_in_area_lut_ = getLut(*scan_params);
+      points_in_area_lut_params_ = scan_params;
+    }
+    const LaserScanCachedLookup& lut = points_in_area_lut_;
+    if (points_in_area_cloud_.fields.empty())
+    {
+      points_in_area_cloud_ = buildCloudStaticFields(params_.frame_id);
+    }
+    sensor_msgs::msg::PointCloud2& cloud_out = points_in_area_cloud_;
     cloud_out.header.stamp = stamp;
     cloud_out.data.clear();
     sensor_msgs::PointCloud2Modifier modifier(cloud_out);
@@ -536,17 +579,18 @@ void UamROS::readSafetyAreas()
 
   LOCUS_LOG_INFO_STREAM(logger_, "Going to read Laser Safety areas");
 
-  auto toSafetyArea = [this](const protocol::YRCommandReply& yr) -> ScanWithCRC
+  const std::shared_ptr<const ScanParameters> scan_params = getScanParams();
+  auto toSafetyArea = [this, scan_params](const protocol::YRCommandReply& yr) -> ScanWithCRC
   {
     sensor_msgs::msg::LaserScan msg;
     msg.header.frame_id = params_.frame_id;
-    msg.angle_min = scan_params_.getAngleMinLimit();
-    msg.angle_max = scan_params_.getAngleMaxLimit();
-    msg.angle_increment = scan_params_.getAngleIncrement();
-    msg.scan_time = scan_params_.getScanPeriod();
-    msg.time_increment = scan_params_.getTimeIncrement();
-    msg.range_min = scan_params_.getRangeMin();
-    msg.range_max = scan_params_.getRangeMax();
+    msg.angle_min = scan_params->getAngleMinLimit();
+    msg.angle_max = scan_params->getAngleMaxLimit();
+    msg.angle_increment = scan_params->getAngleIncrement();
+    msg.scan_time = scan_params->getScanPeriod();
+    msg.time_increment = scan_params->getTimeIncrement();
+    msg.range_min = scan_params->getRangeMin();
+    msg.range_max = scan_params->getRangeMax();
 
     msg.ranges.reserve(yr.area_data.size());
     std::transform(

@@ -84,6 +84,11 @@ UamDriver::UamDriver(const rclcpp::Logger& logger) :
 
 UamDriver::~UamDriver()
 {
+  stop();
+}
+
+void UamDriver::stop()
+{
   // Cancel the fake job so that the io_service object will terminate cleanly
   io_work_.reset();
 

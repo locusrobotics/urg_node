@@ -103,6 +103,11 @@ public:
   ~UamDriver();
 
   /**
+   * @brief Disconnect and stop the receiver thread; no callbacks are invoked after this returns
+   */
+  void stop();
+
+  /**
    * @brief Connect to a uam lidar at the specified IP address and port.
    *
    * @param[in] ip - The IP Address of the lidar
