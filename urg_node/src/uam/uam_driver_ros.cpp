@@ -79,10 +79,16 @@ UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
   }
 
+  // The timers share a mutually exclusive group so the blocking
+  // configure/watchdog callbacks serialize with each other without
+  // delaying the node's other callbacks (e.g. the status service).
+  timer_callback_group_ =
+    this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
   configure_timer_ = this->create_wall_timer(
     std::chrono::duration<double>(params_.reconfiguration_timeout.seconds()),
     std::bind(&UamROS::configureTimerCallback, this),
-    nullptr,
+    timer_callback_group_,
     false);
 
   points_in_area_pub_ =
@@ -104,7 +110,8 @@ UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
 
   scan_watchdog_timer_ = this->create_wall_timer(
     std::chrono::duration<double>(params_.scan_timeout.seconds()),
-    std::bind(&UamROS::scanWatchdogTimerCallback, this));
+    std::bind(&UamROS::scanWatchdogTimerCallback, this),
+    timer_callback_group_);
 
   lidar_.registerCallback<AR01Worker>(std::bind(
     static_cast<void (UamROS::*)(const protocol::AR01CommandReply&, const rclcpp::Time&)>(
@@ -132,7 +139,8 @@ UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
     {
       init_timer_->cancel();
       configureTimerCallback();
-    });
+    },
+    timer_callback_group_);
 }
 
 void UamROS::advertiseSafetyAreaPublishers()

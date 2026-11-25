@@ -471,6 +471,11 @@ private:
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr lidar_hard_reset_client_;
 
   /**
+   * @brief Mutually exclusive group that serializes the init/configure/watchdog timers
+   */
+  rclcpp::CallbackGroup::SharedPtr timer_callback_group_;
+
+  /**
    * @brief Dedicated callback group for the (blocking) lidar hard reset service client,
    * so its response can be processed while a timer callback is blocked waiting for it.
    * Requires this node be spun with a MultiThreadedExecutor.
