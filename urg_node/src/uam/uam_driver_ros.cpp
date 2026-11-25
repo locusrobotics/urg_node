@@ -98,7 +98,6 @@ UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
     this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
   lidar_hard_reset_client_ = this->create_client<std_srvs::srv::Trigger>(
     params_.lidar_hard_reset_service, rclcpp::ServicesQoS(), lidar_hard_reset_callback_group_);
-  lidar_hard_reset_client_->wait_for_service();
 
   // Advertise safety area publisher
   advertiseSafetyAreaPublishers();
@@ -201,6 +200,15 @@ void UamROS::scanWatchdogTimerCallback()
 
 bool UamROS::lidarHardReset()
 {
+  // Fast-path: bail out earlier if the lidar hard reset service is not ready
+  // to avoid the 10-second timeout on service call.
+  if (!lidar_hard_reset_client_->service_is_ready())
+  {
+    LOCUS_LOG_ERROR_STREAM(logger_,
+      "Lidar hard reset service '" << params_.lidar_hard_reset_service
+      << "' is not available. Skipping lidar restart.");
+    return false;
+  }
   if (
     !last_restart_time_.has_value() ||
     this->get_clock()->now() - last_restart_time_.value() > params_.lidar_power_cycle_interval)
