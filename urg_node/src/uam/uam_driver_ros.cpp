@@ -143,6 +143,15 @@ UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
     timer_callback_group_);
 }
 
+UamROS::~UamROS()
+{
+  init_timer_->cancel();
+  configure_timer_->cancel();
+  scan_watchdog_timer_->cancel();
+  // Stop the receiver thread so no scan callback can run while members are destroyed
+  lidar_.stop();
+}
+
 void UamROS::advertiseSafetyAreaPublishers()
 {
   const auto latched_qos = rclcpp::QoS(1).transient_local();

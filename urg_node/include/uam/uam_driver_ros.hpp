@@ -99,6 +99,13 @@ public:
    */
   explicit UamROS(const rclcpp::NodeOptions & node_options = rclcpp::NodeOptions());
 
+  /**
+   * @brief Destructor
+   *
+   * Stops the timers and the lidar receiver thread before the members they use are destroyed
+   */
+  ~UamROS() override;
+
 private:
   /**
    * @brief Get a snapshot of the scan parameters
