@@ -191,16 +191,21 @@ void UamROS::publishSafetyArea(const size_t area_number)
 void UamROS::scanWatchdogTimerCallback()
 {
   // If the timeout has expired, try to reconnect to the lidar
-  std::lock_guard<std::mutex> lock(watchdog_mutex_);
+  rclcpp::Time last_scan_stamp(0, 0, RCL_ROS_TIME);
+  rclcpp::Time last_activity(0, 0, RCL_ROS_TIME);
+  {
+    std::lock_guard<std::mutex> lock(watchdog_mutex_);
+    last_scan_stamp = scan_stamp_;
+    last_activity = std::max(configured_stamp_, scan_stamp_);
+  }
   const rclcpp::Time now = this->get_clock()->now();
-  const rclcpp::Time last_activity = std::max(configured_stamp_, scan_stamp_);
   const rclcpp::Duration elapsed_time = now - last_activity;
   if (configured_ && elapsed_time > params_.scan_timeout)
   {
     LOCUS_LOG_WARN_STREAM(logger_,
       "No scan sector messages have been received from Hokuyo lidar ("
       << params_.ip_address << ") in the last " << std::setprecision(3) << elapsed_time.seconds() << " seconds (since "
-      << scan_stamp_.nanoseconds() << "). Resetting the lidar.");
+      << last_scan_stamp.nanoseconds() << "). Resetting the lidar.");
 
     auto lidar_reset_done = lidarHardReset();
     LOCUS_LOG_WARN_STREAM_COND(
