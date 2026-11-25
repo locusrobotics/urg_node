@@ -288,7 +288,7 @@ void UamROS::statusCallback(
   // 2 scan cycles -> 4 half(s) of scan
   static const uint32_t scan_cycles_timeout = 2;
   static const uint32_t half_scan_cycles_timeout = scan_cycles_timeout * 2;
-  const auto sleep_time = std::chrono::duration<double>(scan_params_.getScanPeriod() / 2);
+  const auto sleep_time = std::chrono::duration<double>(getScanParams()->getScanPeriod() / 2);
 
   // Let the received thread know that we are expecting status
   publish_status_requested_ = true;
@@ -351,10 +351,9 @@ bool UamROS::configure()
     // TODO(cribeiromendes): make scip commands work seamlessly. Right now we
     // need to ask this before starting continuous async reads
 
-    // At this point the receiver thread is not yet running, so we can safely
-    // write into scan_params
-    scan_params_ = lidar_.getScanDetails();
-    scan_params_.setAngleLimits(params_.angle_min, params_.angle_max);
+    auto scan_params = std::make_shared<ScanParameters>(lidar_.getScanDetails());
+    scan_params->setAngleLimits(params_.angle_min, params_.angle_max);
+    setScanParams(std::move(scan_params));
 
     auto version_details = toString(lidar_.getVersionDetails());
     LOCUS_LOG_INFO_STREAM(logger_, "Sensor details: " << version_details);
@@ -454,7 +453,7 @@ void UamROS::publishPointsInArea(const std::vector<std::pair<size_t, float>>& ra
     };
 
     // Compute the Lookup table of sen and cos
-    static LaserScanCachedLookup lut = getLut(scan_params_);
+    static LaserScanCachedLookup lut = getLut(*getScanParams());
     // Get the cloud, we can re-use it and clear the points
     static sensor_msgs::msg::PointCloud2 cloud_out = buildCloudStaticFields(params_.frame_id);
     cloud_out.header.stamp = stamp;
@@ -555,17 +554,18 @@ void UamROS::readSafetyAreas()
 
   LOCUS_LOG_INFO_STREAM(logger_, "Going to read Laser Safety areas");
 
-  auto toSafetyArea = [this](const protocol::YRCommandReply& yr) -> ScanWithCRC
+  const std::shared_ptr<const ScanParameters> scan_params = getScanParams();
+  auto toSafetyArea = [this, scan_params](const protocol::YRCommandReply& yr) -> ScanWithCRC
   {
     sensor_msgs::msg::LaserScan msg;
     msg.header.frame_id = params_.frame_id;
-    msg.angle_min = scan_params_.getAngleMinLimit();
-    msg.angle_max = scan_params_.getAngleMaxLimit();
-    msg.angle_increment = scan_params_.getAngleIncrement();
-    msg.scan_time = scan_params_.getScanPeriod();
-    msg.time_increment = scan_params_.getTimeIncrement();
-    msg.range_min = scan_params_.getRangeMin();
-    msg.range_max = scan_params_.getRangeMax();
+    msg.angle_min = scan_params->getAngleMinLimit();
+    msg.angle_max = scan_params->getAngleMaxLimit();
+    msg.angle_increment = scan_params->getAngleIncrement();
+    msg.scan_time = scan_params->getScanPeriod();
+    msg.time_increment = scan_params->getTimeIncrement();
+    msg.range_min = scan_params->getRangeMin();
+    msg.range_max = scan_params->getRangeMax();
 
     msg.ranges.reserve(yr.area_data.size());
     std::transform(

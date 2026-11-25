@@ -50,6 +50,7 @@
 #include <atomic>
 #include <limits>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -99,6 +100,24 @@ public:
   explicit UamROS(const rclcpp::NodeOptions & node_options = rclcpp::NodeOptions());
 
 private:
+  /**
+   * @brief Get a snapshot of the scan parameters
+   */
+  std::shared_ptr<const ScanParameters> getScanParams() const
+  {
+    std::lock_guard<std::mutex> lock(scan_params_mutex_);
+    return scan_params_;
+  }
+
+  /**
+   * @brief Replace the scan parameters
+   */
+  void setScanParams(std::shared_ptr<const ScanParameters> scan_params)
+  {
+    std::lock_guard<std::mutex> lock(scan_params_mutex_);
+    scan_params_ = std::move(scan_params);
+  }
+
   /**
    * @brief Attempt to reconnect to the lidar if no scan are received
    */
@@ -161,23 +180,32 @@ private:
       return;
     }
 
+    // Snapshot of the scan parameters; immutable, safe to read while a
+    // concurrent reconfiguration replaces the member
+    const std::shared_ptr<const ScanParameters> scan_params = getScanParams();
+    if (!scan_params)
+    {
+      // The scan arrived before the first configuration completed
+      return;
+    }
+
     // Fill scan metadata and header
     sensor_msgs::msg::LaserScan msg;
     msg.header.frame_id = params_.frame_id;
-    msg.angle_min = scan_params_.getAngleMin();
-    msg.angle_max = scan_params_.getAngleMax();
-    msg.angle_increment = scan_params_.getAngleIncrement();
-    msg.scan_time = scan_params_.getScanPeriod();
-    msg.time_increment = scan_params_.getTimeIncrement();
-    msg.range_min = scan_params_.getRangeMin();
-    msg.range_max = scan_params_.getRangeMax();
+    msg.angle_min = scan_params->getAngleMin();
+    msg.angle_max = scan_params->getAngleMax();
+    msg.angle_increment = scan_params->getAngleIncrement();
+    msg.scan_time = scan_params->getScanPeriod();
+    msg.time_increment = scan_params->getTimeIncrement();
+    msg.range_min = scan_params->getRangeMin();
+    msg.range_max = scan_params->getRangeMax();
 
-    msg.header.stamp = wall_time + time_offset + rclcpp::Duration::from_seconds(scan_params_.getAngularTimeOffset());
+    msg.header.stamp = wall_time + time_offset + rclcpp::Duration::from_seconds(scan_params->getAngularTimeOffset());
 
     // First and last steps (device step indices, always non-negative; held as
     // size_t for clean comparison against container sizes/indices below)
-    const size_t first_step = scan_params_.getFirstStep();
-    const size_t last_step = scan_params_.getLastStep();
+    const size_t first_step = scan_params->getFirstStep();
+    const size_t last_step = scan_params->getLastStep();
 
     const auto number_of_readings = last_step - first_step + 1;
 
@@ -436,8 +464,16 @@ private:
 
   /**
    * @brief Scan Parameters
+   *
+   * Written on (re)configuration, read concurrently by the receiver thread
+   * and the status service; accessed only through getScanParams()/setScanParams()
    */
-  ScanParameters scan_params_;
+  std::shared_ptr<const ScanParameters> scan_params_;
+
+  /**
+   * @brief Guards scan_params_
+   */
+  mutable std::mutex scan_params_mutex_;
 
   /**
    * @brief Scan Publisher
