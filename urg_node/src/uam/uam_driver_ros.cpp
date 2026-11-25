@@ -125,11 +125,14 @@ UamROS::UamROS(const rclcpp::NodeOptions & node_options) :
     std::placeholders::_1,
     std::placeholders::_2));
 
-  // Configure the lidar. On failure, start a timer to try again later.
-  if (!configure())
-  {
-    configure_timer_->reset();
-  }
+  // Configure the lidar on the executor to avoid blocking in the constructor
+  init_timer_ = this->create_wall_timer(
+    std::chrono::nanoseconds(1),
+    [this]()
+    {
+      init_timer_->cancel();
+      configureTimerCallback();
+    });
 }
 
 void UamROS::advertiseSafetyAreaPublishers()

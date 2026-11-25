@@ -414,6 +414,11 @@ private:
   rclcpp::TimerBase::SharedPtr configure_timer_;
 
   /**
+   * @brief One-shot timer that performs the initial lidar configuration
+   */
+  rclcpp::TimerBase::SharedPtr init_timer_;
+
+  /**
    * @brief Safety Area publishers
    */
   std::array<rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr, uam::protocol::EYRAreaType::MAX>
